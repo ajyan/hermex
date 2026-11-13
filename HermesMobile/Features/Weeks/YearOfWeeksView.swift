@@ -9,6 +9,8 @@ struct YearOfWeeksView: View {
     let open: (String) -> Void
 
     @State private var year: Int
+    /// A read of the folders is in flight.
+    @State private var isLoading = false
 
     private let palette = DeckPalette.week
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 8)
@@ -24,14 +26,31 @@ struct YearOfWeeksView: View {
     }
 
     var body: some View {
+        Group {
+            if model.isLoaded {
+                grid
+            } else if isLoading || model.loadError == nil {
+                // Until every folder has been read once, a tile can't tell a sealed week from a missed one.
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                HXFailedView(title: "Couldn't read your weeks", message: "Check your connection and try again.") {
+                    Task { await load() }
+                }
+            }
+        }
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle("Your year in weeks")
+        .task { await load() }
+    }
+
+    private var grid: some View {
         let tiles = tiles
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header(reviewed: tiles.filter { if case .reviewed = $0.state { true } else { false } }.count, total: tiles.count)
                 if let loadError = model.loadError {
-                    Text(verbatim: loadError)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                    // The tiles show the last good read; a later one failed.
+                    HXFailedView(title: loadError, style: .inline) { Task { await load() } }
                         .padding(.top, 8)
                 }
                 LazyVGrid(columns: columns, spacing: 4) {
@@ -48,12 +67,15 @@ struct YearOfWeeksView: View {
             .padding(.top, 8)
             .padding(.bottom, 40)
         }
-        .background(Color.hxCanvas.ignoresSafeArea())
-        .hxNavigationTitle("Your year in weeks")
-        .task {
-            await model.load()
-            await model.loadDuePredictions()
-        }
+        .refreshable { await load() }
+    }
+
+    /// Lists the weeks, then reads the records for the predictions now due. Cancelled with the screen.
+    private func load() async {
+        isLoading = true
+        await model.load()
+        isLoading = false
+        await model.loadDuePredictions()
     }
 
     // MARK: Header
@@ -174,23 +196,27 @@ struct YearOfWeeksView: View {
     private var predictionsDue: some View {
         VStack(alignment: .leading, spacing: 0) {
             HXSectionHeader(title: "Predictions due")
-                .padding(.bottom, 6)
-            ForEach(Array(model.duePredictions.enumerated()), id: \.element.id) { index, prediction in
-                if index > 0 { WeekHairline(palette: palette) }
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(verbatim: prediction.text)
-                        .font(AppFont.body())
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 8)
-                    Text(verbatim: "due \(DailyDeckPaths.label(prediction.due))")
-                        .font(AppFont.footnote())
-                        .foregroundStyle(palette.ink)
-                        .monospacedDigit()
+                .padding(.bottom, 8)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(model.duePredictions.enumerated()), id: \.element.id) { index, prediction in
+                    if index > 0 { Rectangle().fill(Color.hxSeparator).frame(height: 0.5) }
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(verbatim: prediction.text)
+                            .font(AppFont.body())
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Text(verbatim: "due \(DailyDeckPaths.label(prediction.due))")
+                            .font(AppFont.footnote())
+                            .foregroundStyle(palette.ink)
+                            .monospacedDigit()
+                    }
+                    .padding(.vertical, 10)
+                    .accessibilityElement(children: .combine)
                 }
-                .padding(.vertical, 10)
-                .accessibilityElement(children: .combine)
             }
+            .padding(.horizontal, 14)
+            .hxCard()
         }
     }
 }

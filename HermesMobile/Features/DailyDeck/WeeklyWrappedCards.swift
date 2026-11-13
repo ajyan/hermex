@@ -40,7 +40,7 @@ struct WeekHeldCard: View {
                     if let ifThen = month?.held?.ifThen {
                         Text(verbatim: ifThen)
                             .font(AppFont.serif(style: .body).italic())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -166,16 +166,16 @@ struct WeekPlanCard: View {
             } label: {
                 Label(accepted ? "Set for next week" : "Use this", systemImage: accepted ? "checkmark.circle.fill" : "checkmark")
                     .font(AppFont.body(weight: .semibold))
-                    .foregroundStyle(accepted ? palette.ink : Color.hxOnAccent)
+                    .foregroundStyle(accepted ? palette.ink : palette.onInk)
                     .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(accepted ? palette.colors.wash : Color.accentColor, in: Capsule())
+                    .background(accepted ? palette.colors.wash : palette.ink, in: Capsule())
             }
             .buttonStyle(.plain)
             .padding(.top, 18)
             .accessibilityHint(Text(verbatim: accepted ? "Undoes accepting the intention" : "Sets this as next week's intention"))
             Text(verbatim: "It shows on your morning This week line all week. Tap a line to make it yours.")
                 .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
         }
@@ -293,7 +293,7 @@ struct WeekLetterCard: View {
             if let letter {
                 Text(verbatim: letter)
                     .font(AppFont.serif(style: .footnote))
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .blur(radius: 2.5)

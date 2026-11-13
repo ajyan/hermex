@@ -11,7 +11,7 @@ enum DeckDots {
 }
 
 /// One dot. `ink` is the card's ink; a done day is filled, today ringed, yesterday waiting on its check-in
-/// ringed with a plus, a missed day a faint ring, a skipped day half-filled, a day ahead dashed, a day it
+/// ringed with a plus, a missed day a faint ring, a skipped day a faint fill, a day ahead dashed, a day it
 /// isn't due a small mark.
 struct DeckDot: View {
     let state: String

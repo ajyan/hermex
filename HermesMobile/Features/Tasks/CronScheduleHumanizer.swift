@@ -234,17 +234,25 @@ enum CronScheduleHumanizer {
 
     /// Sunday-zero index to a standalone weekday name in `locale`.
     private static func weekdayName(_ day: Int, locale: Locale) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        let symbols = formatter.standaloneWeekdaySymbols ?? []
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        let symbols = calendar.standaloneWeekdaySymbols
         guard symbols.indices.contains(day) else { return "\(day)" }
         return symbols[day]
     }
 
+    /// One ordinal formatter per locale, kept (a schedule list humanizes every row).
+    private static let ordinalFormatters = NSCache<NSString, NumberFormatter>()
+
     private static func ordinalText(_ value: Int, locale: Locale) -> String? {
-        let formatter = NumberFormatter()
-        formatter.locale = locale
-        formatter.numberStyle = .ordinal
+        let key = locale.identifier as NSString
+        let formatter = ordinalFormatters.object(forKey: key) ?? {
+            let formatter = NumberFormatter()
+            formatter.locale = locale
+            formatter.numberStyle = .ordinal
+            ordinalFormatters.setObject(formatter, forKey: key)
+            return formatter
+        }()
         return formatter.string(from: NSNumber(value: value))
     }
 }

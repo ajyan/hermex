@@ -128,7 +128,7 @@ struct GoalsFinishedListView: View {
         case .unavailable:
             ContentUnavailableView(label: { Text(verbatim: "No goals on this server") })
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load goals", message: message) { Task { await viewModel.load() } }
+            HXFailedView(title: "Couldn't load goals", message: message) { Task { await viewModel.load() } }
         case .loaded(let home) where home.finished.isEmpty:
             ContentUnavailableView {
                 Label { Text(verbatim: "Nothing finished yet") } icon: { Image(systemName: "medal") }

@@ -23,16 +23,30 @@ enum ActivityLoadState: Equatable, Sendable {
     case failed(String)
 }
 
+/// One day of the Activity timeline: its start, and its events or episodes in the server's order.
+struct ActivityDay<Item> {
+    let day: Date
+    let items: [Item]
+}
+
 @MainActor
 @Observable
 final class ActivityViewModel {
-    private(set) var events: [AtlasActivityEvent] = []
+    private(set) var events: [AtlasActivityEvent] = [] {
+        didSet { eventDays = Self.days(events, at: \.ts) }
+    }
     var filter: AtlasActivityFilter = .all
     private(set) var state: ActivityLoadState = .idle
     private(set) var rulesError: String?
     private(set) var isLoadingMore = false
-    private(set) var episodes: [AtlasEpisode] = []
+    private(set) var episodes: [AtlasEpisode] = [] {
+        didSet { episodeDays = Self.days(episodes, at: \.firstTs) }
+    }
     private(set) var episodesAvailable: Bool = false
+    /// `events` by day, newest day first; grouped when the events change, not on every render.
+    private(set) var eventDays: [ActivityDay<AtlasActivityEvent>] = []
+    /// `episodes` by the day each started, newest day first.
+    private(set) var episodeDays: [ActivityDay<AtlasEpisode>] = []
 
     /// Cursor for the next (older) page: the last page's `nextBefore`.
     private var nextBefore: Int?
@@ -166,6 +180,13 @@ final class ActivityViewModel {
         } catch {
             rulesError = error.localizedDescription
         }
+    }
+
+    /// Items grouped by the start of their day on `calendar`, newest day first, each day keeping the items' order.
+    static func days<Item>(_ items: [Item], at date: (Item) -> Date,
+                           calendar: Calendar = .current) -> [ActivityDay<Item>] {
+        let grouped = Dictionary(grouping: items) { calendar.startOfDay(for: date($0)) }
+        return grouped.keys.sorted(by: >).map { ActivityDay(day: $0, items: grouped[$0] ?? []) }
     }
 
     // MARK: - State transitions

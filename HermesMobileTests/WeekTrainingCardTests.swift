@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import HermesMobile
 
@@ -71,6 +72,37 @@ final class WeekTrainingCardTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(card).name, "Training")
     }
 
+    /// Body home, the finish screen and this card all draw `CoachProposalCard`, so they share one
+    /// vocabulary: Use (primary), Not now, and Ask only where a chat can open.
+    func testEveryProposalSaysUseNotNowAndAsk() throws {
+        typealias Card = CoachProposalCard
+        XCTAssertEqual(Card.actions(canDecide: true, canAsk: true), [.use, .notNow, .ask])
+        XCTAssertEqual(Card.actions(canDecide: true, canAsk: false), [.use, .notNow])
+        XCTAssertEqual(Card.actions(canDecide: false, canAsk: false), [], "a review without the Body API is read-only")
+        XCTAssertEqual(Card.actions(canDecide: true, canAsk: true).map(\.label), ["Use", "Not now", "Ask"])
+        XCTAssertEqual(Card.Action.notNow.accessibilityLabel("Deload"), "Not now: Deload")
+        XCTAssertEqual(Card.Action.ask.accessibilityLabel("Deload"), "Ask Baki about: Deload")
+    }
+
+    /// The card's buttons call the actions it was given, as VoiceOver would press them.
+    func testTheCardsButtonsCallTheirActions() async throws {
+        var calls: [String] = []
+        let proposal = try Self.proposal(id: "p1")
+        let window = try HostedWindow.show(VStack {
+            Button("Hosted probe") {}
+            CoachProposalCard(proposal: proposal, style: .compact, use: { calls.append("use") },
+                              notNow: { calls.append("notNow") }, ask: { calls.append("ask") })
+        })
+        defer { HostedWindow.close(window) }
+        await settle(window)
+        try XCTSkipUnless(HostedWindow.element("Hosted probe", in: window) != nil,
+                          "This toolchain does not expose the SwiftUI accessibility tree")
+        for label in ["Use: \(proposal.title)", "Not now: \(proposal.title)", "Ask Baki about: \(proposal.title)"] {
+            XCTAssertTrue(try XCTUnwrap(HostedWindow.element(label, in: window), label).accessibilityActivate())
+        }
+        XCTAssertEqual(calls, ["use", "notNow", "ask"])
+    }
+
     func testPendingProposalsOnly() throws {
         let card = try DailyDeck.decode(Self.deckJSON).cards[0]
         let model = WeekTrainingModel(client: FakeTrainingClient())
@@ -134,5 +166,41 @@ final class WeekTrainingCardTests: XCTestCase {
             XCTAssertTrue(model.visible([proposal]).isEmpty, "HTTP \(status)")
             XCTAssertNil(model.error, "HTTP \(status)")
         }
+    }
+}
+
+/// A SwiftUI view hosted in a real window, driven through its accessibility elements as VoiceOver
+/// would (the `PrepDrillViewsTests` pattern). Pair with `XCTestCase.settle(_:)`.
+@MainActor
+enum HostedWindow {
+    static func show<V: View>(_ view: V) throws -> UIWindow {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        window.rootViewController = UIHostingController(rootView: view.transaction { $0.disablesAnimations = true })
+        window.makeKeyAndVisible()
+        return window
+    }
+
+    static func close(_ window: UIWindow) {
+        window.isHidden = true
+        window.rootViewController = nil
+    }
+
+    /// The first accessibility element under `root` with exactly this label.
+    static func element(_ label: String, in root: UIView) -> NSObject? {
+        var pending: [NSObject] = [root]
+        var seen: Set<ObjectIdentifier> = []
+        while let node = pending.popLast() {
+            guard seen.insert(ObjectIdentifier(node)).inserted else { continue }
+            if node.accessibilityLabel == label { return node }
+            pending += (node as? UIView)?.subviews ?? []
+            pending += (node.accessibilityElements ?? []).compactMap { $0 as? NSObject }
+            let count = node.accessibilityElementCount()
+            if count != NSNotFound, count > 0 {
+                pending += (0..<count).compactMap { node.accessibilityElement(at: $0) as? NSObject }
+            }
+        }
+        return nil
     }
 }

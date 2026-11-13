@@ -653,6 +653,50 @@ extension BrainViewModelTests {
         XCTAssertEqual(viewModel.loads, loads + 1, "the journal's paging restarts after any reload")
     }
 
+    /// The calendar's days grow with each older page instead of being rebuilt from every item, and a reload
+    /// starts them over from its first page.
+    func testTheJournalIndexGrowsPageByPage() async {
+        let client = FakeBrainClient()
+        func day(_ date: String) -> BrainItem { BrainItem(module: .journal, id: "journal/\(date).md", date: date) }
+        let first = BrainList(items: [day("2026-10-12"), day("2026-10-06")], nextCursor: 1)
+        let second = BrainList(items: [day("2026-10-06"), day("2026-08-03")], nextCursor: nil)
+        client.listResults = [.success(first), .success(second), .success(first)]
+        let viewModel = BrainListViewModel(module: .journal, client: client,
+                                           cache: BrainCacheHandle(server: reviewServer, context: nil))
+        await viewModel.load()
+        XCTAssertEqual(viewModel.journal.monthCounts, ["2026-10": 2])
+        await viewModel.loadMore()
+        XCTAssertEqual(viewModel.journal.monthCounts, ["2026-10": 2, "2026-08": 1], "a repeated day counts once")
+        XCTAssertEqual(viewModel.journal.oldest, "2026-08-03")
+        XCTAssertEqual(viewModel.journal.newest, "2026-10-12")
+        XCTAssertEqual(BrainJournalCalendarLayout.months(oldest: viewModel.journal.oldest, newest: viewModel.journal.newest,
+                                                         today: BrainJournalCalendarLayout.date(fromKey: "2026-10-20")!,
+                                                         local: Calendar(identifier: .gregorian)).map(\.id),
+                       ["2026-10", "2026-09", "2026-08"])
+        await viewModel.load()
+        XCTAssertEqual(viewModel.journal.monthCounts, ["2026-10": 2])
+    }
+
+    /// People rows are searched or filtered once per list, search and relationship, not on every render.
+    func testPeopleRowsAreKeptUntilTheListOrSearchMoves() async {
+        let client = FakeBrainClient()
+        let people = BrainList(items: [BrainItem(module: .people, id: "p/ada.md", title: "Ada Lovelace", relationshipType: "friend"),
+                                       BrainItem(module: .people, id: "p/bo.md", title: "Bo Test", relationshipType: "family"),
+                                       BrainItem(module: .people, id: "p/ada.md", title: "Ada Lovelace", relationshipType: "friend")],
+                               nextCursor: nil)
+        client.listResults = [.success(people)]
+        let viewModel = BrainListViewModel(module: .people, client: client,
+                                           cache: BrainCacheHandle(server: reviewServer, context: nil))
+        await viewModel.load()
+        XCTAssertEqual(viewModel.everyone.map(\.id), ["p/ada.md", "p/bo.md"])
+        XCTAssertEqual(Set(viewModel.peopleRelationships.map(\.type)), ["friend", "family"])
+        let memo = BrainPeopleRowsMemo()
+        XCTAssertEqual(memo.rows(for: viewModel, query: "", relationship: "family").map(\.id), ["p/bo.md"])
+        XCTAssertEqual(memo.rows(for: viewModel, query: "ada", relationship: "family").map(\.id), ["p/ada.md"],
+                       "a search covers everyone")
+        XCTAssertEqual(memo.rows(for: viewModel, query: "", relationship: nil).count, 2)
+    }
+
     func testADeckLeftOpenOvernightKeepsItsOwnDay() async {
         let store = makeReviewStore()
         let client = FakeBrainClient()

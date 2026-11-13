@@ -123,9 +123,9 @@ struct MoneyMarketView: View {
                         .font(AppFont.subheadline())
                     }
                 }
-                .padding(12)
+                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .glowSurface(.money, cornerRadius: HXRadius.lg)
+                .hxCardSurface(.wash(.money))
             }
         } else {
             Text(verbatim: "Atlas hasn't written this week's market story yet.")

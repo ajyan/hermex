@@ -143,7 +143,7 @@ import SwiftUI
                 .adaptiveGlass(isInteractive: true, in: Circle())
                 .keyboardShortcut(.cancelAction)
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                Image(systemName: "magnifyingglass").foregroundStyle(Color.hxTextSecondary)
                     .accessibilityHidden(true)
                 TextField("Search", text: $query)
                     .focused($searchFocused)
@@ -157,7 +157,7 @@ import SwiftUI
                         query = ""
                         searchFocused = true
                     }
-                    .labelStyle(.iconOnly).foregroundStyle(.secondary)
+                    .labelStyle(.iconOnly).foregroundStyle(Color.hxTextSecondary)
                     .frame(minWidth: 44, minHeight: 44)
                 }
             }
@@ -184,7 +184,7 @@ import SwiftUI
     }
 
     private func status(_ text: LocalizedStringKey) -> some View {
-        Text(text).font(.callout).foregroundStyle(.secondary)
+        Text(text).font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary)
             .frame(maxWidth: .infinity, alignment: .leading).padding(20)
     }
 
@@ -207,7 +207,7 @@ import SwiftUI
                     Text("Message").font(AppFont.subheadline()).foregroundStyle(.tertiary)
                 }
                 Text(SessionSearchExcerpt(text: hit.excerpt, query: request.query).highlighted)
-                    .font(AppFont.body()).foregroundStyle(.secondary)
+                    .font(AppFont.body()).foregroundStyle(Color.hxTextSecondary)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
             }
         }
@@ -227,7 +227,7 @@ import SwiftUI
                     Text("Message").font(AppFont.subheadline()).foregroundStyle(.tertiary)
                 }
                 Text(SessionSearchExcerpt(text: hit.excerpt, query: request.query).highlighted)
-                    .font(AppFont.body()).foregroundStyle(.secondary)
+                    .font(AppFont.body()).foregroundStyle(Color.hxTextSecondary)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
             }
         }
@@ -264,7 +264,7 @@ import SwiftUI
                     Text("Bot").font(AppFont.subheadline()).foregroundStyle(.tertiary)
                 }
                 if let description = profile.description {
-                    Text(description).font(AppFont.body()).foregroundStyle(.secondary)
+                    Text(description).font(AppFont.body()).foregroundStyle(Color.hxTextSecondary)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                 }
             }

@@ -145,7 +145,7 @@ struct PrepStoryCandidateCard: View {
             if let why = candidate.why, !why.isEmpty {
                 Text(verbatim: why)
                     .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(paper.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let message = failure ?? candidate.error, !message.isEmpty {
@@ -204,7 +204,8 @@ private struct PrepDismissedCandidateRow: View {
     }
 }
 
-/// A capsule button on the candidate card: accent when prominent, quiet otherwise, dimmed when off.
+/// A capsule button on the candidate card, in the Prep paper: filled in the glow when prominent,
+/// the wash and edge otherwise, a faint wash when off.
 private struct PrepCandidateButton: View {
     let title: String
     let prominent: Bool
@@ -213,15 +214,17 @@ private struct PrepCandidateButton: View {
     let action: () -> Void
 
     var body: some View {
+        let paper = HermexPaper.prep
+        let filled = prominent && enabled
         Button(action: action) {
             Text(verbatim: title)
                 .font(BrainStyle.rowSubtitle.weight(.semibold))
-                .foregroundStyle(prominent && enabled ? Color.hxOnAccent : Color.hxTextSecondary)
+                .foregroundStyle(filled ? paper.onGlow : enabled ? paper.glow : paper.secondaryInk)
                 .lineLimit(1)
                 .padding(.horizontal, BrainStyle.l)
                 .padding(.vertical, BrainStyle.s)
-                .background(
-                    prominent && enabled ? Color.accentColor : Color.hxSeparator.opacity(0.6), in: Capsule())
+                .background(filled ? paper.glow : enabled ? paper.wash : paper.glow.opacity(0.15), in: Capsule())
+                .overlay { if enabled && !prominent { Capsule().strokeBorder(paper.edge, lineWidth: 0.5) } }
                 .frame(minHeight: BrainStyle.minTapTarget)
                 .contentShape(Capsule())
         }
@@ -240,7 +243,8 @@ private struct PrepStoryRow: View {
             BrainRow(
                 title: story.title,
                 subtitle: story.last.map { "Last told \(PrepCopy.daysAgo($0))" },
-                badge: story.ready ? "Ready" : nil)
+                badge: story.ready ? "Ready" : nil,
+                badgePaper: .prep)
             // One line when it fits; stacked at accessibility text sizes.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: BrainStyle.m) { marks }
@@ -318,7 +322,7 @@ struct PrepStoryPageView: View {
         case .failed(let message):
             // A server without the story page can still drill the story.
             ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this story") } icon: { Image(systemName: "exclamationmark.triangle") }
+                Label { Text(verbatim: "Couldn't load this story") } icon: { Image(systemName: "exclamationmark.triangle") } // design-drift: allow a second action (Drill it) HXFailedView has no slot for
             } description: {
                 Text(verbatim: message)
             } actions: {
@@ -468,12 +472,15 @@ struct PrepStoryPageView: View {
             BrainSectionHeader(title: "The full telling")
             PrepRunCard {
                 if showsTelling {
-                    MarkdownRenderer(content: page.sayItMD)
+                    // A story script is built from his own story: saved words, so the serif.
+                    Text(inlineMarkdown(page.sayItMD))
+                        .brainText(.quote)
+                        .fixedSize(horizontal: false, vertical: true)
                         .transition(.opacity)
                 } else {
                     Text(verbatim: "Tell it out loud from the beats first, then compare.")
                         .font(BrainStyle.rowTitle)
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(HermexPaper.prep.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
                     Button {
                         withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsTelling = true }

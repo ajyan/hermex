@@ -57,7 +57,7 @@ struct BotQuickRepliesEditorView: View {
                             Text(verbatim: text).foregroundStyle(.primary)
                             Spacer(minLength: 8)
                             if isAdded {
-                                Text("Added").foregroundStyle(.secondary)
+                                Text("Added").foregroundStyle(Color.hxTextSecondary)
                             } else {
                                 Image(systemName: "plus.circle.fill")
                             }

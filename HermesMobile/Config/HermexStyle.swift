@@ -30,6 +30,19 @@ extension EnvironmentValues {
     @Entry var hxPaper: HermexPaper?
 }
 
+/// Supporting text (DESIGN.md § Papers, `secondaryInk`): the paper's secondary ink inside a glow
+/// or wash card, `hxTextSecondary` everywhere else. Use `.foregroundStyle(.hxSecondary)` for every
+/// caption, meta line, or detail so the same view reads right on a card and on the canvas.
+struct HXSecondaryStyle: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color {
+        environment.hxPaper?.secondaryInk ?? .hxTextSecondary
+    }
+}
+
+extension ShapeStyle where Self == HXSecondaryStyle {
+    static var hxSecondary: HXSecondaryStyle { HXSecondaryStyle() }
+}
+
 extension View {
     func hxShadow(_ shadow: HXShadow) -> some View {
         modifier(HXShadowModifier(shadow: shadow))
@@ -77,18 +90,16 @@ extension HermexPaper {
     static let knowledge = HermexPaper.wiki
     /// A file read, written, listed, or searched (grep, find).
     static let file = HermexPaper.notes
-    /// A web search or fetch.
-    static let web = HermexPaper.video
     /// Memory and skills: what Atlas knows about itself.
     static let recall = HermexPaper.advisor
     /// Shell, code, and everything without a kind of its own.
     static let tool = HermexPaper.plain
-    /// Money: net worth, accounts, and the market card.
-    static let money = HermexPaper.ledger
+    /// Money: net worth, accounts, the market card and spending. Gold, so the Brain is the only green.
+    static let money = HermexPaper.past
     /// The in-app feedback inbox and its drawer row.
     static let feedback = HermexPaper.notes
     /// Meals: the Daily Brief's dinner and week-of-dinners cards.
-    static let meal = HermexPaper.kitchen
+    static let meal = HermexPaper.reading
     /// Body: workouts, lifts, Baki's notes and proposals, and the Body value on the reviews. Cyan,
     /// since a teal read as Brain's mint beside it in the drawer.
     static let training = HermexPaper.video
@@ -100,12 +111,8 @@ extension HermexPaper {
     static let prep = HermexPaper.orchid
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
-        switch kind {
-        case .read, .write, .list, .search: .file
-        case .web: .web
-        case .skill, .memory: .recall
-        case .shell, .delegate, .unknown: .tool
-        }
+        // Every tool step is Atlas's own machinery, so all wear one paper; the chip's symbol and label say what ran.
+        .tool
     }
 }
 
@@ -199,7 +206,11 @@ private struct HXCardSurface: ViewModifier {
         }
         switch role {
         case .glow(let paper):
+            // The paper's hue is the tint and `\.hxPaper` (DESIGN.md principle 5), so controls and
+            // `.hxSecondary` text inside take the card's color without being told.
             clipped
+                .tint(paper.glow)
+                .environment(\.hxPaper, paper)
                 .background(paper.card, in: shape)
                 .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
                 .hxShadow(.paper)
@@ -323,6 +334,21 @@ extension View {
             }
         }
     }
+
+    /// Keeps an editor sheet from losing work. With unsaved changes a swipe down
+    /// is blocked, and Cancel sets `isConfirmingDiscard` to ask before
+    /// `onDiscard` closes the sheet.
+    func hxDiscardChangesGuard(
+        hasChanges: Bool,
+        isConfirmingDiscard: Binding<Bool>,
+        onDiscard: @escaping () -> Void
+    ) -> some View {
+        interactiveDismissDisabled(hasChanges)
+            .confirmationDialog("Discard changes?", isPresented: isConfirmingDiscard, titleVisibility: .visible) {
+                Button("Discard changes", role: .destructive, action: onDiscard)
+                Button("Keep editing", role: .cancel) {}
+            }
+    }
 }
 
 /// Saved notes and course text carry *emphasis* and **bold**; show it rather than the asterisks.
@@ -375,6 +401,59 @@ struct HXChip<Trailing: View>: View {
 extension HXChip where Trailing == EmptyView {
     init(paper: HermexPaper, symbol: String? = nil, label: String, lines: Int = 1) {
         self.init(paper: paper, symbol: symbol, label: label, lines: lines) { EmptyView() }
+    }
+}
+
+/// What couldn't load, why, and Try again. `.screen` fills a screen whose content never loaded;
+/// `.inline` is one row inside a screen that still shows what it has (a section that failed, or a
+/// refresh that failed over older data).
+struct HXFailedView: View {
+    enum Style { case screen, inline }
+
+    static let retryLabel = "Try again"
+
+    let title: String
+    var message: String?
+    var style: Style = .screen
+    let retry: () -> Void
+
+    var body: some View {
+        switch style {
+        case .screen:
+            ContentUnavailableView {
+                Label { Text(verbatim: title) } icon: { Image(systemName: "exclamationmark.triangle") }
+            } description: {
+                if let message { Text(verbatim: message) }
+            } actions: {
+                Button(action: retry) { Text(verbatim: Self.retryLabel) }
+            }
+        case .inline:
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.hxWarning)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: title)
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                    if let message {
+                        Text(verbatim: message)
+                            .font(AppFont.caption())
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button(action: retry) {
+                    Text(verbatim: Self.retryLabel)
+                        .font(AppFont.footnote(weight: .semibold))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text(verbatim: "\(Self.retryLabel): \(title)"))
+            }
+            .font(AppFont.footnote())
+        }
     }
 }
 

@@ -133,6 +133,7 @@ private struct InteractiveAnswerLiveCard: View {
                     .font(.footnote.weight(.semibold))
                     .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
+                    .chatMinimumHitTarget(horizontalPadding: 6, verticalPadding: 6, in: Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(.tint)

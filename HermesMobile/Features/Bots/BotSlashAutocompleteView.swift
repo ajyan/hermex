@@ -21,16 +21,16 @@ struct BotSlashAutocompleteView: View {
                                 .foregroundStyle(Color.accentColor)
                                 .accessibilityHidden(true)
                             Text(verbatim: "/" + skill.name)
-                                .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                                .font(AppFont.mono(style: .subheadline, weight: .semibold))
                                 .foregroundStyle(.primary).lineLimit(1).layoutPriority(2)
                             if let category = skill.category {
                                 Text(verbatim: category)
-                                    .font(AppFont.footnote()).foregroundStyle(.secondary)
+                                    .font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
                                     .lineLimit(1).layoutPriority(1)
                             }
                             Spacer(minLength: 8)
                             Text(verbatim: skill.description ?? String(localized: "Skill"))
-                                .font(AppFont.caption()).foregroundStyle(.secondary)
+                                .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                                 .lineLimit(1).truncationMode(.tail)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -46,7 +46,7 @@ struct BotSlashAutocompleteView: View {
         .clipShape(RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
         .adaptiveGlass(.regular, fallbackMaterial: .ultraThinMaterial,
                        in: RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .hxShadow(.float)
         .accessibilityIdentifier("bot-slash-autocomplete")
     }
 }

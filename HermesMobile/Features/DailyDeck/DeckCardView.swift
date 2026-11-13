@@ -25,15 +25,11 @@ struct DeckPageView: View {
 
     var body: some View {
         let palette = DeckPalette.of(page, inV2Weekly: viewModel.isSealedWeekly)
-        let words = Group {
-            switch page {
-            case .card(let card):
-                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback, isOpen: isOpen)
-            case .followUps(let cards):
-                FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
-            }
-        }
-        .opacity(contentOpacity)
+        // A swipe changes only `contentOpacity`, so the words compare equal and don't redraw each frame.
+        let words = DeckPageWords(page: page, palette: palette, viewModel: viewModel, file: file,
+                                  feedback: feedback, isOpen: isOpen)
+            .equatable()
+            .opacity(contentOpacity)
         if isOpen {
             words
         } else {
@@ -82,6 +78,32 @@ struct DeckPageView: View {
         return HXCardAction(title: DeckCard.openTitle(for: route)) {
             deck.opened("source", on: card.id)
             open(route)
+        }
+    }
+}
+
+/// A page's words without its surface. Equal while the page, its palette and the deck are, whatever
+/// closures it was handed: the stack rebuilds those on every frame of a swipe. What the words read
+/// from the deck redraws them through observation, as before.
+private struct DeckPageWords: View, Equatable {
+    let page: DeckPage
+    let palette: DeckPalette
+    let viewModel: DailyDeckViewModel
+    let file: () -> Void
+    let feedback: (() -> Void)?
+    let isOpen: Bool
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.page == rhs.page && lhs.palette == rhs.palette && lhs.viewModel === rhs.viewModel
+            && lhs.isOpen == rhs.isOpen && (lhs.feedback == nil) == (rhs.feedback == nil)
+    }
+
+    var body: some View {
+        switch page {
+        case .card(let card):
+            DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback, isOpen: isOpen)
+        case .followUps(let cards):
+            FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
         }
     }
 }
@@ -186,6 +208,8 @@ struct DeckCardView: View {
         }
         .foregroundStyle(palette.ink)
         .tint(palette.ink)
+        // A glow card's choices wear its paper; a neutral card's stay Nous blue.
+        .environment(\.hxPaper, palette.isNeutralCard ? nil : palette.colors)
         .sheet(isPresented: $isWriting) {
             ReflectionSheet(card: card, palette: palette, viewModel: viewModel)
         }
@@ -233,7 +257,7 @@ struct DeckCardView: View {
                              answered: viewModel.answer(for: card)?.text, onAnswer: answerMandarin)
         }
         if !card.isMandarin, let lead = text.lead {
-            Text(inlineMarkdown(lead))
+            Text(card.markdown(lead))
                 .font(DeckCardText.leadFont(for: card, lead: lead))
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -248,7 +272,7 @@ struct DeckCardView: View {
         }
         diagramButtons
         if !card.isMandarin, let detail = text.detail {
-            Text(inlineMarkdown(detail))
+            Text(card.markdown(detail))
                 .font(AppFont.body())
                 .lineSpacing(4)
                 .foregroundStyle(Color.hxTextPrimary)
@@ -311,7 +335,7 @@ struct DeckCardView: View {
         let idea = DeckIdea(card, palette: palette)
         DeckKindLabel(symbol: palette.symbol, text: idea.kindLine, ink: palette.secondaryInk)
         if let sentence = idea.sentence {
-            Text(inlineMarkdown(sentence))
+            Text(card.markdown(sentence))
                 .font(AppFont.display(style: .title2, weight: .bold))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -319,7 +343,7 @@ struct DeckCardView: View {
                 .textSelection(.enabled)
                 .accessibilityAddTraits(.isHeader)
         }
-        DeckIdeaBody(idea: idea, palette: palette)
+        DeckIdeaBody(idea: idea, palette: palette, markdown: card.markdown)
         diagramButtons
         if let question = viewModel.question(for: card) {
             Text(verbatim: question)
@@ -378,7 +402,7 @@ struct DeckCardView: View {
         let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
             : isYearAgo ? (card.title ?? text.lead) : text.lead
         if let title {
-            Text(inlineMarkdown(title))
+            Text(card.markdown(title))
                 .font(isYearAgo ? AppFont.serif(style: .title2) : AppFont.display(style: .title2, weight: .bold))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -427,7 +451,7 @@ struct DeckCardView: View {
     /// "From today's idea · <title>" in the idea card's own paper, on a writing card whose prompt builds on it.
     private func fromIdeaChip(_ idea: DeckFromIdea) -> some View {
         let source = viewModel.cards.first { $0.id == idea.id }.map { DeckPalette.of($0) }
-        return HXChip(paper: source?.colors ?? .notes, symbol: source?.symbol ?? "lightbulb",
+        return HXChip(paper: source?.colors ?? .knowledge, symbol: source?.symbol ?? "lightbulb",
                       label: "From today's idea · \(idea.title)", lines: 2)
     }
 
@@ -450,7 +474,7 @@ struct DeckCardView: View {
                             .font(AppFont.footnote(weight: .semibold))
                             .foregroundStyle(palette.secondaryInk)
                     }
-                    Text(inlineMarkdown(context))
+                    Text(card.markdown(context))
                         .font(AppFont.body())
                         .lineSpacing(3)
                         .foregroundStyle(Color.hxTextPrimary)
@@ -465,7 +489,7 @@ struct DeckCardView: View {
                     Text(verbatim: "That day")
                         .font(AppFont.footnote(weight: .semibold))
                         .foregroundStyle(palette.secondaryInk)
-                    Text(inlineMarkdown(later))
+                    Text(card.markdown(later))
                         .font(AppFont.serif(style: .body))
                         .lineSpacing(3)
                         .foregroundStyle(Color.hxTextPrimary)
@@ -482,7 +506,7 @@ struct DeckCardView: View {
                     .padding(.top, 6)
             }
             if let detail = text.detail {
-                Text(inlineMarkdown(detail))
+                Text(card.markdown(detail))
                     .font(AppFont.body())
                     .lineSpacing(3)
                     .foregroundStyle(Color.hxTextPrimary)
@@ -519,7 +543,7 @@ struct DeckCardView: View {
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: "Your reflection: \(text). Edit"))
@@ -550,6 +574,8 @@ struct DeckCardView: View {
                     .accessibilityLabel(Text(verbatim: "Comes back in \(option.label)"))
                 }
             }
+            // The chips are controls, so the chosen one stays Nous blue on the dusk card (DESIGN.md).
+            .environment(\.hxPaper, nil)
         }
     }
 
@@ -714,16 +740,20 @@ struct DeckCardView: View {
                     Text(verbatim: line).font(AppFont.footnote())
                 }
             } else {
-                DeckTagLines(tags: card.headlineTags)
+                DeckTagLines(tags: card.openerTags)
             }
         }
         .foregroundStyle(palette.ink)
         .padding(.trailing, 24)
         Text(verbatim: card.title ?? "Today")
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
+            .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 14)
             .accessibilityAddTraits(.isHeader)
+        if let calendar = card.calendar {
+            DeckOpenerCalendar(calendar: calendar, today: viewModel.date, paper: palette.colors).padding(.top, 16)
+        }
         ForEach(Array(Self.acts(pages).enumerated()), id: \.offset) { index, group in
             act(group.name, group.pages).padding(.top, index == 0 ? 22 : 16)
         }
@@ -747,6 +777,7 @@ struct DeckCardView: View {
         .padding(.trailing, 24)
         Text(verbatim: card.title ?? "Today")
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
+            .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 10)
         if let recap = card.recap {
@@ -807,6 +838,7 @@ struct DeckCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: "\(name) · \(pages.count) \(pages.count == 1 ? "card" : "cards")")
                 .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
                 .padding(.bottom, 6)
                 .accessibilityAddTraits(.isHeader)
             ForEach(pages) { page in
@@ -861,6 +893,7 @@ struct DeckCardView: View {
             .padding(.trailing, 24)
             Text(verbatim: shownQuestion)
                 .font(AppFont.display(style: .title, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
                 .id(shownQuestion)
@@ -917,6 +950,7 @@ struct DeckCardView: View {
             .padding(.trailing, 24)
             Text(verbatim: card.title ?? palette.name)
                 .font(AppFont.display(style: .title, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
         }
@@ -940,7 +974,7 @@ struct DeckCardView: View {
                 .foregroundStyle(palette.ink)
                 .frame(maxWidth: .infinity, minHeight: 50)
                 .background(palette.colors.wash, in: Capsule())
-                .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 1))
+                .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 0.5))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -960,7 +994,7 @@ struct DeckCardView: View {
             .padding(.leading, 16)
             .withDictation(noteBinding)
             .frame(minHeight: 46)
-            .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+            .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             .padding(.top, 10)
         }
     }
@@ -1021,7 +1055,7 @@ struct DeckCardView: View {
                 .padding(.top, 24)
         }
         closeStatus(seal: false)
-        fileButton(seal: false)
+        fileButton()
     }
 
     @ViewBuilder
@@ -1037,7 +1071,7 @@ struct DeckCardView: View {
             if case .failed(let message) = viewModel.filing {
                 Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
             }
-            fileButton(seal: seal)
+            fileButton()
         } else {
             Text(verbatim: DeckCopy.closeHeading(seal: seal, filed: filed, count: count))
                 .font(AppFont.display(style: .largeTitle, weight: .semibold))
@@ -1055,7 +1089,7 @@ struct DeckCardView: View {
                 DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)
                     .padding(.top, 24)
             }
-            fileButton(seal: seal)
+            fileButton()
         }
     }
 
@@ -1096,21 +1130,22 @@ struct DeckCardView: View {
 
     /// File It (Seal the week on a weekly review), then Rate earlier cards on today's morning deck.
     @ViewBuilder
-    private func fileButton(seal: Bool) -> some View {
+    private func fileButton() -> some View {
         let filed = viewModel.isFiled && !viewModel.hasChanges
-        // On a neutral card (a sealed week, the habit tracker) the one filled button is Nous blue.
-        let seal = seal || palette.isNeutralCard
+        // The card's one filled button wears its glow (Seal the week on the dusk review included); only on a
+        // neutral card (the habit tracker, the opener's paper) is it Nous blue.
+        let nous = palette.isNeutralCard
         let sealsWeek = viewModel.isSealedWeekly
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(seal ? Color.hxOnAccent : palette.onInk) }
+                if viewModel.filing == .filing { ProgressView().tint(nous ? Color.hxOnAccent : palette.onInk) }
                 Text(verbatim: sealsWeek ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
                      : viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(seal ? Color.hxOnAccent : palette.onInk)
+            .foregroundStyle(nous ? Color.hxOnAccent : palette.onInk)
             .frame(maxWidth: .infinity, minHeight: 50)
-            .background(seal ? Color.accentColor.opacity(filed ? 0.35 : 1) : palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
+            .background(nous ? Color.accentColor.opacity(filed ? 0.35 : 1) : palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
         }
         .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
@@ -1194,9 +1229,9 @@ private struct RecapList: View {
     }
 }
 
-/// The week on one 0–10 scale: sleep hours as bars, energy (Garmin Body Battery) as a solid line,
-/// mood (read from your writing) dashed. A missing reading leaves a gap. Under the chart, each
-/// day's mood with the words it was read from.
+/// The week on one 0–10 scale: energy (Garmin Body Battery) as a solid line, mood (read from your
+/// writing) dashed; a missing reading leaves a gap. Under the chart, sleep as a dot a day
+/// (`SleepDot`: numbers are dots, never bars), then each day's mood with the words it was read from.
 private struct MoodChart: View {
     let points: [DeckPoint]
     let palette: DeckPalette
@@ -1207,62 +1242,8 @@ private struct MoodChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Chart {
-                ForEach(points, id: \.label) { point in
-                    if let hours = point.sleep {
-                        BarMark(x: .value("Day", point.label), y: .value("Value", min(hours, 10)), width: .ratio(0.5))
-                            .foregroundStyle(palette.ink.opacity(0.13))
-                            .cornerRadius(HXRadius.xs)
-                            .accessibilityLabel(Text(verbatim: "\(point.label), sleep"))
-                            .accessibilityValue(Text(verbatim: "\(hours.formatted(.number.precision(.fractionLength(0...1)))) hours"))
-                    }
-                }
-                ForEach(points.filter { $0.energy != nil }, id: \.label) { point in
-                    LineMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0), series: .value("Kind", "Energy"))
-                        .foregroundStyle(palette.ink)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    PointMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0))
-                        .foregroundStyle(palette.ink)
-                        .accessibilityLabel(Text(verbatim: "\(point.label), energy"))
-                        .accessibilityValue(Text(verbatim: "\(point.energy ?? 0) of 10"))
-                }
-                ForEach(points.filter { $0.mood != nil }, id: \.label) { point in
-                    LineMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0), series: .value("Kind", "Mood"))
-                        .foregroundStyle(palette.ink.opacity(0.55))
-                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 4]))
-                    PointMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0))
-                        .foregroundStyle(palette.ink.opacity(0.55))
-                        .symbolSize(30)
-                        .accessibilityLabel(Text(verbatim: "\(point.label), mood"))
-                        .accessibilityValue(Text(verbatim: "\(point.mood ?? 0) of 10"))
-                }
-            }
-            .chartXScale(domain: points.map(\.label))
-            .chartYScale(domain: 0...10)
-            .chartYAxis {
-                AxisMarks(values: [0, 5, 10]) { _ in
-                    AxisGridLine().foregroundStyle(palette.ink.opacity(0.12))
-                    AxisValueLabel().foregroundStyle(palette.secondaryInk)
-                }
-            }
-            .chartXAxis {
-                AxisMarks { _ in AxisValueLabel().foregroundStyle(palette.secondaryInk) }
-            }
-            .frame(height: 180)
-            HStack(spacing: 14) {
-                if hasEnergy { legend("Energy", line: []) }
-                if hasMood { legend("Mood", line: [4, 4]) }
-                if hasSleep {
-                    HStack(spacing: 6) {
-                        // A 10 pt chart key swatch, too small for the radius scale.
-                        RoundedRectangle(cornerRadius: 2).fill(palette.ink.opacity(0.13)).frame(width: 10, height: 12) // design-drift: allow
-                        Text(verbatim: "Sleep (h)")
-                    }
-                }
-            }
-            .font(AppFont.footnote(weight: .medium))
-            .foregroundStyle(palette.secondaryInk)
-            .accessibilityHidden(true)
+            if hasEnergy || hasMood { chart }
+            if hasSleep { sleepDots }
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(points.filter { $0.mood != nil && !($0.quote ?? "").isEmpty }, id: \.label) { point in
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -1286,6 +1267,89 @@ private struct MoodChart: View {
         }
     }
 
+    /// Energy and mood on one 0–10 chart, with their key.
+    @ViewBuilder
+    private var chart: some View {
+        Chart {
+            ForEach(points.filter { $0.energy != nil }, id: \.label) { point in
+                LineMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0), series: .value("Kind", "Energy"))
+                    .foregroundStyle(palette.ink)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                PointMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0))
+                    .foregroundStyle(palette.ink)
+                    .accessibilityLabel(Text(verbatim: "\(point.label), energy"))
+                    .accessibilityValue(Text(verbatim: "\(point.energy ?? 0) of 10"))
+            }
+            ForEach(points.filter { $0.mood != nil }, id: \.label) { point in
+                LineMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0), series: .value("Kind", "Mood"))
+                    .foregroundStyle(palette.ink.opacity(0.55))
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 4]))
+                PointMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0))
+                    .foregroundStyle(palette.ink.opacity(0.55))
+                    .symbolSize(30)
+                    .accessibilityLabel(Text(verbatim: "\(point.label), mood"))
+                    .accessibilityValue(Text(verbatim: "\(point.mood ?? 0) of 10"))
+            }
+        }
+        .chartXScale(domain: points.map(\.label))
+        .chartYScale(domain: 0...10)
+        .chartYAxis {
+            AxisMarks(values: [0, 5, 10]) { _ in
+                AxisGridLine().foregroundStyle(palette.ink.opacity(0.12))
+                AxisValueLabel().foregroundStyle(palette.secondaryInk)
+            }
+        }
+        .chartXAxis {
+            AxisMarks { _ in AxisValueLabel().foregroundStyle(palette.secondaryInk) }
+        }
+        .frame(height: 180)
+        HStack(spacing: 14) {
+            if hasEnergy { legend("Energy", line: []) }
+            if hasMood { legend("Mood", line: [4, 4]) }
+        }
+        .font(AppFont.footnote(weight: .medium))
+        .foregroundStyle(palette.secondaryInk)
+        .accessibilityHidden(true)
+    }
+
+    /// Sleep hours, one dot a day in the same order as the chart, with the hours and the day under it.
+    private var sleepDots: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(verbatim: "Sleep")
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.secondaryInk)
+                Spacer(minLength: 8)
+                Text(verbatim: SleepDot.key)
+                    .font(AppFont.caption2())
+                    .foregroundStyle(palette.secondaryInk)
+            }
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(points, id: \.label) { point in
+                    VStack(spacing: 4) {
+                        DeckDot(state: SleepDot.state(hours: point.sleep, need: nil), ink: palette.ink, column: DeckDots.dot)
+                        Text(verbatim: point.sleep.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "–")
+                            .font(AppFont.caption2())
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Text(verbatim: point.label)
+                            .font(AppFont.caption2())
+                            .foregroundStyle(palette.secondaryInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Sleep"))
+        .accessibilityValue(Text(verbatim: points.map { point in
+            "\(point.label): " + (point.sleep.map { "\($0.formatted(.number.precision(.fractionLength(0...1)))) hours" } ?? "no data")
+        }.joined(separator: ", ")))
+    }
+
     private func legend(_ name: String, line dash: [CGFloat]) -> some View {
         HStack(spacing: 6) {
             Path { $0.move(to: CGPoint(x: 0, y: 4)); $0.addLine(to: CGPoint(x: 18, y: 4)) }
@@ -1296,7 +1360,8 @@ private struct MoodChart: View {
     }
 }
 
-/// A goals card's week: each commitment under its goal, with how many of its target you hit.
+/// A goals card's week: each commitment under its goal, with a pip per unit of its target, filled for
+/// each one hit, in the close tracker's columns (`DeckWeekGridLayout`). Numbers are pips, never a bar or a count.
 private struct GoalMeters: View {
     let meters: [DeckMeter]
     let palette: DeckPalette
@@ -1310,25 +1375,26 @@ private struct GoalMeters: View {
                         .foregroundStyle(palette.secondaryInk)
                         .padding(.top, index == 0 ? 0 : 6)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(verbatim: meter.label).font(AppFont.body())
-                        Spacer(minLength: 8)
-                        Text(verbatim: "\(meter.done) of \(meter.target)")
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .monospacedDigit()
-                    }
-                    Capsule()
-                        .fill(palette.ink.opacity(0.12))
-                        .frame(height: 8)
-                        .overlay(alignment: .leading) {
-                            GeometryReader { proxy in
-                                Capsule().fill(palette.ink).frame(width: proxy.size.width * meter.fraction)
-                            }
-                        }
-                        .accessibilityHidden(true)
+                HStack(alignment: .center, spacing: 8) {
+                    Text(verbatim: meter.label)
+                        .font(AppFont.body())
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    pips(meter)
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: "\(meter.label), \(meter.done) of \(meter.target)"))
+            }
+        }
+    }
+
+    private func pips(_ meter: DeckMeter) -> some View {
+        let count = max(meter.target, meter.done)
+        let column = DeckWeekGridLayout.pipColumn(pips: count, addsOne: false)
+        return HStack(spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+                DeckDot(state: index < meter.done ? "done" : "missed", ink: palette.ink, column: column,
+                        size: min(DeckDots.dot, column - 4))
             }
         }
     }
@@ -1430,6 +1496,7 @@ private struct FollowUpsPage: View {
         .scrollDismissesKeyboard(.interactively)
         .swipeUpForFeedback(mark: DeckPalette.followUps.ink, action: feedback)
         .foregroundStyle(DeckPalette.followUps.ink)
+        .environment(\.hxPaper, DeckPalette.followUps.colors)
     }
 }
 
@@ -1458,7 +1525,7 @@ private struct FollowUpRow: View {
         VStack(alignment: .leading, spacing: 8) {
             // The Sunday view-take card: its kicker, the week's answers, and what you said last time.
             ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
-                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : .secondary)
+                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : palette.secondaryInk)
             }
             Text(verbatim: card.title ?? (isPage ? palette.name : "Follow-up"))
                 .font(isPage ? AppFont.display(style: .title2, weight: .semibold) : AppFont.headline())
@@ -1467,13 +1534,13 @@ private struct FollowUpRow: View {
                 .padding(.bottom, isPage ? 6 : 0)
                 .accessibilityAddTraits(isPage ? .isHeader : [])
             if let body = card.decisionBody {
-                Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(palette.secondaryInk)
             }
             if !card.entries.isEmpty {
                 RecapList(entries: card.entries, palette: palette).padding(.vertical, 6)
             }
             if let context = card.context {
-                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let preview = draftPreview {
@@ -1486,7 +1553,7 @@ private struct FollowUpRow: View {
                         }
                     }
                     .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
                     if preview.editable {
                         // The words Text sends: tap to change them before Messages opens.
                         let message = Binding(get: { editedText ?? preview.text }, set: { editedText = $0 })
@@ -1639,14 +1706,17 @@ private struct AnswerBox: View {
     }
 }
 
-/// A capsule toggle for follow-up choices.
-/// A pill choice: the decision card's buttons, also the Daily Ask's.
+/// A pill choice: the decision card's buttons, also the Daily Ask's. On a glow card (the paper in
+/// `\.hxPaper`) it wears the card's hue like `WeekChoiceChip`: the wash and edge until chosen, then
+/// filled with the glow. On a neutral card or the app's own surfaces it stays Nous blue.
 struct ChoiceButton: View {
     let title: String
     let isSelected: Bool
     /// A narrow chip for a row of numbers, so ten fit on one line.
     var compact = false
     let action: () -> Void
+
+    @Environment(\.hxPaper) private var paper
 
     var body: some View {
         Button(action: action) {
@@ -1656,13 +1726,25 @@ struct ChoiceButton: View {
                 .monospacedDigit()
                 .padding(.horizontal, compact ? 4 : 12)
                 .frame(minWidth: compact ? 30 : nil, minHeight: 36)
-                .foregroundStyle(isSelected ? Color.hxOnAccent : Color.primary)
-                .background(isSelected ? Color.accentColor : Color.hxSurface, in: Capsule())
-                // A hairline so the chip reads on a neutral card, whose fill is the same surface.
-                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Color.hxSeparator, lineWidth: 1))
+                .foregroundStyle(foreground)
+                .background(fill, in: Capsule())
+                // A hairline so the chip reads on its card: the paper's edge, or `hxSeparator` on a neutral
+                // card, whose fill is the same surface.
+                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : (paper?.edge ?? Color.hxSeparator),
+                                                lineWidth: paper == nil ? 1 : 0.5))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var foreground: Color {
+        guard let paper else { return isSelected ? .hxOnAccent : .hxTextPrimary }
+        return isSelected ? paper.onGlow : paper.glow
+    }
+
+    private var fill: Color {
+        guard let paper else { return isSelected ? .accentColor : .hxSurface }
+        return isSelected ? paper.glow : paper.wash
     }
 }
 
@@ -1699,7 +1781,7 @@ struct DeckAheadRow: View {
                 .font(AppFont.caption(weight: .semibold))
                 .foregroundStyle(ink)
                 .frame(width: 26, height: 26)
-                .background(wash, in: RoundedRectangle(cornerRadius: HXRadius.xs + 2, style: .continuous))
+                .background(wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 .accessibilityHidden(true)
             Text(verbatim: title)
                 .font(AppFont.subheadline())

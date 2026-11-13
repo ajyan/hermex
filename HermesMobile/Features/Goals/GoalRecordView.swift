@@ -56,7 +56,7 @@ struct GoalRecordContent: View {
                 Text(verbatim: "This server has no record for this goal.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this record", message: message) {
+            HXFailedView(title: "Couldn't load this record", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let record):

@@ -248,6 +248,44 @@ final class JobPipelineModelTests: XCTestCase {
     }
 }
 
+extension JobPipelineModelTests {
+    /// A server without the route keeps the section hidden; any other failure offers a retry, and the retry
+    /// brings the pipeline back.
+    @MainActor
+    func testAFailedLoadOffersARetryButAMissingRouteStaysHidden() async throws {
+        let app = try PrepDecoding.decode(JobApplication.self, from: Data(Self.detailJSON.utf8))
+        let missing = ScriptedJobClient(application: app)
+        missing.pipelineErrors = [APIError.http(statusCode: 404, body: "")]
+        let hidden = JobPipelineModel(client: missing)
+        await hidden.load()
+        XCTAssertNil(hidden.pipeline)
+        XCTAssertFalse(hidden.loadFailed)
+
+        let flaky = ScriptedJobClient(application: app)
+        flaky.pipelineErrors = [APIError.http(statusCode: 500, body: "boom")]
+        let model = JobPipelineModel(client: flaky)
+        await model.load()
+        XCTAssertNil(model.pipeline)
+        XCTAssertTrue(model.loadFailed)
+        await model.load()
+        XCTAssertNotNil(model.pipeline)
+        XCTAssertFalse(model.loadFailed)
+    }
+
+    /// A failed reload keeps the pipeline on screen instead of swapping it for the retry line.
+    @MainActor
+    func testAFailedReloadKeepsThePipeline() async throws {
+        let app = try PrepDecoding.decode(JobApplication.self, from: Data(Self.detailJSON.utf8))
+        let client = ScriptedJobClient(application: app)
+        let model = JobPipelineModel(client: client)
+        await model.load()
+        client.pipelineErrors = [URLError(.timedOut)]
+        await model.load()
+        XCTAssertNotNil(model.pipeline)
+        XCTAssertFalse(model.loadFailed)
+    }
+}
+
 private final class ScriptedJobClient: JobPipelineDataClient, @unchecked Sendable {
     let application: JobApplication
     var requests: [JobPipelineRequest] = []
@@ -255,8 +293,11 @@ private final class ScriptedJobClient: JobPipelineDataClient, @unchecked Sendabl
 
     init(application: JobApplication) { self.application = application }
 
+    var pipelineErrors: [Error] = []
+
     func pipeline() async throws -> JobPipeline {
-        try PrepDecoding.decode(JobPipeline.self, from: Data(JobPipelineModelTests.summaryJSON.utf8))
+        if !pipelineErrors.isEmpty { throw pipelineErrors.removeFirst() }
+        return try PrepDecoding.decode(JobPipeline.self, from: Data(JobPipelineModelTests.summaryJSON.utf8))
     }
 
     func application(_ id: String) async throws -> JobApplication { application }

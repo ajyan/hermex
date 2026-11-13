@@ -175,6 +175,8 @@ struct BrainModuleListView: View {
     @State private var wikiQuery = ""
     /// People only: Everyone narrowed to one `relationship_type`.
     @State private var relationship: String?
+    /// People only: the rows for the current list, search and relationship.
+    @State private var peopleRows = BrainPeopleRowsMemo()
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
 
@@ -230,19 +232,17 @@ struct BrainModuleListView: View {
         if module == .journal {
             BrainListStateView(viewModel: viewModel) { list in
                 BrainJournalCalendarView(
-                    list: list,
+                    index: viewModel.journal,
                     isLoadingOlder: list.nextCursor != nil && !viewModel.loadMoreFailed && !viewModel.isShowingCachedCopy,
                     loadOlderFailed: viewModel.loadMoreFailed,
                     isShowingCachedCopy: viewModel.isShowingCachedCopy,
-                    onRetry: { loadMore() }
+                    // Keyed by the load too: a refresh drops the page in flight and lands on the same cursor, so
+                    // paging starts again from there.
+                    pageKey: "\(list.nextCursor ?? -1)-\(viewModel.loads)",
+                    onRetry: { loadMore() },
+                    loadOlder: { await viewModel.loadMore() }
                 )
                 .refreshable { await viewModel.load() }
-                // Older pages load one after another so earlier months fill in. Keyed by the load
-                // too: a refresh drops the page in flight and lands on the same cursor, so paging
-                // starts again from there.
-                .task(id: "\(list.nextCursor ?? -1)-\(viewModel.loads)") {
-                    if list.nextCursor != nil { await viewModel.loadMore() }
-                }
             }
         } else if hasChipBar, !chipTags.isEmpty {
             // The chip bar stays put while a tag reloads; the state shows beneath it.
@@ -302,10 +302,8 @@ struct BrainModuleListView: View {
     @ViewBuilder
     private func peopleSection(_ list: BrainList) -> some View {
         let query = peopleQuery.trimmingCharacters(in: .whitespaces)
-        let everyone = BrainListLayout.uniqueItems(list.items)
-        let items = query.isEmpty
-            ? BrainPeopleLayout.filtered(everyone, relationship: relationship)
-            : peopleMatches(list)
+        let items = peopleRows.rows(for: viewModel, query: query, relationship: relationship)
+        let relationships = viewModel.peopleRelationships
         let lastID = items.last?.id
         // A search covers everyone, so the sections step aside while there's a query.
         if query.isEmpty {
@@ -338,7 +336,7 @@ struct BrainModuleListView: View {
                     .brainListRow()
             } else if items.isEmpty, let relationship, list.nextCursor == nil {
                 // Every page is in and no one has this relationship (any more): say so, with the way back.
-                let label = BrainPeopleLayout.relationshipLabel(relationship, in: BrainPeopleLayout.relationships(everyone))
+                let label = BrainPeopleLayout.relationshipLabel(relationship, in: relationships)
                 HStack {
                     Text(verbatim: "No one marked \(label)")
                         .font(AppFont.subheadline())
@@ -355,7 +353,7 @@ struct BrainModuleListView: View {
             if query.isEmpty {
                 BrainPeopleEveryoneHeader(
                     count: items.count,
-                    relationships: BrainPeopleLayout.relationships(everyone),
+                    relationships: relationships,
                     selected: $relationship
                 )
             }
@@ -366,16 +364,12 @@ struct BrainModuleListView: View {
         }
     }
 
-    private func peopleMatches(_ list: BrainList) -> [BrainItem] {
-        BrainPeopleSearch.matches(BrainListLayout.uniqueItems(list.items), query: peopleQuery)
-    }
 
     /// Pinned above the People list. Return opens the top match.
     private var peopleSearchField: some View {
         listSearchField(prompt: "Search people", text: $peopleQuery) {
-            guard let list = viewModel.list,
-                  !peopleQuery.trimmingCharacters(in: .whitespaces).isEmpty,
-                  let top = peopleMatches(list).first
+            let query = peopleQuery.trimmingCharacters(in: .whitespaces)
+            guard !query.isEmpty, let top = peopleRows.rows(for: viewModel, query: query, relationship: relationship).first
             else { return }
             push(.page(.people, top.id))
         }
@@ -385,7 +379,7 @@ struct BrainModuleListView: View {
     private func listSearchField(prompt: String, text: Binding<String>, onSubmit: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
                 .accessibilityHidden(true)
 
             TextField(prompt, text: text)
@@ -399,7 +393,7 @@ struct BrainModuleListView: View {
                     text.wrappedValue = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
@@ -566,12 +560,8 @@ struct BrainListStateView<Loaded: View>: View {
                 Text(verbatim: "This server doesn't serve the Second Brain. It needs the Brain API from your hermes-webui fork.")
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this list") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load this list", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded:
             ContentUnavailableView {
@@ -712,7 +702,8 @@ struct BrainPeopleRow: View {
             leading: { BrainMonogram(name: item.title, size: side) },
             title: item.title,
             subtitle: item.subtitle,
-            badge: item.badge
+            badge: item.badge,
+            badgePaper: BrainModuleID.people.paper
         )
     }
 }

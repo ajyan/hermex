@@ -171,7 +171,8 @@ struct InlineMathImageProvider: InlineImageProvider {
     let fontSize: CGFloat
     let colorScheme: ColorScheme
     let scale: CGFloat
-    var fallback: any InlineImageProvider = DefaultInlineImageProvider.default
+    /// Ordinary images beside the math; never fetched from another host (`TranscriptRemoteFetchPolicy`).
+    var fallback: any InlineImageProvider = TranscriptGatedInlineImageProvider()
     var tintImages = false
 
     func image(with url: URL, label: String) async throws -> Image {

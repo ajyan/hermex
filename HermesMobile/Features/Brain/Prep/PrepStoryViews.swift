@@ -238,7 +238,7 @@ struct PrepProbeCard: View {
             if !prompt.isEmpty {
                 Text(verbatim: prompt)
                     .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(HermexPaper.prep.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(verbatim: probe.attack)

@@ -96,3 +96,25 @@ final class MoneyViewTests: XCTestCase {
         }
     }
 }
+
+/// The shared failed state's Try again, pressed as VoiceOver would, in both styles.
+@MainActor
+final class HXFailedViewTests: XCTestCase {
+    func testTryAgainCallsRetry() async throws {
+        var retries: [String] = []
+        let window = try HostedWindow.show(VStack {
+            Button("Hosted probe") {}
+            HXFailedView(title: "Couldn't load Money", message: "Timed out") { retries.append("screen") }
+                .frame(height: 300)
+            HXFailedView(title: "Couldn't load spending", style: .inline) { retries.append("inline") }
+        })
+        defer { HostedWindow.close(window) }
+        await settle(window)
+        try XCTSkipUnless(HostedWindow.element("Hosted probe", in: window) != nil,
+                          "This toolchain does not expose the SwiftUI accessibility tree")
+        XCTAssertTrue(try XCTUnwrap(HostedWindow.element(HXFailedView.retryLabel, in: window)).accessibilityActivate())
+        XCTAssertTrue(try XCTUnwrap(HostedWindow.element("Try again: Couldn't load spending", in: window))
+            .accessibilityActivate())
+        XCTAssertEqual(retries, ["screen", "inline"])
+    }
+}

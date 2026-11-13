@@ -29,6 +29,7 @@ struct MealsLogSheet: View {
             .background(Color.hxCanvas.ignoresSafeArea())
             .safeAreaInset(edge: .bottom) { doneButton.padding(BrainStyle.l) }
             .scrollDismissesKeyboard(.interactively)
+            .hxNavigationTitle("Dinner", subtitle: MealsCopy.short(draft.day))
         }
         .presentationDetents([.large])
     }
@@ -39,10 +40,10 @@ struct MealsLogSheet: View {
                 .font(AppFont.headline(weight: .bold))
                 .foregroundStyle(paper.glow)
                 .frame(width: 44, height: 44)
-                .glowSurface(paper, cornerRadius: 22)
+                .glowSurface(paper, cornerRadius: HXRadius.md)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: "Logged · \(MealsCopy.short(draft.day))")
+                Text(verbatim: "Logged")
                     .font(AppFont.footnote(weight: .semibold))
                     .foregroundStyle(paper.glow)
                 Text(verbatim: "Enjoy dinner")
@@ -95,14 +96,11 @@ struct MealsLogSheet: View {
             Task { if await viewModel.finishLog(draft) { dismiss() } }
         } label: {
             Group {
-                if viewModel.isSaving { ProgressView() } else { Text(verbatim: "Done") }
+                if viewModel.isSaving { ProgressView().tint(Color.hxOnAccent) } else { Text(verbatim: "Done") }
             }
-            .font(AppFont.display(style: .headline, weight: .semibold))
-            .frame(maxWidth: .infinity)
+            .bodyPrimaryHeight()
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
         .disabled(viewModel.isSaving)
     }
 }

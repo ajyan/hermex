@@ -70,7 +70,12 @@ private struct AtlasAskMediumView: View {
                 }
             } else {
                 HStack(spacing: 8) {
-                    AtlasActionChip(symbol: "phone", label: "Call Atlas", url: HermesDeepLink.newCallURL)
+                    // Call Atlas goes through the intent, so the call starts without a second tap.
+                    Button(intent: AtlasWidgetLaunchIntent(.call)) {
+                        AtlasActionChipLabel(symbol: "phone")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Call Atlas")
                     AtlasActionChip(symbol: "square.and.pencil", label: "New chat", url: HermesDeepLink.newChatURL)
                 }
             }
@@ -92,12 +97,14 @@ private struct AtlasAskMediumView: View {
                 .contentShape(Rectangle())
             }
 
-            Link(destination: HermesDeepLink.newChatVoiceURL ?? Self.fallbackURL) {
+            // Through the intent, so dictation starts without a second tap.
+            Button(intent: AtlasWidgetLaunchIntent(.voiceChat)) {
                 Image(systemName: "mic")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15, weight: .medium)) // design-drift: allow (SF Symbol in a fixed-size control)
                     .frame(width: 32, height: 32)
                     .background(Color.primary.opacity(0.1), in: Circle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Dictate")
         }
         .padding(.leading, 12)
@@ -119,7 +126,7 @@ private struct AtlasRecentRow: View {
             ?? AtlasAskMediumView.fallbackURL) {
             HStack(spacing: 8) {
                 Image(systemName: "bubble.left")
-                    .font(.system(size: 12))
+                    .font(AppFont.caption())
                     .foregroundStyle(.tertiary)
                 Text(session.title)
                     .font(.subheadline)
@@ -155,13 +162,21 @@ private struct AtlasActionChip: View {
 
     var body: some View {
         Link(destination: url ?? AtlasAskMediumView.fallbackURL) {
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .medium))
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-                .background(Color.primary.opacity(0.1), in: Capsule())
+            AtlasActionChipLabel(symbol: symbol)
         }
         .accessibilityLabel(label)
+    }
+}
+
+private struct AtlasActionChipLabel: View {
+    let symbol: String
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 16, weight: .medium)) // design-drift: allow (SF Symbol in a fixed-height control)
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .background(Color.primary.opacity(0.1), in: Capsule())
     }
 }
 

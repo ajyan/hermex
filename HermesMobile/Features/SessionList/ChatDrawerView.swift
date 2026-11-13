@@ -12,6 +12,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let isSearching: Bool
     /// What each section holds today, by section. A section with nothing to say is absent.
     let notes: [DrawerSection: String]
+    /// The Status bar's note; nil hides the bar (no answer yet, or a server without Status).
+    let status: AtlasStatusDrawerNote?
     let selectedSessionID: String?
     let showsMessageCount: Bool
     let showsWorkspace: Bool
@@ -95,6 +97,9 @@ struct ChatDrawerView<ServerMenu: View>: View {
                 if !isSearching { composeButton }
             }
 
+            if let status {
+                AtlasStatusDrawerBar(note: status) { onOpen(.status) }
+            }
             settingsBar
         }
         .background(Color.hxCanvas.ignoresSafeArea())

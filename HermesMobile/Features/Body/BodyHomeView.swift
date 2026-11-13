@@ -60,7 +60,7 @@ struct BodyHomeView: View {
                 Text(verbatim: "This server doesn't serve Body. It needs the Body API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load Body", message: message) {
+            HXFailedView(title: "Couldn't load Body", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let home):
@@ -116,36 +116,14 @@ struct BodyHomeView: View {
         }
     }
 
-    /// One change to approve, inside Baki's card: what changes, why, and Accept or Skip.
+    /// One change to approve, inside Baki's card: the same proposal, words and actions as the finish
+    /// screen's card, drawn compact.
     private func proposalRows(_ proposal: BodyProposal) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: "A change to approve")
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(paper.glow)
-            Text(verbatim: proposal.title)
-                .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-            ForEach(Array(proposal.why.enumerated()), id: \.offset) { _, reason in
-                Text(verbatim: reason)
-                    .font(AppFont.footnote())
-                    .foregroundStyle(paper.secondaryInk)
-            }
-            HStack(spacing: 8) {
-                Button { Task { await viewModel.decide(proposal, accept: true) } } label: {
-                    Text(verbatim: "Accept").bodyTapHeight()
-                }
-                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
-                .accessibilityLabel(Text(verbatim: "Accept: \(proposal.title)"))
-                Button { Task { await viewModel.decide(proposal, accept: false) } } label: {
-                    Text(verbatim: "Skip").bodyTapHeight()
-                }
-                .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                .accessibilityLabel(Text(verbatim: "Skip: \(proposal.title)"))
-            }
-            .disabled(viewModel.deciding.contains(proposal.id))
-            .padding(.top, 4)
-        }
-        .fixedSize(horizontal: false, vertical: true)
+        CoachProposalCard(
+            proposal: proposal, style: .compact, paper: paper, isBusy: viewModel.deciding.contains(proposal.id),
+            use: { Task { await viewModel.decide(proposal, accept: true) } },
+            notNow: { Task { await viewModel.decide(proposal, accept: false) } },
+            ask: openDraftChat.isAvailable ? { openDraftChat(BodyAskBaki.draft(about: proposal.title)) } : nil)
     }
 
     // MARK: Up next
@@ -327,7 +305,7 @@ struct BodyHomeView: View {
             HXSectionHeader(title: "Lifts")
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(BodyHomeCopy.liftGroups(lifts).enumerated()), id: \.element.id) { groupOffset, group in
-                    if groupOffset > 0 { Divider() }
+                    if groupOffset > 0 { PrepRowDivider() }
                     Text(verbatim: group.title)
                         .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(paper.glow)
@@ -336,7 +314,7 @@ struct BodyHomeView: View {
                         .padding(.bottom, 2)
                         .accessibilityAddTraits(.isHeader)
                     ForEach(Array(group.lifts.enumerated()), id: \.element.id) { offset, lift in
-                        if offset > 0 { Divider().padding(.leading, 14) }
+                        if offset > 0 { PrepRowDivider().padding(.leading, 14) }
                         NavigationLink(value: ShellPushDestination.bodyLift(lift.id)) {
                             liftRow(lift)
                         }
@@ -393,10 +371,9 @@ struct BodyHomeView: View {
 
     // MARK: Sessions
 
-    /// A lift that went up reads in the training glow; a rough night's note in the `notes` glow.
+    /// A lift that went up, or a rough night's trimmed session, reads in the training glow.
     private func detailColor(_ session: BodySessionSummary) -> Color {
-        if session.highlight != nil { return paper.glow }
-        return session.trimmed ? HermexPaper.notes.glow : Color.hxTextSecondary
+        session.highlight != nil || session.trimmed ? paper.glow : Color.hxTextSecondary
     }
 
     private func sessions(_ sessions: [BodySessionSummary]) -> some View {
@@ -404,7 +381,7 @@ struct BodyHomeView: View {
             HXSectionHeader(title: "Sessions")
             VStack(spacing: 0) {
                 ForEach(Array(sessions.prefix(5).enumerated()), id: \.element.id) { offset, session in
-                    if offset > 0 { Divider().padding(.leading, 14) }
+                    if offset > 0 { PrepRowDivider().padding(.leading, 14) }
                     NavigationLink(value: ShellPushDestination.bodySession(session.id)) {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {

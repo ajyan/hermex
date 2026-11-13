@@ -325,9 +325,46 @@ final class ChatScrollPolicyTests: XCTestCase {
         guard case .inAppBrowser = decision else { return XCTFail("Expected the in-app browser, got \(decision)") }
     }
 
-    func testAnotherLinkTheScreenLeavesGoesToTheSystem() {
-        let decision = TranscriptLinkRouter.decision(for: URL(string: "mailto:someone@example.com")!, hostResult: nil)
-        guard case .system = decision else { return XCTFail("Expected the system, got \(decision)") }
+    func testMailAndPhoneLinksTheScreenLeavesGoToTheSystem() {
+        for link in ["mailto:someone@example.com", "tel:+15555550100"] {
+            let decision = TranscriptLinkRouter.decision(for: URL(string: link)!, hostResult: nil)
+            guard case .system = decision else { return XCTFail("Expected the system for \(link), got \(decision)") }
+        }
+    }
+
+    func testAnyOtherSchemeAsksBeforeOpening() {
+        for link in ["shortcuts://run-shortcut?name=x", "\(HermesDeepLink.scheme)://new-call", "sms:5555550100", "custom-app:do"] {
+            let decision = TranscriptLinkRouter.decision(for: URL(string: link)!, hostResult: nil)
+            guard case .confirmBeforeOpening = decision else {
+                return XCTFail("Expected a confirmation for \(link), got \(decision)")
+            }
+        }
+    }
+
+    @MainActor
+    func testTappingAnUntrustedSchemeShowsTheConfirmationInsteadOfOpening() {
+        let router = TranscriptLinkRouter()
+        let link = URL(string: "shortcuts://run-shortcut?name=x")!
+        var confirmed: URL?
+        router.handler = { _ in nil }
+        router.confirmOpening = { confirmed = $0 }
+
+        router.openURL(link)
+
+        XCTAssertEqual(confirmed, link)
+    }
+
+    func testTheConfirmationNamesTheAppAndTheWholeAddress() {
+        let atlas = URL(string: "\(HermesDeepLink.scheme)://new-call")!
+        XCTAssertEqual(ExternalLinkPolicy.title(for: atlas), "Open this Atlas link?")
+        XCTAssertTrue(ExternalLinkPolicy.message(for: atlas).hasSuffix(atlas.absoluteString))
+
+        let sms = URL(string: "sms:5555550100")!
+        XCTAssertEqual(ExternalLinkPolicy.opener(for: sms), "Messages opens it.")
+
+        let unknown = URL(string: "custom-app:do?x=1")!
+        XCTAssertTrue(ExternalLinkPolicy.opener(for: unknown).contains("custom-app:"))
+        XCTAssertTrue(ExternalLinkPolicy.message(for: unknown).hasSuffix("custom-app:do?x=1"))
     }
 
     @MainActor

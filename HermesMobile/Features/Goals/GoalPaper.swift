@@ -6,7 +6,9 @@ import SwiftUI
 enum GoalPaper {
     /// The papers a goal can take, and their names in the goal file (`color:`). The widget reads the
     /// name back (`AtlasWidgetGoals.paper(named:)`).
-    static let choices: [DeckPalette] = [.wiki, .quote, .book, .reading, .notes, .video, .past]
+    /// Each wears the paper it's named for, not the Brief palette's (those are all the Brain's green).
+    static let choices: [DeckPalette] = zip([DeckPalette.wiki, .quote, .book, .reading, .notes, .video, .past], names)
+        .map { palette, name in palette.wearing(HermexPaper.named(name) ?? .knowledge) }
     static let names = ["wiki", "quote", "book", "reading", "notes", "video", "past"]
 
     /// Where an amber name lands: `reading`, the nearest warm hue that isn't amber, so a goal its
@@ -165,8 +167,9 @@ enum GoalCalendar {
     }
 }
 
-/// A goal's accent on the app's own surfaces (rows, calendar, choices): its glow, which
-/// already adapts to the appearance; `on` is the text on it.
+/// A goal's own color on the app's own surfaces, for the marks that are the goal (dots, pips,
+/// the calendar, milestones): its glow, which already adapts to the appearance; `on` is the text
+/// on it. Controls on those surfaces (choices, links, Save) stay Nous blue (DESIGN.md § Buttons).
 struct GoalTint {
     let fill: Color
     let on: Color

@@ -67,7 +67,7 @@ struct DeckGoalCard: View {
             Button {
                 Task { await model.load() }
             } label: {
-                Label { Text(verbatim: "Retry") } icon: { Image(systemName: "arrow.clockwise") }
+                Label { Text(verbatim: "Try again") } icon: { Image(systemName: "arrow.clockwise") }
                     .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(palette.ink)
             }
@@ -148,7 +148,6 @@ private struct GoalCheckInSection: View {
                     GoalChoiceRow(
                         options: check.options.map { ($0, $0.capitalized) },
                         selected: check.today,
-                        tint: tint,
                         isDisabled: model.isPending(goal.slug, .check(check.id)),
                         accessibilityPrefix: check.question
                     ) { value in

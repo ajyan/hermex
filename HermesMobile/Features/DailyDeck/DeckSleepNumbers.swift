@@ -35,7 +35,7 @@ struct SleepNumbers: View {
             }
             if sleep.nights.contains(where: { $0.hours != nil }) {
                 SleepBox(palette: palette) {
-                    SleepBoxHeader(title: "Hours · 7 nights", detail: "line = need", palette: palette)
+                    SleepBoxHeader(title: "Hours · 7 nights", detail: SleepDot.key, palette: palette)
                     SleepStrip(nights: sleep.nights, palette: palette)
                 }
             }
@@ -224,38 +224,24 @@ private struct SleepHRVChart: View {
     }
 }
 
-/// The last seven nights as bars, last night full strength, each with its hours above it and a tick
-/// at that night's need.
+/// The last seven nights as dots (`SleepDot`), one fixed column a night with its hours and day under
+/// it, last night's labels bold. Numbers are dots, never bars.
 private struct SleepStrip: View {
     let nights: [DeckNight]
     let palette: DeckPalette
 
-    @ScaledMetric(relativeTo: .caption2) private var height: CGFloat = 64
-
     var body: some View {
-        let top = max(nights.compactMap { max($0.hours ?? 0, $0.need ?? 0) }.max() ?? 0, 1)
-        HStack(alignment: .bottom, spacing: 8) {
+        HStack(alignment: .top, spacing: 0) {
             ForEach(Array(nights.enumerated()), id: \.offset) { index, night in
                 let last = index == nights.count - 1
                 VStack(spacing: 4) {
+                    DeckDot(state: SleepDot.state(hours: night.hours, need: night.need), ink: palette.ink,
+                            column: DeckDots.dot)
                     Text(verbatim: night.hours.map { String(format: "%.1f", $0) } ?? "–")
                         .font(AppFont.caption2(weight: last ? .semibold : .regular))
                         .foregroundStyle(Color.hxTextPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    ZStack(alignment: .bottom) {
-                        Color.clear
-                        RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
-                            .fill(palette.ink.opacity(night.hours == nil ? 0.12 : last ? 1 : 0.35))
-                            .frame(height: night.hours.map { max(height * $0 / top, 3) } ?? 3)
-                        if let need = night.need {
-                            Rectangle()
-                                .fill(Color.hxTextPrimary.opacity(0.8))
-                                .frame(height: 1.5)
-                                .padding(.bottom, height * need / top)
-                        }
-                    }
-                    .frame(height: height)
                     Text(verbatim: night.day)
                         .font(AppFont.caption2(weight: last ? .semibold : .regular))
                         .foregroundStyle(palette.ink)
@@ -271,5 +257,20 @@ private struct SleepStrip: View {
             "\(night.day): " + (night.hours.map { "\($0.formatted()) hours" } ?? "no data")
                 + (night.need.map { " of \($0.formatted()) needed" } ?? "")
         }.joined(separator: ", ")))
+    }
+}
+
+/// A night's hours as a `DeckDot`, the way Goals' running year tiers its months: filled once the night
+/// met its need (7.5 h when the need isn't known), a faint fill within an hour of it, a faint ring below that,
+/// and the small off mark with no data. Never the ring or ringed + that mean today and waiting.
+enum SleepDot {
+    static let defaultNeed = 7.5
+    /// The key beside a row of sleep dots.
+    static let key = "full = need met · faint = within 1 h"
+
+    static func state(hours: Double?, need: Double?) -> String {
+        guard let hours, hours > 0 else { return "off" }
+        let need = need ?? defaultNeed
+        return hours >= need ? "done" : hours >= need - 1 ? "skip" : "missed"
     }
 }

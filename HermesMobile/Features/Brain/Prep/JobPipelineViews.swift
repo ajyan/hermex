@@ -2,14 +2,15 @@ import SwiftUI
 
 /// Prep home's Pipeline: every open application as a hairline row in one neutral card (the company, then its
 /// stage and next step in plain words), each opening its company page, and Add a company. The week's
-/// applications sit in the header as pips, the same count the Ask and the Brief's search card show. Hidden until
-/// the pipeline loads, and on a server without one.
+/// applications sit in the header as pips, the same count the Ask and the Brief's search card show. An empty
+/// pipeline says so over Add, so the first company can be added. Hidden until the pipeline loads and on a server
+/// without one (404); a failed load shows one retry line instead.
 struct PrepPipelineSection: View {
     let model: JobPipelineModel
     @State private var adding = false
 
     var body: some View {
-        if let pipeline = model.pipeline, !pipeline.applications.isEmpty || !pipeline.upcoming.isEmpty {
+        if let pipeline = model.pipeline {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
                 HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
                     BrainSectionHeader(title: "Pipeline")
@@ -24,6 +25,13 @@ struct PrepPipelineSection: View {
                 }
                 SectionCard {
                     VStack(spacing: 0) {
+                        if pipeline.applications.isEmpty {
+                            Text(verbatim: "No applications yet. Add the first company you're talking to.")
+                                .font(BrainStyle.rowSubtitle)
+                                .foregroundStyle(Color.hxTextSecondary)
+                                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         ForEach(Array(pipeline.applications.enumerated()), id: \.element.id) { offset, row in
                             if offset > 0 { PrepRowDivider() }
                             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.application(row.id)))) {
@@ -50,6 +58,8 @@ struct PrepPipelineSection: View {
                 }
             }
             .sheet(isPresented: $adding) { JobAddSheet(model: model) }
+        } else if model.loadFailed {
+            HXFailedView(title: "Couldn't load your pipeline", style: .inline) { Task { await model.load() } }
         }
     }
 }
@@ -171,7 +181,7 @@ struct JobNextInterviewCard: View {
                spacing: BrainStyle.s, kicker: {
             Text(verbatim: "Next interview · \(JobCopy.when(inDays: slot.inDays))")
                 .font(BrainStyle.meta)
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(HermexPaper.prep.secondaryInk)
         }, content: {
             Text(verbatim: [JobCopy.day(slot.on), slot.time, slot.role].compactMap { $0 }.joined(separator: " · "))
                 .font(BrainStyle.rowSubtitle)
@@ -239,7 +249,8 @@ struct JobCountPips: View {
                 DeckDot(state: index < count.done ? "done" : "missed", ink: ink, column: column, size: size)
             }
             if count.overflows {
-                Text(verbatim: count.spoken).font(AppFont.caption()).foregroundStyle(.secondary).padding(.leading, 6)
+                // The label's color, which the caller sets for its surface (secondary ink on a card).
+                Text(verbatim: count.spoken).font(AppFont.caption()).padding(.leading, 6)
             }
         }
     }

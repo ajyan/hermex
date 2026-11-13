@@ -34,8 +34,7 @@ struct MealsAddLinkSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: model.fillsIn == nil ? "Add a recipe" : "Add from a link"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(model.fillsIn == nil ? "Add a recipe" : "Add from a link")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Cancel") }
@@ -195,11 +194,9 @@ struct MealsAddLinkSheet: View {
                     Text(verbatim: model.target == nil ? "Save to Recipes" : "Save the recipe")
                 }
             }
-            .font(AppFont.headline(weight: .semibold))
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .bodyPrimaryHeight()
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
         .disabled(!model.canSave)
         .padding(.horizontal, BrainStyle.l)
         .padding(.bottom, 8)

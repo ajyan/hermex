@@ -82,10 +82,21 @@ struct DeckChangesCard: View {
                         .tint(palette.ink)
                         .accessibilityLabel(Text(verbatim: "Undoing"))
                 } else if viewModel.canUndo(row) {
-                    Button { confirming = row } label: { Text(verbatim: "Undo") }
-                        .buttonStyle(.bordered)
-                        .font(AppFont.subheadline(weight: .semibold))
+                    // A secondary in the card's paper: its wash and edge, the label in its glow.
+                    Button { confirming = row } label: {
+                        Text(verbatim: "Undo")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(palette.ink)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 36)
+                            .background(palette.colors.wash, in: Capsule())
+                            .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 0.5))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                        .buttonStyle(.plain)
                         .disabled(viewModel.undoingChangeID != nil)
+                        .opacity(viewModel.undoingChangeID != nil ? 0.5 : 1)
                         .accessibilityLabel(Text(verbatim: row.change.isEmpty ? "Undo this fix" : "Undo \(row.change)"))
                         .accessibilityHint(Text(verbatim: "Reverts this change on the vault's main branch."))
                 }
@@ -99,7 +110,7 @@ struct DeckChangesCard: View {
             if let notice = viewModel.changeNotices[row.id] {
                 Text(verbatim: notice)
                     .font(AppFont.footnote(weight: .medium))
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
             }
         }
         .padding(.vertical, 12)

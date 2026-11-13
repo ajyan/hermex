@@ -153,7 +153,8 @@ struct BrainHomeView: View {
                     isSearching: searchViewModel.isSearching,
                     didFail: searchViewModel.didFail,
                     moduleTitles: moduleTitles,
-                    showsSeeAll: true
+                    showsSeeAll: true,
+                    onRetry: { searchViewModel.resume() }
                 )
             }
             .brainListStyle()
@@ -162,12 +163,8 @@ struct BrainHomeView: View {
             case .loading, .unavailable:
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let message):
-                ContentUnavailableView {
-                    Label { Text(verbatim: "Couldn't load the Brain") } icon: { Image(systemName: "exclamationmark.triangle") }
-                } description: {
-                    Text(verbatim: message)
-                } actions: {
-                    Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+                HXFailedView(title: "Couldn't load the Brain", message: message) {
+                    Task { await viewModel.load() }
                 }
             case .loaded:
                 home

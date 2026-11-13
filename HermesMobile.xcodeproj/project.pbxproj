@@ -26,6 +26,9 @@
 		AEA15000000000000000000D /* MealsDishPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000000C /* MealsDishPicker.swift */; };
 		AEA15000000000000000000B /* MealsLogSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000000A /* MealsLogSheet.swift */; };
 		AEA150000000000000000009 /* MealsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000008 /* MealsHomeView.swift */; };
+		A7A750000000000000000002 /* AtlasStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A750000000000000000001 /* AtlasStatus.swift */; };
+		A7A750000000000000000004 /* AtlasStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A750000000000000000003 /* AtlasStatusView.swift */; };
+		A7A750000000000000000006 /* AtlasStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A750000000000000000005 /* AtlasStatusTests.swift */; };
 		AEA150000000000000000007 /* MealsHomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000006 /* MealsHomeViewModel.swift */; };
 		AEA150000000000000000005 /* MealsScreenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000004 /* MealsScreenClient.swift */; };
 		AEA150000000000000000003 /* MealsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000002 /* MealsModels.swift */; };
@@ -589,6 +592,7 @@
 		1A2B3C4D5E6F700000000102 /* AppThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F700000000103 /* AppThemeTests.swift */; };
 		8C3A97D597D2A395D84CD232 /* HermexColorsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CAE7665F6FE8B55B3DBAAF0 /* HermexColorsTests.swift */; };
 		D35A00000000000000000003 /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35A00000000000000000004 /* DesignSystemTests.swift */; };
+		0B1EC7EE0000000000000001 /* ObjectKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1EC7EE0000000000000002 /* ObjectKeyTests.swift */; };
 		863000000000000000000003 /* NotificationOfferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 863000000000000000000004 /* NotificationOfferTests.swift */; };
 		C012400000000000000006 /* AppIconChoiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C012400000000000000005 /* AppIconChoiceTests.swift */; };
 		1A2B3C4D5E6F70000000110 /* ArchivedSessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F70000000111 /* ArchivedSessionsView.swift */; };
@@ -825,6 +829,7 @@
 		C09200000000000000000003 /* AppFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09200000000000000000002 /* AppFont.swift */; };
 		B1D0B70B0000000000000004 /* DeckJobParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D0B70B0000000000000003 /* DeckJobParts.swift */; };
 		B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D0B70B0000000000000001 /* DeckWeekGrid.swift */; };
+		C0FE0CA10000000000000002 /* DeckOpenerCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FE0CA10000000000000001 /* DeckOpenerCalendar.swift */; };
 		AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F34E30177D3A494A9742C3 /* DeckAskCard.swift */; };
 		AF6622CA57DD85E38D602DB0 /* DeckSearchCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */; };
 		900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */; };
@@ -983,6 +988,9 @@
 		AEA15000000000000000000C /* MealsDishPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsDishPicker.swift; sourceTree = "<group>"; };
 		AEA15000000000000000000A /* MealsLogSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsLogSheet.swift; sourceTree = "<group>"; };
 		AEA150000000000000000008 /* MealsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsHomeView.swift; sourceTree = "<group>"; };
+		A7A750000000000000000001 /* AtlasStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasStatus.swift; sourceTree = "<group>"; };
+		A7A750000000000000000003 /* AtlasStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasStatusView.swift; sourceTree = "<group>"; };
+		A7A750000000000000000005 /* AtlasStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasStatusTests.swift; sourceTree = "<group>"; };
 		AEA150000000000000000006 /* MealsHomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsHomeViewModel.swift; sourceTree = "<group>"; };
 		AEA150000000000000000004 /* MealsScreenClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsScreenClient.swift; sourceTree = "<group>"; };
 		AEA150000000000000000002 /* MealsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsModels.swift; sourceTree = "<group>"; };
@@ -1521,6 +1529,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		1A2B3C4D5E6F700000000103 /* AppThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppThemeTests.swift; sourceTree = "<group>"; };
 		2CAE7665F6FE8B55B3DBAAF0 /* HermexColorsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermexColorsTests.swift; sourceTree = "<group>"; };
 		D35A00000000000000000004 /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
+		0B1EC7EE0000000000000002 /* ObjectKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectKeyTests.swift; sourceTree = "<group>"; };
 		863000000000000000000004 /* NotificationOfferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationOfferTests.swift; sourceTree = "<group>"; };
 		C012400000000000000005 /* AppIconChoiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconChoiceTests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F70000000111 /* ArchivedSessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchivedSessionsView.swift; sourceTree = "<group>"; };
@@ -1776,6 +1785,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckDot.swift; sourceTree = "<group>"; };
 		B1D0B70B0000000000000003 /* DeckJobParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckJobParts.swift; sourceTree = "<group>"; };
 		B1D0B70B0000000000000001 /* DeckWeekGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekGrid.swift; sourceTree = "<group>"; };
+		C0FE0CA10000000000000001 /* DeckOpenerCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckOpenerCalendar.swift; sourceTree = "<group>"; };
 		20F34E30177D3A494A9742C3 /* DeckAskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckAskCard.swift; sourceTree = "<group>"; };
 		C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckSearchCard.swift; sourceTree = "<group>"; };
 		EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModel.swift; sourceTree = "<group>"; };
@@ -1930,6 +1940,15 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0FFEE5000000000000000AC /* MoneySpendingCharts.swift */,
 			);
 			path = Money;
+			sourceTree = "<group>";
+		};
+		A7A750000000000000000000 /* Status */ = {
+			isa = PBXGroup;
+			children = (
+				A7A750000000000000000001 /* AtlasStatus.swift */,
+				A7A750000000000000000003 /* AtlasStatusView.swift */,
+			);
+			path = Status;
 			sourceTree = "<group>";
 		};
 		AEA150000000000000000000 /* Meals */ = {
@@ -2285,6 +2304,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C03900000000000000000014 /* MessageActionContextTests.swift */,
 				C03900000000000000000015 /* SessionIdentityTests.swift */,
 				D0A7E5000000000000000003 /* DrawerNotesTests.swift */,
+				A7A750000000000000000005 /* AtlasStatusTests.swift */,
 				C03900000000000000000016 /* TranscriptDisplayModelTests.swift */,
 				C14300000000000000000004 /* StreamingMarkdownSupportTests.swift */,
 				C13000000000000000000002 /* ChatVerticalScrollAxisGuardTests.swift */,
@@ -2318,6 +2338,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F700000000103 /* AppThemeTests.swift */,
 				2CAE7665F6FE8B55B3DBAAF0 /* HermexColorsTests.swift */,
 				D35A00000000000000000004 /* DesignSystemTests.swift */,
+				0B1EC7EE0000000000000002 /* ObjectKeyTests.swift */,
 				863000000000000000000004 /* NotificationOfferTests.swift */,
 				C012400000000000000005 /* AppIconChoiceTests.swift */,
 				C03120000000000000F006 /* APIClientGitTests.swift */,
@@ -2521,6 +2542,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				FEEDB0DE00000000000000A0 /* Feedback */,
 				B0D700000000000000000005 /* Body */,
 				AEA150000000000000000000 /* Meals */,
+				A7A750000000000000000000 /* Status */,
 				B1A1C0DE00000000000F0001 /* Goals */,
 				C0FFEE500000000000000001 /* Money */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
@@ -3088,6 +3110,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */,
 				B1D0B70B0000000000000003 /* DeckJobParts.swift */,
 				B1D0B70B0000000000000001 /* DeckWeekGrid.swift */,
+				C0FE0CA10000000000000001 /* DeckOpenerCalendar.swift */,
 				20F34E30177D3A494A9742C3 /* DeckAskCard.swift */,
 				C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */,
 				EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */,
@@ -3407,6 +3430,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				AEA15000000000000000000D /* MealsDishPicker.swift in Sources */,
 				AEA15000000000000000000B /* MealsLogSheet.swift in Sources */,
 				AEA150000000000000000009 /* MealsHomeView.swift in Sources */,
+				A7A750000000000000000002 /* AtlasStatus.swift in Sources */,
+				A7A750000000000000000004 /* AtlasStatusView.swift in Sources */,
 				AEA150000000000000000007 /* MealsHomeViewModel.swift in Sources */,
 				AEA150000000000000000005 /* MealsScreenClient.swift in Sources */,
 				AEA150000000000000000003 /* MealsModels.swift in Sources */,
@@ -3440,6 +3465,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE00FF71B0EBD4FA4E8F12 /* DeckDot.swift in Sources */,
 				B1D0B70B0000000000000004 /* DeckJobParts.swift in Sources */,
 				B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */,
+				C0FE0CA10000000000000002 /* DeckOpenerCalendar.swift in Sources */,
 				AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */,
 				AF6622CA57DD85E38D602DB0 /* DeckSearchCard.swift in Sources */,
 				900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */,
@@ -4149,6 +4175,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C03910000000000000000014 /* MessageActionContextTests.swift in Sources */,
 				C03910000000000000000015 /* SessionIdentityTests.swift in Sources */,
 				D0A7E5100000000000000003 /* DrawerNotesTests.swift in Sources */,
+				A7A750000000000000000006 /* AtlasStatusTests.swift in Sources */,
 				C03910000000000000000016 /* TranscriptDisplayModelTests.swift in Sources */,
 				C14300000000000000000003 /* StreamingMarkdownSupportTests.swift in Sources */,
 				C13000000000000000000001 /* ChatVerticalScrollAxisGuardTests.swift in Sources */,
@@ -4182,6 +4209,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F700000000102 /* AppThemeTests.swift in Sources */,
 				8C3A97D597D2A395D84CD232 /* HermexColorsTests.swift in Sources */,
 				D35A00000000000000000003 /* DesignSystemTests.swift in Sources */,
+				0B1EC7EE0000000000000001 /* ObjectKeyTests.swift in Sources */,
 				863000000000000000000003 /* NotificationOfferTests.swift in Sources */,
 				C012400000000000000006 /* AppIconChoiceTests.swift in Sources */,
 				C03120000000000000B006 /* APIClientGitTests.swift in Sources */,

@@ -465,6 +465,7 @@ struct MandarinTakeaway: View {
                         .foregroundStyle(palette.onInk)
                         .frame(width: 36, height: 36)
                         .background(palette.ink, in: Circle())
+                        .contentShape(.interaction, Rectangle().inset(by: -4))  // a 44 pt target
                 }
                 .buttonStyle(.plain)
                 .accessibilityHidden(true)
@@ -503,7 +504,7 @@ struct MandarinRow: View {
                 if let note, !note.isEmpty {
                     Text(verbatim: note)
                         .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -514,6 +515,7 @@ struct MandarinRow: View {
                         .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(palette.ink)
                         .frame(width: 32, height: 32)
+                        .contentShape(.interaction, Rectangle().inset(by: -6))  // a 44 pt target
                 }
                 .buttonStyle(.plain)
                 .accessibilityHidden(true)

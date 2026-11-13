@@ -101,7 +101,7 @@ struct ComposerAttachmentPillPreview: View {
 
     private func placeholderTile(systemName: String) -> some View {
         Image(systemName: systemName)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold)) // design-drift: allow (SF Symbol sized to the fixed tile)
             .foregroundStyle(Color.hxTextSecondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(.tertiarySystemFill))
@@ -158,6 +158,7 @@ private struct ComposerAttachmentThumbnailView: View {
                     .background(Circle().fill(Color.hxCanvas))
                     .foregroundStyle(Color.hxTextPrimary)
                     .overlay(Circle().stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5))
+                    .chatMinimumHitTarget(horizontalPadding: 10, verticalPadding: 10, in: Circle())
             }
             .buttonStyle(.chatTactile(
                 .icon,
@@ -198,7 +199,7 @@ private struct ComposerAttachmentThumbnailView: View {
                     .fill(Color(.systemFill))
                     .overlay(
                         Image(systemName: "photo")
-                            .font(.system(size: 30, weight: .regular))
+                            .font(.system(size: 30, weight: .regular)) // design-drift: allow (SF Symbol sized to the fixed thumbnail)
                             .foregroundStyle(Color(.tertiaryLabel))
                     )
             }
@@ -263,10 +264,11 @@ private struct ComposerAttachmentThumbnailView: View {
 
             VStack(spacing: 3) {
                 Image(systemName: fileIconName)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 24, weight: .semibold)) // design-drift: allow (SF Symbol sized to the fixed badge)
                 Text(fileExtensionLabel)
-                    .font(.system(size: 9, weight: .bold))
+                    .font(AppFont.caption2(weight: .bold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(HermexPaper.file.glow)
         }

@@ -25,6 +25,17 @@ final class AppIntentRouter {
         guard let url else { return }
         pendingDeepLink = url
     }
+
+    /// Routes the Ask Atlas widget's Call Atlas and Dictate buttons as intents. Called at launch,
+    /// including the launch the system makes to perform `AtlasWidgetLaunchIntent`.
+    static func installWidgetLaunch() {
+        AtlasWidgetLaunchIntent.handler = { launch in
+            switch launch {
+            case .call: shared.requestDeepLink(HermesDeepLink.newCallURL)
+            case .voiceChat: shared.requestDeepLink(HermesDeepLink.newChatVoiceURL)
+            }
+        }
+    }
 }
 
 /// "New Chat" — opens Hermex on the New Chat composer, mirroring the in-app "+" button

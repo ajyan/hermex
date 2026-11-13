@@ -52,7 +52,7 @@ struct MoneySpendingView: View {
                 Button { withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.toggleReveal() } } label: {
                     Image(systemName: viewModel.isHidden ? "eye" : "eye.slash")
                 }
-                .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Show Amounts" : "Hide Amounts"))
+                .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Show amounts" : "Hide amounts"))
             }
         }
         .hidesMoneyOnResign(viewModel)
@@ -97,7 +97,7 @@ struct MoneySpendingView: View {
     }
 
     private func step(to index: Int) {
-        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
+        withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) {
             monthIndex = index
             picked = nil
             showsAllLog = false
@@ -187,9 +187,9 @@ struct MoneySpendingView: View {
                     .accessibilityElement(children: .combine)
                 }
             }
-            .padding(12)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glowSurface(.money, cornerRadius: HXRadius.md)
+            .hxCardSurface(.wash(.money))
         }
     }
 
