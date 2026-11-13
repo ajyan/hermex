@@ -92,11 +92,8 @@ struct FeedbackSheet: View {
     private var header: some View {
         HStack(spacing: 8) {
             closeButton
-            Text(verbatim: "Send feedback")
-                .font(AppFont.headline())
-                .foregroundStyle(Color.hxTextPrimary)
+            HXNavigationTitle(title: "Send feedback")
                 .frame(maxWidth: .infinity)
-                .accessibilityAddTraits(.isHeader)
             sendButton
         }
         .padding(.horizontal, 12)
