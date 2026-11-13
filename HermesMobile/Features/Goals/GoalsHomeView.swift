@@ -227,8 +227,7 @@ private struct GoalsAgentList: View {
                     Text(verbatim: goal.title)
                 }
             }
-            .navigationTitle(Text(verbatim: "Atlas's projects"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Atlas's projects")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }
