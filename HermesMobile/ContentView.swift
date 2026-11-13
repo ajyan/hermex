@@ -27,7 +27,7 @@ struct ContentView: View {
 
     var body: some View {
         content
-            .onOpenURL(perform: handleOpenURL)
+            .onOpenURL { handleOpenURL($0) }
             .task {
                 guard !didCheckInitialPendingShare else { return }
                 didCheckInitialPendingShare = true
@@ -142,7 +142,9 @@ struct ContentView: View {
         }
     }
 
-    private func handleOpenURL(_ url: URL) {
+    /// `fromIntent` is true for a link an App Intent queued (Siri, Shortcuts, the Action
+    /// button), which the user asked for; any other is a link from outside the app.
+    private func handleOpenURL(_ url: URL, fromIntent: Bool = false) {
         Task { await AgentLiveActivityManager.shared.dismissFinishedActivity(from: url) }
         pendingWebuiPush = nil
         switch IncomingURLRoute(url) {
@@ -163,8 +165,13 @@ struct ContentView: View {
             if reachWebuiServer() { pendingScreen = .goals }
         case .meals:
             if reachWebuiServer() { pendingScreen = .meals }
+        // Another app's link opens the call screen with Start call; a spoken intent starts it.
+        // Either way the microphone waits for App Lock (`VoiceCallStartGate`).
         case .newCall:
-            if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(startsCall: true) }
+            if reachWebuiServer() {
+                VoiceCallLaunch.request(waitsForTap: !fromIntent)
+                pendingNewChatRequest = NewChatRequest(startsCall: true)
+            }
         // The profile variant pins the new session to the chosen profile (#339).
         case .newChatInProfile(let profileName):
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(profileName: profileName) }
@@ -255,7 +262,7 @@ struct ContentView: View {
     private func drainPendingIntentDeepLink() {
         guard let url = intentRouter.pendingDeepLink else { return }
         intentRouter.pendingDeepLink = nil
-        handleOpenURL(url)
+        handleOpenURL(url, fromIntent: true)
     }
 
     private func importPendingSharedDraftIfAvailable() {

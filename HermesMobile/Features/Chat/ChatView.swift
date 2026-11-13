@@ -320,6 +320,8 @@ struct ChatView: View {
     @State private var isVoiceCallPresented = false
     @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
+    /// The automatic call came from another app's link, so it waits for Start call.
+    @State private var callWaitsForTap = false
     @State private var mockCall: MockCallState
     /// The mock call's end, from hang-up until the call screen has gone.
     @State private var endedMockCall: MockCallEnd?
@@ -1039,6 +1041,7 @@ struct ChatView: View {
                 isVoiceCallPresented = true
             }
             .fullScreenCover(isPresented: $isVoiceCallPresented, onDismiss: {
+                callWaitsForTap = false
                 // Call turns don't go through the composer's send path.
                 if !viewModel.messages.isEmpty { onConversationStarted() }
                 if let end = endedMockCall {
@@ -1046,7 +1049,8 @@ struct ChatView: View {
                     onMockCallEnded?(end)
                 }
             }) {
-                VoiceCallView(chat: viewModel, server: server, onAPIError: onAPIError, openingTurn: mockCall.openingTurn, onTurnTimed: reportMockProgress) { summary in
+                VoiceCallView(chat: viewModel, server: server, onAPIError: onAPIError, openingTurn: mockCall.openingTurn,
+                              waitsForTap: callWaitsForTap, onTurnTimed: reportMockProgress) { summary in
                     isVoiceCallPresented = false
                     if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
                         endedMockCall = end
@@ -1057,6 +1061,7 @@ struct ChatView: View {
             .onAppear {
                 guard startsCall, !didAutoStartCall else { return }
                 didAutoStartCall = true
+                callWaitsForTap = VoiceCallLaunch.takeWaitsForTap()
                 VoiceCallDiagnostics.write("call opened automatically for a new chat")
                 isVoiceCallPresented = true
             }

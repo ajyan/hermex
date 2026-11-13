@@ -178,8 +178,10 @@ struct VoiceCallStatus: View {
 }
 
 /// Replaces the call controls when the call dropped: why, in one line, and the two ways on.
+/// A call opened by a link from another app uses it too, with Start call as the way on.
 struct VoiceCallFailurePanel: View {
     let reason: String
+    var primaryTitle: LocalizedStringKey = "Reconnect"
     let onReconnect: () -> Void
     let onBack: () -> Void
 
@@ -219,7 +221,7 @@ struct VoiceCallFailurePanel: View {
 
     private var reconnect: some View {
         Button(action: onReconnect) {
-            Text("Reconnect").lineLimit(1).frame(maxWidth: .infinity)
+            Text(primaryTitle).lineLimit(1).frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
         .tint(Color.accentColor)

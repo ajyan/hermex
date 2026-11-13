@@ -64,6 +64,33 @@ enum VoiceCallDiagnostics {
     }
 }
 
+/// How the next automatic call starts. `ContentView` marks a call that a link from
+/// another app asked for (`hermes-agent://new-call`), which must wait for Start call;
+/// the chat that opens the call takes the mark once.
+@MainActor
+enum VoiceCallLaunch {
+    private static var nextWaitsForTap = false
+
+    static func request(waitsForTap: Bool) {
+        nextWaitsForTap = waitsForTap
+    }
+
+    static func takeWaitsForTap() -> Bool {
+        defer { nextWaitsForTap = false }
+        return nextWaitsForTap
+    }
+}
+
+/// When a call on screen may open the microphone: never while App Lock covers the app,
+/// and for a call another app's link asked for, only after Start call.
+struct VoiceCallStartGate: Equatable {
+    var isAppLocked: Bool
+    var waitsForTap: Bool
+    var tapped: Bool
+
+    var mayStart: Bool { !isAppLocked && (!waitsForTap || tapped) }
+}
+
 /// Holds an iPhone in portrait while a call is on screen: the call is laid out for a phone held
 /// upright. `PushAppDelegate` reads it for the app's supported orientations.
 @MainActor
@@ -152,6 +179,8 @@ struct VoiceCallView: View {
     let server: URL
     let onAPIError: (Error) -> Void
     let openingTurn: String?
+    /// Shows Start call instead of opening the microphone by itself.
+    let waitsForTap: Bool
     /// The turn times so far, each time a turn is timed (a voice mock saves them as it goes).
     let onTurnTimed: (([Int]) -> Void)?
     let onDismiss: (VoiceCallSummary) -> Void
@@ -176,14 +205,18 @@ struct VoiceCallView: View {
     @State private var sourcesSheet: VoiceCallSourcesSheet.Request?
     /// The latest turn and its reply as text, swiped up from the subtitles.
     @State private var showsReply = false
+    /// Start call was tapped on a call that waits for it.
+    @State private var isStartApproved = false
     @Environment(\.openURL) private var openURL
 
     init(chat: ChatViewModel, server: URL, onAPIError: @escaping (Error) -> Void, openingTurn: String? = nil,
-         onTurnTimed: (([Int]) -> Void)? = nil, onDismiss: @escaping (VoiceCallSummary) -> Void) {
+         waitsForTap: Bool = false, onTurnTimed: (([Int]) -> Void)? = nil,
+         onDismiss: @escaping (VoiceCallSummary) -> Void) {
         self.chat = chat
         self.server = server
         self.onAPIError = onAPIError
         self.openingTurn = openingTurn
+        self.waitsForTap = waitsForTap
         self.onTurnTimed = onTurnTimed
         self.onDismiss = onDismiss
     }
@@ -250,7 +283,11 @@ struct VoiceCallView: View {
     /// Feeds the controller the chat's state and follows the call's lifetime.
     private func callEvents(_ content: some View) -> some View {
         content
-            .task { await startCall() }
+            // Held while App Lock covers the app, and until Start call when the call waits for it.
+            .task(id: startGate) {
+                guard startGate.mayStart else { return }
+                await startCall()
+            }
             .onAppear { VoiceCallOrientationLock.set(true) }
             .onChange(of: controller?.turnLatenciesMS ?? []) { _, _ in onTurnTimed?(turnMS) }
             // However the screen goes away, its system call goes with it; a call left
@@ -318,6 +355,13 @@ struct VoiceCallView: View {
                 Button("Back to chat", role: .cancel) { onClose() }
             }
     }
+
+    private var startGate: VoiceCallStartGate {
+        VoiceCallStartGate(isAppLocked: AppLock.shared.isLocked, waitsForTap: waitsForTap, tapped: isStartApproved)
+    }
+
+    /// Before Start call, on a call another app's link asked for.
+    private var awaitsStartTap: Bool { controller == nil && waitsForTap && !isStartApproved }
 
     private var snapshot: VoiceCallChatSnapshot {
         VoiceCallChatSnapshot.of(chat)
@@ -550,6 +594,13 @@ struct VoiceCallView: View {
                 onReconnect: startOver,
                 onBack: onClose
             )
+        } else if awaitsStartTap {
+            VoiceCallFailurePanel(
+                reason: String(localized: "Another app opened this call. The microphone stays off until you start it."),
+                primaryTitle: "Start call",
+                onReconnect: { isStartApproved = true },
+                onBack: onClose
+            )
         } else {
             callControls
         }
@@ -601,6 +652,7 @@ struct VoiceCallView: View {
     /// Whose turn it is, in one word under the cloud.
     private var stateWord: String {
         switch state {
+        case .idle where awaitsStartTap: String(localized: "Ready to call")
         case .idle, .connecting: String(localized: "Connecting")
         case .listening: controller?.isMuted == true ? String(localized: "Muted") : String(localized: "Listening")
         case .thinking: String(localized: "Thinking")
