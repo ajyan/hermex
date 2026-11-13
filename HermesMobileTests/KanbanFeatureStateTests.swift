@@ -307,6 +307,28 @@ final class KanbanFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.selectedStatus, "ready")
     }
 
+    /// Status counts are kept per snapshot and query; a search or a changed Board must
+    /// still replace them.
+    func testStatusCountsFollowTheSearchAndTheBoard() async throws {
+        let client = ImmediateMutationClient(statusResults: [
+            .success(mutationDecode(#"{"task":{"id":"CARD-1","status":"archived"}}"#))
+        ])
+        let state = KanbanFeatureState(server: URL(string: "https://example.test")!, client: client)
+        await state.loadIfNeeded()
+        let card = try XCTUnwrap(state.allCards.first { $0.cardID == "CARD-1" })
+        let status = try XCTUnwrap(card.status?.rawValue)
+        let count = state.statusCount(status)
+        XCTAssertEqual(count, state.allCards.count { $0.status?.rawValue == status })
+
+        state.searchText = "no card has this"
+        XCTAssertEqual(state.statusCount(status), 0)
+        state.searchText = ""
+        XCTAssertEqual(state.statusCount(status), count)
+
+        await state.archiveCard(card)
+        XCTAssertEqual(state.statusCount(status), count - 1)
+    }
+
     func testColdLoadOpensOnTheFirstStatusWithCards() async {
         let state = KanbanFeatureState(
             server: URL(string: "https://example.test")!,

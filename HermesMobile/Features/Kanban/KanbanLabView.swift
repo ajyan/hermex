@@ -1103,13 +1103,14 @@ struct KanbanStatusFocusView: View {
                 .listRowSeparator(.hidden)
             }
 
+            let visibleCards = model.visibleCards
             if model.isRefreshing, model.snapshot == nil {
                 EmptyView()
-            } else if model.visibleCards.isEmpty {
+            } else if visibleCards.isEmpty {
                 emptyContent
                     .listRowSeparator(.hidden)
             } else if model.groupByProfile {
-                ForEach(Array(model.groupedVisibleCards.enumerated()), id: \.offset) { _, group in
+                ForEach(model.groupedByProfile(visibleCards), id: \.profile) { group in
                     Section {
                         ForEach(group.cards, id: \.cardID) { card in
                             cardRow(card)
@@ -1120,7 +1121,7 @@ struct KanbanStatusFocusView: View {
                     }
                 }
             } else {
-                ForEach(model.visibleCards, id: \.cardID) { card in
+                ForEach(visibleCards, id: \.cardID) { card in
                     cardRow(card)
                 }
             }
