@@ -65,7 +65,13 @@ final class DailyDeckViewModel {
     private(set) var deck: DailyDeck?
     /// What each swipe shows; set with the deck.
     private(set) var pages: [DeckPage] = []
-    private(set) var answers: [String: DeckAnswer] = [:]
+    /// What he's answered, kept here as he types; `store` gets it `draftDelay` after the last change
+    /// (`saveDraft()` writes it at once).
+    private(set) var answers: [String: DeckAnswer] = [:] {
+        didSet { syncVisibility() }
+    }
+    /// What decides which pages show, apart from `answers`, so typing an answer never redraws the stack.
+    private(set) var visibility = DeckVisibility()
     private(set) var filing: DailyDeckFilingState = .idle
     private(set) var sessionID: String?
     /// The deck on screen is this device's saved copy, shown because the server couldn't be reached.
@@ -125,10 +131,13 @@ final class DailyDeckViewModel {
     /// Starts a chat with these words, from a card that asks Atlas (the money card's rows); nil does nothing.
     @ObservationIgnored var askAtlas: ((String) -> Void)?
     private let now: () -> Date
+    /// How long after the last change an answer is written to `store`.
+    private let draftDelay: Duration
 
     init(server: URL, client: any DailyDeckDataClient, store: DailyDeckStore = DailyDeckStore(),
          feedback: (any FeedbackDataClient)? = nil, mandarin: (any MandarinPracticeClient)? = nil,
-         body: (any BodyDataClient)? = nil, now: @escaping () -> Date = Date.init) {
+         body: (any BodyDataClient)? = nil, now: @escaping () -> Date = Date.init,
+         draftDelay: Duration = .milliseconds(500)) {
         self.training = WeekTrainingModel(client: body)
         self.server = server
         self.client = client
@@ -136,6 +145,7 @@ final class DailyDeckViewModel {
         self.feedback = feedback
         self.mandarin = mandarin
         self.now = now
+        self.draftDelay = draftDelay
         let today = DailyDeckPaths.day(now())
         self.today = today
         self.date = today
@@ -174,17 +184,31 @@ final class DailyDeckViewModel {
 
     /// What the deck shows: every page but cards marked "Not for Me". `index` counts these.
     var visiblePages: [DeckPage] {
-        let variant = Self.shownWeekVariant(cards: cards, answers: answers)
+        let visibility = visibility
         return pages.filter { page in
             guard case .card(let card) = page else { return true }
-            if Self.isHiddenWeekCard(card, shownVariant: variant) { return false }
-            return answers[card.id]?.feedback == nil
+            if Self.isHiddenWeekCard(card, shownVariant: visibility.weekVariant) { return false }
+            return !visibility.dismissed.contains(card.id)
         }
+    }
+
+    /// The cards marked "Not for Me" and the week divider's question, read from `answers`.
+    struct DeckVisibility: Equatable {
+        var dismissed: Set<String> = []
+        /// `shownWeekVariant`: nil when the deck has no divider.
+        var weekVariant: Int?
+    }
+
+    /// Updates `visibility` only when it changes, so its readers redraw only then.
+    private func syncVisibility() {
+        let next = DeckVisibility(dismissed: Set(answers.compactMap { $0.value.feedback == nil ? nil : $0.key }),
+                                  weekVariant: Self.shownWeekVariant(cards: cards, answers: answers))
+        if next != visibility { visibility = next }
     }
 
     /// Which of the week's drafted questions is on the divider: its place among the question and
     /// the alternatives, 0 when the deck has no divider.
-    var weekVariant: Int { Self.shownWeekVariant(cards: cards, answers: answers) ?? 0 }
+    var weekVariant: Int { visibility.weekVariant ?? 0 }
 
     /// The variant the deck's week divider shows, given the deck's answers (filed or unsent): the
     /// divider's answered question's place among its question and alternatives, 0 when it names
@@ -250,7 +274,7 @@ final class DailyDeckViewModel {
     }
 
     /// Cards on this deck marked "Not for Me".
-    var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
+    var skippedCount: Int { cards.filter { visibility.dismissed.contains($0.id) }.count }
 
     /// Counts the cover photo's successful uploads; the photo view reloads when it changes.
     private(set) var weekPhotoVersion = 0
@@ -793,7 +817,33 @@ final class DailyDeckViewModel {
         var answer = answers[card.id] ?? DeckAnswer(card: card.id)
         change(&answer)
         answers[card.id] = answer.isEmpty ? nil : answer
-        store.setAnswers(answers, for: server, date: date, kind: kind)
+        scheduleDraftSave()
+    }
+
+    /// The answers waiting to be written, with the deck they belong to.
+    @ObservationIgnored private var pendingDraft: (date: String, kind: String, answers: [String: DeckAnswer])?
+    /// Writes `pendingDraft` once the typing pauses for `draftDelay`.
+    @ObservationIgnored private(set) var draftSave: Task<Void, Never>?
+
+    /// Each keystroke and dictated word lands in `answers` at once; the store is written once it settles.
+    private func scheduleDraftSave() {
+        pendingDraft = (date, kind, answers)
+        draftSave?.cancel()
+        draftSave = Task { [weak self, draftDelay] in
+            try? await Task.sleep(for: draftDelay)
+            guard !Task.isCancelled else { return }
+            self?.saveDraft()
+        }
+    }
+
+    /// Writes the unsaved answers now: the screen is leaving or backgrounding, the deck is being
+    /// filed, or another deck is opening.
+    func saveDraft() {
+        draftSave?.cancel()
+        draftSave = nil
+        guard let pending = pendingDraft else { return }
+        pendingDraft = nil
+        store.setAnswers(pending.answers, for: server, date: pending.date, kind: pending.kind)
     }
 
     // MARK: The v3 weekly review
@@ -1083,6 +1133,7 @@ final class DailyDeckViewModel {
     /// The app became active or left the foreground: only time in the foreground counts.
     func scenePhaseChanged(active: Bool) {
         sceneActive = active
+        if !active { saveDraft() }
         syncClock()
     }
 
@@ -1095,6 +1146,7 @@ final class DailyDeckViewModel {
 
     func screenDisappeared() {
         screensShowing = max(0, screensShowing - 1)
+        saveDraft()
         syncClock()
     }
 
@@ -1173,6 +1225,7 @@ final class DailyDeckViewModel {
     func file() async -> DailyDeckFilingResult? {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
+        saveDraft()
         // What is sent: the user can type or open another day while it's in flight.
         if !signals.usage.isEmpty {  // each read card's answer length, as filed
             updateSignals { signals in
@@ -1234,6 +1287,7 @@ final class DailyDeckViewModel {
     /// made while filing stay unsent; another deck on screen is left alone.
     private func markFiled(_ sent: [String: DeckAnswer], _ sentSignals: DeckSignals, date: String, kind: String,
                            confirmed: Bool, note: DailyDeckFiledNote?) {
+        saveDraft()  // edits made while filing count as unsent
         if store.answers(for: server, date: date, kind: kind) == sent {
             store.setAnswers([:], for: server, date: date, kind: kind)
         }

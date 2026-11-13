@@ -419,6 +419,7 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertFalse(viewModel.hasChanges, "back to what was filed")
 
         viewModel.setText("Ship it today.", for: viewModel.cards[1])
+        viewModel.screenDisappeared()  // leaving writes the draft
         let reopened = makeViewModel(client)
         await reopened.load()
         XCTAssertEqual(reopened.answer(for: reopened.cards[1])?.text, "Ship it today.", "unsent edits win over the filed copy")
@@ -465,6 +466,7 @@ final class DailyDeckTests: XCTestCase {
         viewModel.choose(skip, for: decision)  // second tap clears it
         XCTAssertNil(viewModel.answer(for: decision))
         viewModel.setText("Still true.", for: viewModel.cards[3])
+        viewModel.screenDisappeared()  // leaving writes the draft
 
         let reopened = makeViewModel(client)
         await reopened.load()
