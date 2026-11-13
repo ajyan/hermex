@@ -1027,7 +1027,7 @@ final class VoiceCallControllerTests: XCTestCase {
         update(text: "First sentence. Second", approval: approval())
         XCTAssertEqual(controller.state, .awaitingApproval("send email to Sam"))
         XCTAssertEqual(speaker.stopCount, 1)
-        XCTAssertEqual(speaker.spoken.last, "Atlas wants to send email to Sam. Say approve, or deny.")
+        XCTAssertEqual(speaker.spoken.last, "Atlas wants to send email to Sam. The command is: himalaya send. Say approve, or deny.")
 
         speaker.drain()
         await say("Approve.")
@@ -1038,7 +1038,28 @@ final class VoiceCallControllerTests: XCTestCase {
     func testApprovalReadBackFallsBackToCommand() async {
         await startSpeaking()
         update(approval: approval(description: nil))
-        XCTAssertEqual(speaker.spoken.last, "Atlas wants to himalaya send. Say approve, or deny.")
+        XCTAssertEqual(speaker.spoken.last, "Atlas wants to run: himalaya send. Say approve, or deny.")
+    }
+
+    // MARK: - Approval read-back
+
+    func testApprovalReadBackSaysTheCommandWithItsDescription() {
+        XCTAssertEqual(
+            VoiceCallPhrases.approvalReadBack(description: "tidy the folder", command: "rm -rf ~/Downloads"),
+            "Atlas wants to tidy the folder. The command is: rm -rf ~/Downloads. Say approve, or deny."
+        )
+        XCTAssertEqual(
+            VoiceCallPhrases.approvalReadBack(description: nil, command: nil),
+            "Atlas wants to run a command. Say approve, or deny."
+        )
+    }
+
+    func testALongCommandIsCutAndSaysHowMuchIsLeft() {
+        let command = "echo " + String(repeating: "a", count: 295)
+        let spoken = VoiceCallPhrases.spokenCommand(command + "\n  ")
+        XCTAssertTrue(spoken.hasPrefix(String(command.prefix(VoiceCallPhrases.spokenCommandLimit))))
+        XCTAssertTrue(spoken.hasSuffix(", and 100 more characters on the screen"))
+        XCTAssertEqual(VoiceCallPhrases.spokenCommand("ls\n  -la"), "ls -la")
     }
 
     func testApprovalWaitsForFinalBeforeDeciding() async {

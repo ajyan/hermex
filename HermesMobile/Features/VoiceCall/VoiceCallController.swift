@@ -96,8 +96,33 @@ enum VoiceCallPhrases {
         return String(text.dropFirst(length))
     }
 
-    static func approvalReadBack(_ action: String) -> String {
-        "Atlas wants to \(action). Say approve, or deny."
+    /// What Atlas says when a run asks for approval: what it wants to do in its own words,
+    /// and always the command itself, so an answer approves what will actually run.
+    static func approvalReadBack(description: String?, command: String?) -> String {
+        let description = description?.trimmingCharacters(in: .whitespacesAndNewlines).ifNotEmpty
+        let command = command.map(spokenCommand)?.ifNotEmpty
+        let ask = "Say approve, or deny."
+        switch (description, command) {
+        case let (description?, command?):
+            return "Atlas wants to \(description). The command is: \(command). \(ask)"
+        case let (nil, command?):
+            return "Atlas wants to run: \(command). \(ask)"
+        case let (description?, nil):
+            return "Atlas wants to \(description). \(ask)"
+        case (nil, nil):
+            return "Atlas wants to run a command. \(ask)"
+        }
+    }
+
+    /// The most characters of a command read aloud; a longer one is cut and says how much is left.
+    static let spokenCommandLimit = 200
+
+    /// A command on one line, cut at `spokenCommandLimit` with the rest counted.
+    static func spokenCommand(_ command: String) -> String {
+        let oneLine = command.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard oneLine.count > spokenCommandLimit else { return oneLine }
+        let rest = oneLine.count - spokenCommandLimit
+        return "\(oneLine.prefix(spokenCommandLimit)), and \(rest) more characters on the screen"
     }
 }
 
@@ -1183,7 +1208,7 @@ final class VoiceCallController {
         setCue(false)
         let action = approval.pending.description ?? approval.pending.command ?? "run a command"
         state = .awaitingApproval(action)
-        say(VoiceCallPhrases.approvalReadBack(action))
+        say(VoiceCallPhrases.approvalReadBack(description: approval.pending.description, command: approval.pending.command))
     }
 
     private func beginApprovalListening(seed: String?) {
@@ -1331,4 +1356,8 @@ final class VoiceCallController {
         stopListener()
         restartListener(after: reason)
     }
+}
+
+private extension String {
+    var ifNotEmpty: String? { isEmpty ? nil : self }
 }
