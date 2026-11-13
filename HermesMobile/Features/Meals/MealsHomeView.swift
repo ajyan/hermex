@@ -176,15 +176,13 @@ struct MealsHomeView: View {
             let others = home.days.filter { $0.day != home.day && $0.logged == nil }
             HStack(spacing: 10) {
                 Button { Task { await viewModel.eatTonight() } } label: {
-                    Text(verbatim: "Eating it")
-                        .font(AppFont.display(style: .headline, weight: .semibold))
-                        .foregroundStyle(paper.onGlow)
-                        .frame(maxWidth: .infinity)
+                    Group {
+                        if viewModel.isSaving { ProgressView().tint(paper.onGlow) } else { Text(verbatim: "Eating it") }
+                    }
+                    .bodyTapHeight()
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .tint(paper.glow)
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+                .environment(\.hxPaper, paper)
                 .disabled(viewModel.isSaving)
                 .accessibilityHint(Text(verbatim: "Logs tonight's dinner"))
                 if !others.isEmpty {
@@ -308,7 +306,7 @@ struct MealsHomeView: View {
             VStack(spacing: 0) {
                 ForEach(Array(home.days.enumerated()), id: \.element.id) { index, day in
                     if index > 0 { Divider().padding(.leading, 58) }
-                    MealsDayRow(day: day, isToday: day.day == home.day, paper: paper) {
+                    MealsDayRow(day: day, today: home.day, paper: paper) {
                         pickingFor = PickerTarget(day: day.day)
                     }
                     .onTapGesture {
@@ -386,13 +384,17 @@ struct MealsHomeView: View {
     }
 }
 
-/// One day of the week: its date, the meal (main, then sides), and a day circle: a filled check
-/// once logged, a ring for tonight, a faint ring for a planned night. An open night offers a plus.
+/// One day of the week: its date, the meal (main, then sides), and its `DeckDot` (`MealsCopy.dayDot`):
+/// filled once logged, ringed tonight, dashed ahead, a faint ring for a past night never logged. An
+/// open night offers a plus.
 private struct MealsDayRow: View {
     let day: MealsDay
-    let isToday: Bool
+    /// The phone's day, YYYY-MM-DD.
+    let today: String
     let paper: HermexPaper
     let onAdd: () -> Void
+
+    private var isToday: Bool { day.day == today }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -444,18 +446,10 @@ private struct MealsDayRow: View {
         if let serves = day.night.flatMap({ MealsCopy.serves($0.servings) }), day.logged == nil {
             HXChip(paper: paper, label: serves)
         }
-        if day.logged != nil {
-            Image(systemName: "checkmark")
-                .font(AppFont.caption(weight: .bold))
-                .foregroundStyle(paper.onGlow)
-                .frame(width: 22, height: 22)
-                .background(paper.glow, in: Circle())
-                .accessibilityLabel(Text(verbatim: "Logged"))
-        } else if day.night != nil {
-            Circle()
-                .strokeBorder(isToday ? paper.glow : Color.hxSeparator, lineWidth: isToday ? 2 : 1.5)
-                .frame(width: 22, height: 22)
-                .accessibilityLabel(Text(verbatim: isToday ? "Tonight" : "Planned"))
+        if let dot = MealsCopy.dayDot(day, today: today) {
+            DeckDot(state: dot, ink: paper.glow, column: 22, size: 22)
+                .accessibilityElement()
+                .accessibilityLabel(Text(verbatim: MealsCopy.dayDotLabel(dot)))
         } else {
             Button(action: onAdd) {
                 Image(systemName: "plus.circle")
@@ -470,6 +464,24 @@ private struct MealsDayRow: View {
 }
 
 extension MealsCopy {
+    /// A week row's `DeckDot` state: done once logged; for a planned night, today, ahead, or missed
+    /// (past and never logged). Nil for an open night, which shows a plus instead.
+    static func dayDot(_ day: MealsDay, today: String) -> String? {
+        if day.logged != nil { return "done" }
+        guard day.night != nil else { return nil }
+        if day.day == today { return "today" }
+        return day.day > today ? "ahead" : "missed"
+    }
+
+    static func dayDotLabel(_ state: String) -> String {
+        switch state {
+        case "done": "Logged"
+        case "today": "Tonight"
+        case "ahead": "Planned"
+        default: "Not logged"
+        }
+    }
+
     /// "Wed · Kabocha with pork riblets", or "Sun · nothing planned".
     static func swapLabel(_ day: MealsDay) -> String {
         "\(weekday(day.day)) · \(day.night?.main?.name ?? "nothing planned")"
