@@ -22,6 +22,11 @@ enum SessionRowActionPolicy {
         !session.isSessionReadOnly
     }
 
+    /// Archive and the other server mutations: a writable row with a live session ID.
+    static func canArchive(_ session: SessionSummary, isViewingCachedData: Bool) -> Bool {
+        offersMutationActions(for: session) && !isViewingCachedData && hasServerSessionID(session)
+    }
+
     static func canDuplicate(_ session: SessionSummary) -> Bool {
         offersMutationActions(for: session) && !session.requiresExternalImport
     }

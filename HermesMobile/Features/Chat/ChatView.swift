@@ -1164,10 +1164,15 @@ struct ChatView: View {
             // The navy canvas behind every chat state (empty, loading, transcript), not the
             // system's pure black.
             .background(Color.hxCanvas.ignoresSafeArea())
+            .focusedSceneValue(\.chatKeyboardActions, ChatKeyboardActions(
+                isStreaming: viewModel.activeStreamID != nil,
+                isCancellingStream: viewModel.isCancellingStream,
+                stopResponse: { Task { await cancelStream() } }
+            ))
             .feedbackContext(FeedbackContext(
                 feature: "Chat", screen: "Chat", item: displayTitle, state: ["session_id": transcriptMediaSessionID]))
             .alert(
-                "Discard Later Messages?",
+                "Discard later messages?",
                 isPresented: $showEditDiscardConfirmation
             ) {
                 Button("Cancel", role: .cancel) {

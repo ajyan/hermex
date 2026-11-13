@@ -1077,8 +1077,23 @@ struct ChatShellView: View {
             createNewChat: openNewChatFromKeyboard,
             searchSessions: openSearchFromKeyboard,
             openChat: openChatFromKeyboard(atPosition:),
-            openAdjacentChat: openAdjacentChatFromKeyboard(offset:)
+            openAdjacentChat: openAdjacentChatFromKeyboard(offset:),
+            isDrawerOpen: navigation.isDrawerOpen,
+            canArchiveChat: openChatSession.map {
+                SessionRowActionPolicy.canArchive($0, isViewingCachedData: viewModel.isViewingCachedData)
+                    && !viewModel.isMutating($0)
+            } ?? false,
+            archiveChat: {
+                guard let session = openChatSession else { return }
+                Task { await archive(session) }
+            }
         )
+    }
+
+    /// The live row for the chat on screen, when the root is a session.
+    private var openChatSession: SessionSummary? {
+        guard case .session(let session) = navigation.root else { return nil }
+        return viewModel.sessions.first { $0.sessionId == session.sessionId } ?? session
     }
 
     /// Chat shortcuts walk the drawer's rows as they appear, after search and
