@@ -1258,6 +1258,7 @@ struct ChatShellView: View {
     /// The row menu's Summarize & Archive. A failure leaves the chat in place
     /// and says why in a toast that can retry.
     private func summarizeAndArchive(_ session: SessionSummary) async {
+        let archiveNumber = archiveToastRoute.archiveStarted()
         if let failure = await viewModel.summarizeAndArchive(session, modelContext: modelContext) {
             handleLastError()
             actionToast.show(
@@ -1280,6 +1281,9 @@ struct ChatShellView: View {
         guard !viewModel.sessions.contains(where: { $0.sessionId == session.sessionId }) else { return }
         removeSessionFromNavigation(session)
         SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
+        if archiveToastRoute.archiveConfirmed(archiveNumber, isListShowing: isArchiveToastHostShowing) {
+            showArchiveUndoToast(for: session)
+        }
     }
 
     /// Skipped while the list shows cached rows: the server was unreachable a
