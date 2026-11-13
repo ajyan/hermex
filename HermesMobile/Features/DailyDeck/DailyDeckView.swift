@@ -93,7 +93,7 @@ struct DailyDeckView: View {
                         Toggle(isOn: Binding(get: { notifies }, set: { on in Task { await DailyBriefReminder.setEnabled(on) } })) {
                             Label { Text(verbatim: "Notify Me at 8:00") } icon: { Image(systemName: "bell") }
                         }
-                        Button { Task { await viewModel.load() } } label: {
+                        Button { Task { await viewModel.reload() } } label: {
                             Label { Text(verbatim: "Reload") } icon: { Image(systemName: "arrow.clockwise") }
                         }
                         if viewModel.workspace != nil {
@@ -110,11 +110,13 @@ struct DailyDeckView: View {
             }
             .hxKeyboardDoneButton()
             .feedbackContext(feedbackContext)
+            // Runs again each time the screen comes back (from a Goal, Brain, Meals or Body page a card
+            // opened): the deck, its page and its cards stay, and are read again in place once stale.
             .task {
                 if let review = DailyBriefLaunch.take() {
                     await viewModel.show(date: review.date, kind: review.kind)
                 } else {
-                    await viewModel.load()
+                    await viewModel.appeared()
                 }
                 await DailyBriefReminder.enableOnFirstOpen()
             }
@@ -124,8 +126,10 @@ struct DailyDeckView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 viewModel.scenePhaseChanged(active: phase == .active)
-                // Left open overnight, the brief moves on to the new day's deck.
-                if phase == .active { Task { await viewModel.refreshDay() } }
+                // Left open overnight, the brief moves on to the new day's deck; a stale deck reads again in place.
+                if phase == .active {
+                    Task { if viewModel.state == .ready { await viewModel.appeared() } else { await viewModel.refreshDay() } }
+                }
             }
             // Time on each card, for the style learner (DeckSignals.usage).
             .onChange(of: viewModel.currentCardID, initial: true) { _, id in viewModel.showCard(id) }
