@@ -49,8 +49,8 @@ enum BrainReviewPage: Identifiable, Hashable {
 // MARK: - Copy and papers
 
 extension BrainBite {
-    /// The Daily Deck palette a bite wears: reading for ideas and takeaways, the quote and book
-    /// papers for saved words. Its symbol marks the bite in the summary's list.
+    /// The Daily Deck kind a bite matches: reading for ideas and takeaways, quote and book for
+    /// saved words. Only its symbol is used, marking the bite in the summary's list.
     var deckPalette: DeckPalette {
         switch kind {
         case .quote: .quote
@@ -59,7 +59,8 @@ extension BrainBite {
         }
     }
 
-    var paper: HermexPaper { deckPalette.colors }
+    /// Every bite wears the Brain's paper; the kicker and symbol name its kind.
+    var paper: HermexPaper { .knowledge }
 
     /// Quotes and highlights are someone's saved words: they get the serif and the quote mark.
     var quotesSavedWords: Bool { kind == .quote || kind == .highlight }
@@ -172,21 +173,13 @@ struct BrainReviewView: View {
             case .loading:
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let message):
-                ContentUnavailableView {
-                    Label { Text(verbatim: "Couldn't load the review") } icon: { Image(systemName: "exclamationmark.triangle") }
-                } description: {
-                    Text(verbatim: message)
-                } actions: {
-                    Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+                HXFailedView(title: "Couldn't load the review", message: message) {
+                    Task { await viewModel.load() }
                 }
             case .unavailable, .loaded:
                 if viewModel.deckFailed {
-                    ContentUnavailableView {
-                        Label { Text(verbatim: "Couldn't load the review") } icon: { Image(systemName: "wifi.exclamationmark") }
-                    } description: {
-                        Text(verbatim: "Check your connection and try again.")
-                    } actions: {
-                        Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+                    HXFailedView(title: "Couldn't load the review", message: "Check your connection and try again.") {
+                        Task { await viewModel.load() }
                     }
                 } else {
                     ContentUnavailableView {
@@ -287,6 +280,7 @@ struct BrainDeckCard<Content: View>: View {
             words
         } else {
             words
+                .tint(.accentColor) // design-drift: allow links in a bite stay Nous blue, as on the open card
                 .hxCardSurface(.glow(paper), clipsContent: true)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: accessibilityLabel))
@@ -400,10 +394,10 @@ struct BrainReviewSummaryCard: View {
                         .padding(.top, 4)
                     VStack(spacing: 0) {
                         ForEach(bites.prefix(Self.shown)) { bite in
-                            let palette = bite.deckPalette
+                            let paper = bite.paper
                             // A Brief opener row, with the kind in its glow.
-                            DeckAheadRow(symbol: palette.symbol, ink: palette.ink, wash: palette.colors.wash,
-                                         title: Self.title(bite), kind: BrainBiteCopy.kind(bite), kindColor: palette.ink)
+                            DeckAheadRow(symbol: bite.deckPalette.symbol, ink: paper.glow, wash: paper.wash,
+                                         title: Self.title(bite), kind: BrainBiteCopy.kind(bite), kindColor: paper.glow)
                         }
                         if bites.count > Self.shown {
                             Text(verbatim: "+ \(bites.count - Self.shown) more")
@@ -422,22 +416,12 @@ struct BrainReviewSummaryCard: View {
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
-            if hasMore {
-                if failed, !isDealing {
-                    Text(verbatim: "Couldn't get ten more. Try again.")
-                        .font(AppFont.subheadline())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
-                }
-                Button {
-                    guard !isDealing else { return }
-                    isDealing = true
-                    Task {
-                        await onMore()
-                        isDealing = false
-                    }
-                } label: {
+            if hasMore, failed, !isDealing {
+                HXFailedView(title: "Couldn't get ten more", style: .inline, retry: dealMore)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+            } else if hasMore {
+                Button(action: dealMore) {
                     // The style draws a neutral capsule on the app's surface; the label takes
                     // Nous blue while enabled, since this is a control (DESIGN.md principle 5);
                     // during a fetch the label takes the style's disabled foreground (a label color
@@ -453,5 +437,14 @@ struct BrainReviewSummaryCard: View {
         .opacity(contentOpacity)
         .hxCardSurface(.summary, clipsContent: true)
         .padding(.vertical, 12)
+    }
+
+    private func dealMore() {
+        guard !isDealing else { return }
+        isDealing = true
+        Task {
+            await onMore()
+            isDealing = false
+        }
     }
 }

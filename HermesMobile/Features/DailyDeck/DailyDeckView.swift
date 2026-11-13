@@ -196,7 +196,7 @@ struct DailyDeckView: View {
             Section {
                 ForEach(paths, id: \.self) { path in
                     Button { Task { await viewModel.chooseWorkspace(path) } } label: {
-                        Text(verbatim: path).font(AppFont.body()).foregroundStyle(.primary)
+                        Text(verbatim: path).font(AppFont.body()).foregroundStyle(Color.hxTextPrimary)
                     }
                 }
             } header: {

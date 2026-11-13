@@ -217,13 +217,7 @@ struct BrainJournalCalendarView: View {
     @ViewBuilder
     private var footer: some View {
         if loadOlderFailed {
-            Button(action: onRetry) {
-                Text(verbatim: "Couldn't load older days. Try again")
-                    .font(BrainStyle.rowSubtitle)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-            }
-            .buttonStyle(.plain)
+            HXFailedView(title: "Couldn't load older days", style: .inline, retry: onRetry)
         } else if isShowingCachedCopy {
             Text(verbatim: "Offline, showing saved copy")
                 .brainText(.meta)

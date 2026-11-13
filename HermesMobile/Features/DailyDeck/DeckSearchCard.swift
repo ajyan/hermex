@@ -91,7 +91,7 @@ struct DeckSearchCard: View {
                         .font(AppFont.subheadline())
                 }
                 Spacer(minLength: 8)
-                Text(verbatim: "One-pager").font(AppFont.caption(weight: .semibold)).foregroundStyle(Color.accentColor)
+                Text(verbatim: "One-pager").font(AppFont.caption(weight: .semibold)).foregroundStyle(palette.ink)
             }
             .padding(.vertical, 6)
             .contentShape(Rectangle())

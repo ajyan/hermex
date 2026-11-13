@@ -379,7 +379,7 @@ struct BrainModuleListView: View {
     private func listSearchField(prompt: String, text: Binding<String>, onSubmit: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
                 .accessibilityHidden(true)
 
             TextField(prompt, text: text)
@@ -393,7 +393,7 @@ struct BrainModuleListView: View {
                     text.wrappedValue = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
@@ -560,12 +560,8 @@ struct BrainListStateView<Loaded: View>: View {
                 Text(verbatim: "This server doesn't serve the Second Brain. It needs the Brain API from your hermes-webui fork.")
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this list") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load this list", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded:
             ContentUnavailableView {
@@ -706,7 +702,8 @@ struct BrainPeopleRow: View {
             leading: { BrainMonogram(name: item.title, size: side) },
             title: item.title,
             subtitle: item.subtitle,
-            badge: item.badge
+            badge: item.badge,
+            badgePaper: BrainModuleID.people.paper
         )
     }
 }

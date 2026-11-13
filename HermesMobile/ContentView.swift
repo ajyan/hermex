@@ -27,7 +27,7 @@ struct ContentView: View {
 
     var body: some View {
         content
-            .onOpenURL(perform: handleOpenURL)
+            .onOpenURL { handleOpenURL($0) }
             .task {
                 guard !didCheckInitialPendingShare else { return }
                 didCheckInitialPendingShare = true
@@ -133,6 +133,7 @@ struct ContentView: View {
                 pendingWebuiPush: $pendingWebuiPush
             )
             .environment(\.dictationServer, server)
+            .environment(\.transcriptServerOrigin, server)
             // Switching the active server keeps us in `.loggedIn`, so without a
             // per-server identity SwiftUI would reuse the same ChatShellView (and
             // its server-bound view model), leaving stale sessions/chat on screen.
@@ -142,7 +143,9 @@ struct ContentView: View {
         }
     }
 
-    private func handleOpenURL(_ url: URL) {
+    /// `fromIntent` is true for a link an App Intent queued (Siri, Shortcuts, the Action
+    /// button), which the user asked for; any other is a link from outside the app.
+    private func handleOpenURL(_ url: URL, fromIntent: Bool = false) {
         Task { await AgentLiveActivityManager.shared.dismissFinishedActivity(from: url) }
         pendingWebuiPush = nil
         switch IncomingURLRoute(url) {
@@ -154,8 +157,10 @@ struct ContentView: View {
         // A fresh request each time (new `id`) so a repeat invocation re-triggers navigation
         // even if the previous one's value still lingers downstream. The voice variant carries
         // `autoStartsVoiceInput` so the composer begins dictation once it appears (#338).
+        // Dictation starts by itself only for an intent (Siri, the Action button, the widget's
+        // mic); another app's link opens the new chat and leaves the mic to a tap.
         case .newChatVoice:
-            if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(autoStartsVoiceInput: true) }
+            if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(autoStartsVoiceInput: fromIntent) }
         case .dailyBrief(let date, let kind):
             if let date, let kind { DailyBriefLaunch.request(date: date, kind: kind) }
             if reachWebuiServer() { pendingScreen = .dailyDeck }
@@ -163,8 +168,13 @@ struct ContentView: View {
             if reachWebuiServer() { pendingScreen = .goals }
         case .meals:
             if reachWebuiServer() { pendingScreen = .meals }
+        // Another app's link opens the call screen with Start call; a spoken intent starts it.
+        // Either way the microphone waits for App Lock (`VoiceCallStartGate`).
         case .newCall:
-            if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(startsCall: true) }
+            if reachWebuiServer() {
+                VoiceCallLaunch.request(waitsForTap: !fromIntent)
+                pendingNewChatRequest = NewChatRequest(startsCall: true)
+            }
         // The profile variant pins the new session to the chosen profile (#339).
         case .newChatInProfile(let profileName):
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(profileName: profileName) }
@@ -255,7 +265,7 @@ struct ContentView: View {
     private func drainPendingIntentDeepLink() {
         guard let url = intentRouter.pendingDeepLink else { return }
         intentRouter.pendingDeepLink = nil
-        handleOpenURL(url)
+        handleOpenURL(url, fromIntent: true)
     }
 
     private func importPendingSharedDraftIfAvailable() {

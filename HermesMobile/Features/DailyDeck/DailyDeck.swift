@@ -400,6 +400,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         /// The headline's tag lines, each with its kind of mark (wire `tags`, `{icon, text}`); a sleep card's
         /// `tags` decode into `tags` instead.
         let headlineTags: [DeckTag]
+        /// The opener's week and today's events, drawn as a calendar (`DeckOpenerCalendar`); nil on older decks
+        /// and when the calendar didn't load.
+        let calendar: DeckDayCalendar?
         /// An idea card's one-sentence gist, its verbatim quotes, its labelled parts, and the week's question it serves.
         let gist: String?
         let quotes: [DeckPiece.Quote]
@@ -428,7 +431,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
             case act, gist, quotes, parts, weekQuestion, thread, linked, fromIdea, dateLabel, month
-            case take, summary, sourceText
+            case take, summary, sourceText, calendar
             case valueID = "value"
             case itemKind = "kind"
         }
@@ -530,6 +533,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             yesterdayOne = try? c.decodeIfPresent(DeckYesterdayOne.self, forKey: .yesterdayOne)
             act = (try? c.decodeIfPresent(String.self, forKey: .act)).flatMap { $0.isEmpty ? nil : $0 }
             headlineTags = ((try? c.decodeIfPresent([Lossy<DeckTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
+            calendar = (try? c.decodeIfPresent(DeckDayCalendar.self, forKey: .calendar)).flatMap { $0.isEmpty ? nil : $0 }
             gist = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .gist))
             quotes = ((try? c.decodeIfPresent([Lossy<DeckPiece.Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
                 .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

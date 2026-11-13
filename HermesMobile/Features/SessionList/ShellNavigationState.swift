@@ -47,6 +47,10 @@ enum ShellPushDestination: Hashable {
     case mealsDish(MealsDishRoute)
     /// A season's record (any day in it), from the recipe book.
     case mealsSeason(String)
+    /// Status: is everything OK, from the drawer's Status bar.
+    case status
+    /// One Status tile opened, by its id.
+    case statusTile(String)
     case settings(SettingsScrollAnchor?)
 }
 
@@ -228,6 +232,7 @@ extension ShellPushDestination {
         case .feedback: "Feedback"
         case .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout: "Body"
         case .meals, .mealsBook, .mealsDish, .mealsSeason: "Meals"
+        case .status, .statusTile: "Status"
         case .settings: "Settings"
         }
     }
@@ -339,7 +344,8 @@ extension ShellPushDestination {
         switch self {
         case .brain, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
-             .feedback, .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
+             .feedback, .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason,
+             .status, .statusTile, .settings: false
         }
     }
 
@@ -355,7 +361,8 @@ extension ShellPushDestination {
              .brainRoute(.prep(.story(_))), .brainRoute(.prep(.gapRun(_))), .brainRoute(.prep(.lessonRun(_))): false
         case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
-             .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
+             .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason,
+             .status, .statusTile, .settings: false
         }
     }
 }

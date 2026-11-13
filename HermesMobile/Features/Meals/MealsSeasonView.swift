@@ -232,8 +232,15 @@ struct MealsSeasonView: View {
                             .foregroundStyle(paper.secondaryInk)
                             .frame(width: 52, alignment: .leading)
                         ForEach(Array(week.days.enumerated()), id: \.offset) { _, state in
-                            DeckDot(state: state, ink: paper.glow, column: dot, size: dot)
-                                .frame(maxWidth: .infinity)
+                            // Nothing outside the season: an "off" day keeps its column, empty.
+                            Group {
+                                if state == "off" {
+                                    Color.clear.frame(width: dot, height: dot)
+                                } else {
+                                    DeckDot(state: state, ink: paper.glow, column: dot, size: dot)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
                         }
                     }
                     .accessibilityElement(children: .ignore)

@@ -30,6 +30,19 @@ extension EnvironmentValues {
     @Entry var hxPaper: HermexPaper?
 }
 
+/// Supporting text (DESIGN.md § Papers, `secondaryInk`): the paper's secondary ink inside a glow
+/// or wash card, `hxTextSecondary` everywhere else. Use `.foregroundStyle(.hxSecondary)` for every
+/// caption, meta line, or detail so the same view reads right on a card and on the canvas.
+struct HXSecondaryStyle: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color {
+        environment.hxPaper?.secondaryInk ?? .hxTextSecondary
+    }
+}
+
+extension ShapeStyle where Self == HXSecondaryStyle {
+    static var hxSecondary: HXSecondaryStyle { HXSecondaryStyle() }
+}
+
 extension View {
     func hxShadow(_ shadow: HXShadow) -> some View {
         modifier(HXShadowModifier(shadow: shadow))
@@ -193,7 +206,11 @@ private struct HXCardSurface: ViewModifier {
         }
         switch role {
         case .glow(let paper):
+            // The paper's hue is the tint and `\.hxPaper` (DESIGN.md principle 5), so controls and
+            // `.hxSecondary` text inside take the card's color without being told.
             clipped
+                .tint(paper.glow)
+                .environment(\.hxPaper, paper)
                 .background(paper.card, in: shape)
                 .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
                 .hxShadow(.paper)

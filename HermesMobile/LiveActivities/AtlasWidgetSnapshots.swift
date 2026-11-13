@@ -363,3 +363,41 @@ extension AtlasWidgetGoals.Item {
         return days
     }
 }
+
+/// What an Ask Atlas widget button starts.
+enum AtlasWidgetLaunch: String, AppEnum {
+    case call
+    case voiceChat
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Atlas Action"
+    static var caseDisplayRepresentations: [AtlasWidgetLaunch: DisplayRepresentation] = [
+        .call: "Call Atlas",
+        .voiceChat: "New Chat with Voice",
+    ]
+}
+
+/// The Ask Atlas widget's Call Atlas and Dictate buttons. An `OpenIntent` in both targets, so
+/// the system opens the app and performs it there, where `handler` (installed at launch) routes
+/// it like Siri's intents: the call or dictation starts once App Lock allows. A plain
+/// `hermes-agent://` link can come from any app, so it waits for a tap instead. Compiled into
+/// the widget too, where `handler` stays nil.
+struct AtlasWidgetLaunchIntent: OpenIntent {
+    static var title: LocalizedStringResource = "Open Atlas"
+    static var isDiscoverable = false
+
+    @Parameter(title: "Action") var target: AtlasWidgetLaunch
+
+    init() {}
+
+    init(_ target: AtlasWidgetLaunch) {
+        self.target = target
+    }
+
+    @MainActor static var handler: ((AtlasWidgetLaunch) -> Void)?
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        Self.handler?(target)
+        return .result()
+    }
+}

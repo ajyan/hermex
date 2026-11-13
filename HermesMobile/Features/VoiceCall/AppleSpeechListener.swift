@@ -281,7 +281,7 @@ private final class AnalyzerRecognizer: CallRecognizer {
             finalizedThrough = CMTimeMaximum(finalizedThrough, result.range.end)
         } else if result.range.end <= finalizedThrough {
             // A volatile result for audio a final already covered would repeat its words.
-            log("listener: dropped stale volatile \"\(text)\"")
+            log("listener: dropped stale volatile \(VoiceCallDiagnostics.size(text))")
             return
         }
         onResult?(text, result.isFinal)

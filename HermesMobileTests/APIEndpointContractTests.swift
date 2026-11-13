@@ -411,6 +411,7 @@ final class ContractReadinessTests: XCTestCase {
             .init(name: "meals plan finish", method: "POST", endpoint: .mealsPlanFinish, path: "/api/meals/plan/finish"),
             .init(name: "meals season", method: "GET", endpoint: .mealsSeason(day: "2026-10-01", today: "2026-11-04"),
                   path: "/api/meals/season", query: ["day": "2026-10-01", "today": "2026-11-04"]),
+            .init(name: "atlas status", method: "GET", endpoint: .atlasStatus, path: "/api/atlas/status"),
             .init(name: "brief file", method: "POST", endpoint: .briefFile, path: "/api/brief/file"),
             .init(name: "brief intention", method: "POST", endpoint: .briefIntention, path: "/api/brief/intention"),
             .init(name: "brief photo", method: "POST", endpoint: .briefPhoto(weekEnding: "2026-10-25"),

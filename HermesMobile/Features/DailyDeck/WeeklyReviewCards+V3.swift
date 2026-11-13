@@ -29,7 +29,7 @@ struct WeekLastIntentionCard: View {
             if let fact = Self.nonBlank(card.fact?.line) {
                 Text(verbatim: fact)
                     .font(AppFont.subheadline())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
             }
@@ -97,7 +97,7 @@ struct WeekValueCard: View {
                     if let line {
                         Text(verbatim: line)
                             .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -154,7 +154,7 @@ struct WeekIntentionCard: View {
                     ProgressView().controlSize(.small)
                     Text(verbatim: "Drafting from your answers")
                         .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 .padding(.top, 8)
                 .accessibilityElement(children: .combine)
@@ -208,7 +208,7 @@ struct WeekIntentionCard: View {
             if let reason = card.frontReason, chosen == card.front {
                 Text(verbatim: "Suggested · \(reason)")
                     .font(AppFont.caption())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -226,7 +226,7 @@ struct WeekIntentionCard: View {
                 if !change.reason.isEmpty {
                     Text(verbatim: change.reason)
                         .font(AppFont.caption())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 if failed.contains(change.goal) {
                     Text(verbatim: "Couldn't confirm. Try again.")
@@ -257,7 +257,7 @@ struct WeekIntentionCard: View {
                     Text(verbatim: "Accept").font(AppFont.footnote(weight: .semibold))
                 }
                 .buttonStyle(.borderless)
-                .tint(Color.accentColor)
+                .tint(palette.ink)
                 .frame(minHeight: 44)
                 .accessibilityLabel(Text(verbatim: "Accept " + (change.label.isEmpty ? change.title : change.label)
                     .replacingOccurrences(of: "→", with: "to")))

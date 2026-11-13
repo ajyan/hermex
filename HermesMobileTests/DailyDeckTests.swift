@@ -2988,11 +2988,12 @@ final class DeckHabitTrackerTests: XCTestCase {
          {"label":"Prep practice","kind":"days","front":"ai","goal":"g","commitment":"prep"},
          {"label":"Applications","kind":"pips","front":"ai","target":5,"done":2},
          {"label":"Call a friend","kind":"days","front":"relationships"},{"label":"Read","kind":"days","paper":"book","front":"ai"},
-         {"label":"Unfiled","kind":"days"}]
+         {"label":"Unfiled","kind":"days"},{"label":"Stretch","kind":"days","paper":"opener","front":"living-well"}]
         """#)
         XCTAssertEqual(card.weekRows.map(\.habitPaper),
-                       [.video, .video, .mandarin, .advisor, .orchid, .orchid, BrainModuleID.people.paper, .book, .plain],
-                       "sleep, lifting, Mandarin, the letter and the job search each keep their kind's paper; the vault's name wins")
+                       [.video, .video, .mandarin, .advisor, .orchid, .orchid, BrainModuleID.people.paper, .book, .plain, .video],
+                       "sleep, lifting, Mandarin, the letter and the job search each keep their kind's paper; the vault's name "
+                       + "wins, except opener, which falls back to the habit's own paper")
         XCTAssertFalse(card.weekRows.contains { $0.habitPaper == .opener }, "amber means waiting on you, so no habit wears it")
     }
 
@@ -3628,5 +3629,70 @@ final class DeckRenderTests: XCTestCase {
             window.isHidden = true
             window.rootViewController = nil
         }
+    }
+}
+
+final class DeckOpenerCalendarTests: XCTestCase {
+    private func timed(_ title: String, _ start: Int, _ end: Int) -> DeckDayCalendar.Event {
+        DeckDayCalendar.Event(title: title, allDay: false, start: start, end: end)
+    }
+
+    func testOpenerDecodesItsCalendarAndDropsItsCalendarLines() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-11-11","kind":"morning","cards":[
+          {"id":"headline","type":"headline","title":"Wed, Nov 11",
+           "tags":[{"icon":"due","text":"She’s due Jan 16 · 66 days"},{"icon":"calendar","text":"11:00 Edra"}],
+           "calendar":{"week":[{"date":"2026-11-09","count":1},{"date":"2026-11-10"},{"count":2}],
+                       "today":[{"title":"Veterans Day","all_day":true},{"title":"Edra","start":660,"end":690},
+                                {"title":"No times"},{"title":"Backwards","start":700,"end":600},{"start":1,"end":2}]}}]}
+        """#)
+        let open = try XCTUnwrap(deck.cards.first)
+        let calendar = try XCTUnwrap(open.calendar)
+        XCTAssertEqual(calendar.week, [.init(date: "2026-11-09", count: 1), .init(date: "2026-11-10", count: 0)],
+                       "a day without a date drops; a missing count is none")
+        XCTAssertEqual(calendar.allDay.map(\.title), ["Veterans Day"])
+        XCTAssertEqual(calendar.timed, [timed("Edra", 660, 690)], "an event without a usable time drops")
+        XCTAssertEqual(open.openerTags.map(\.text), ["She’s due Jan 16 · 66 days"], "the calendar replaces its lines")
+    }
+
+    func testOpenerWithoutACalendarKeepsItsCalendarLines() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-11-13","kind":"morning","cards":[
+          {"id":"headline","type":"headline","title":"Fri, Nov 13",
+           "tags":[{"icon":"calendar","text":"Calendar didn't load"}],"calendar":{"week":[],"today":[]}}]}
+        """#)
+        let open = try XCTUnwrap(deck.cards.first)
+        XCTAssertNil(open.calendar, "an empty block is no calendar")
+        XCTAssertEqual(open.openerTags.map(\.text), ["Calendar didn't load"])
+    }
+
+    func testTimelineGroupsCloseEventsAndSaysWhenYoureFree() {
+        let pieces = DeckTimelineLayout.pieces([timed("Nandini", 780, 840), timed("Edra", 660, 690),
+                                                timed("Tenex", 720, 750), timed("Dinner", 1110, 1200)])
+        XCTAssertEqual(pieces, [
+            .stretch(.init(startHour: 11, endHour: 14, lanes: 1, blocks: [
+                .init(title: "Edra", start: 660, end: 690, lane: 0),
+                .init(title: "Tenex", start: 720, end: 750, lane: 0),
+                .init(title: "Nandini", start: 780, end: 840, lane: 0)])),
+            .free("Free 2:00–6:30"),
+            .stretch(.init(startHour: 18, endHour: 20, lanes: 1, blocks: [.init(title: "Dinner", start: 1110, end: 1200, lane: 0)])),
+            .free("Free after 8:00"),
+        ])
+    }
+
+    func testOverlappingEventsSitSideBySide() {
+        let pieces = DeckTimelineLayout.pieces([timed("A", 540, 660), timed("B", 600, 630), timed("C", 630, 690)])
+        guard case .stretch(let stretch) = pieces.first else { return XCTFail("a stretch first") }
+        XCTAssertEqual(stretch.lanes, 2)
+        XCTAssertEqual(stretch.blocks.map(\.lane), [0, 1, 1], "C starts as B ends, so it reuses B's lane")
+    }
+
+    func testALateDayEndsWithoutAFreeLine() {
+        XCTAssertEqual(DeckTimelineLayout.pieces([timed("Show", 1200, 1350)]).count, 1)
+        XCTAssertEqual(DeckTimelineLayout.pieces([]), [])
+    }
+
+    func testClockReadsLikeTheDeck() {
+        XCTAssertEqual([0, 660, 720, 780, 1110, 1440].map(DeckTimelineLayout.clock), ["12:00", "11:00", "12:00", "1:00", "6:30", "12:00"])
     }
 }

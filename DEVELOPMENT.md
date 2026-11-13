@@ -94,6 +94,16 @@ Check yours with `xcodebuild -version`. With several Xcodes installed, select
 or for the whole Mac with `sudo xcode-select -s <path to Xcode 27.0>.app`.
 Move the local Xcode and both workflow pins together.
 
+## Design drift hook
+
+Turn on the repository's hooks once per clone (worktrees share it):
+
+```zsh
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-commit` then runs `scripts/check-design-drift --staged` on the Swift lines each commit adds and refuses a commit that bypasses `DESIGN.md`. `docs/agents/design-review.md` covers the rules and the design review before a UI commit; `git commit --no-verify` skips the hook once.
+
 ## Local XCTest
 
 Use the repository runner for local tests, including when XcodeBuildMCP is

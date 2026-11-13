@@ -278,7 +278,7 @@ struct WorkoutCardHeader: View, Equatable {
                 if let note = lift.note, !note.isEmpty {
                     Text(verbatim: note)
                         .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(paper.secondaryInk)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -323,7 +323,7 @@ struct WorkoutPairHeader: View, Equatable {
                 }
                 Text(verbatim: "One set of each, then the next round.")
                     .font(AppFont.footnote())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(paper.secondaryInk)
             }
             .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: WorkoutLayout.columnSpacing) {
@@ -393,7 +393,7 @@ struct WorkoutSetRow: View, Equatable {
             HStack(spacing: WorkoutLayout.columnSpacing) {
                 Text(verbatim: tag)
                     .font(AppFont.subheadline(weight: .bold))
-                    .foregroundStyle(isWarm ? Color.hxTextSecondary : paper.glow)
+                    .foregroundStyle(isWarm ? paper.secondaryInk : paper.glow)
                     .frame(width: columns.tag, alignment: .leading)
                 VStack(alignment: .leading, spacing: 1) {
                     if named {
@@ -404,7 +404,7 @@ struct WorkoutSetRow: View, Equatable {
                     Text(verbatim: lastTime)
                         .font(named ? AppFont.caption() : AppFont.subheadline())
                         .monospacedDigit()
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(paper.secondaryInk)
                 }
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -417,7 +417,6 @@ struct WorkoutSetRow: View, Equatable {
             check
         }
         .frame(minHeight: 48)
-        .opacity(row.done ? 0.75 : 1)
         .onChange(of: focus) { old, _ in
             if let old { commit(old) }
             draft = ""
@@ -438,7 +437,7 @@ struct WorkoutSetRow: View, Equatable {
     private var weightLabel: some View {
         Text(verbatim: weightText)
             .font(AppFont.subheadline())
-            .foregroundStyle(Color.hxTextSecondary)
+            .foregroundStyle(paper.secondaryInk)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .frame(width: columns.weight)
@@ -478,7 +477,7 @@ struct WorkoutSetRow: View, Equatable {
     }
 
     /// A 44 pt tall number box, as wide as its column, typed into in place. The set's number shows
-    /// until he types, dimmed while the box has focus; the focused box wears the Nous-blue edge.
+    /// until he types, dimmed while the box has focus; the focused box wears the glow edge.
     private func numberBox(_ field: Field, shown: String, width: CGFloat, label: String) -> some View {
         let isFocused = focus == field
         let shape = RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
@@ -506,7 +505,7 @@ struct WorkoutSetRow: View, Equatable {
         .frame(width: width)
         .frame(minHeight: 44)
         .background(Color.hxCanvas, in: shape)
-        .overlay(shape.strokeBorder(isFocused ? Color.accentColor : Color.hxSeparator, lineWidth: isFocused ? 1.5 : 0.5))
+        .overlay(shape.strokeBorder(isFocused ? paper.glow : Color.hxSeparator, lineWidth: isFocused ? 1.5 : 0.5))
         .contentShape(Rectangle())
         .onTapGesture { focus = field }
     }

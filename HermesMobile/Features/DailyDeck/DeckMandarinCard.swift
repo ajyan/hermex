@@ -504,7 +504,7 @@ struct MandarinRow: View {
                 if let note, !note.isEmpty {
                     Text(verbatim: note)
                         .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

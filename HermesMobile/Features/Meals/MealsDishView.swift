@@ -147,14 +147,13 @@ struct MealsDishView: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(paper.glow)
+                .foregroundStyle(disabled ? Color.hxTextSecondary : paper.glow)
                 .frame(width: 44, height: 44)
                 .background(paper.wash, in: Capsule())
                 .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .opacity(disabled ? 0.4 : 1)
         .accessibilityLabel(Text(verbatim: label))
     }
 
@@ -184,24 +183,16 @@ struct MealsDishView: View {
         } footer: {
             HStack(spacing: 8) {
                 Button { Task { await viewModel.answerFix(use: true) } } label: {
-                    Text(verbatim: "Use this")
-                        .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(atlas.onGlow)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(atlas.glow, in: Capsule())
+                    Text(verbatim: "Use this").bodyTapHeight()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
                 .accessibilityHint(Text(verbatim: "Changes the recipe"))
                 Button { Task { await viewModel.answerFix(use: false) } } label: {
-                    Text(verbatim: "Keep as is")
-                        .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(atlas.glow)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(atlas.wash, in: Capsule())
-                        .overlay(Capsule().strokeBorder(atlas.edge, lineWidth: 0.5))
+                    Text(verbatim: "Keep as is").bodyTapHeight()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
             }
+            .environment(\.hxPaper, atlas)
             .padding(.top, 4)
         }
     }

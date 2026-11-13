@@ -31,7 +31,7 @@ struct MoneyView: View {
                         Button { withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.toggleReveal() } } label: {
                             Image(systemName: viewModel.isHidden ? "eye" : "eye.slash")
                         }
-                        .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Show Amounts" : "Hide Amounts"))
+                        .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Show amounts" : "Hide amounts"))
                     }
                 }
             }
@@ -67,7 +67,7 @@ struct MoneyView: View {
             } description: {
                 Text(verbatim: "Run the money-morning job on your server.")
             } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Check Again") }
+                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Check again") }
             }
         case .failed(let message):
             HXFailedView(title: "Couldn't load Money", message: message) {
@@ -212,9 +212,9 @@ struct MoneyView: View {
                         .multilineTextAlignment(.leading)
                 }
             }
-            .padding(12)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glowSurface(.money, cornerRadius: HXRadius.md)
+            .hxCardSurface(.wash(.money))
         }
         .buttonStyle(.plain)
         .accessibilityHint(Text(verbatim: "Opens the market card"))
@@ -260,9 +260,9 @@ struct MoneyView: View {
                            label: spending.flags.count == 1 ? "1 thing worth a look" : "\(spending.flags.count) things worth a look")
                 }
             }
-            .padding(12)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glowSurface(.money, cornerRadius: HXRadius.md)
+            .hxCardSurface(.wash(.money))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -312,10 +312,7 @@ struct MoneyView: View {
                     .foregroundStyle(Color.hxTextPrimary)
                 Text(verbatim: MoneyFormat.weekChange(account, hidden: viewModel.isHidden))
                     .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(account.change1w == 0 ? Color.hxTextSecondary : Color.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(account.change1w == 0 ? Color.clear : color, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
+                    .foregroundStyle(color)
                     .accessibilityLabel(Text(verbatim: MoneyFormat.weekChangeLabel(account, hidden: viewModel.isHidden)))
             }
             .monospacedDigit()

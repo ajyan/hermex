@@ -610,28 +610,29 @@ struct PrepRunView: View {
     }
 }
 
-/// A thin bar of one segment per rep: done reps in muted secondary text, the current
-/// one stronger, the rest on the separator. Neutral chrome; static, never animated.
+/// One dot per rep (`DeckDot`s in the Prep glow): done reps filled, the current one ringed, the rest dashed
+/// and faint. Numbers are dots, never bars; static, never animated.
 private struct PrepSegmentBar: View {
     let position: Int
     let count: Int
 
     var body: some View {
-        HStack(spacing: 3) {
+        // A long run tightens the columns so the row still fits a phone.
+        let column: CGFloat = count > 24 ? 10 : 14
+        HStack(spacing: 0) {
             ForEach(0..<count, id: \.self) { index in
-                Capsule()
-                    .fill(color(index))
-                    .frame(height: 3)
+                DeckDot(state: state(index), ink: HermexPaper.prep.glow, column: column, size: column - 4)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: "Rep \(position + 1) of \(count)"))
     }
 
-    private func color(_ index: Int) -> Color {
-        if index < position { return Color.hxTextSecondary.opacity(0.55) }
-        if index == position { return Color.hxTextSecondary.opacity(0.9) }
-        return .hxSeparator
+    private func state(_ index: Int) -> String {
+        if index < position { return "done" }
+        if index == position { return "today" }
+        return "ahead"
     }
 }
 

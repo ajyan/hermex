@@ -61,7 +61,7 @@ struct CoachProposalCard: View {
             if !proposal.rule.isEmpty {
                 Text(verbatim: proposal.rule)
                     .font(AppFont.footnote())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(paper.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } footer: {

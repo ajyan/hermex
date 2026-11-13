@@ -59,10 +59,14 @@ enum BrainReaderLayout {
     }
 
     /// Further reading split as the server sends it: the page's sources (reason "source"),
-    /// then pages that share its tags (the reason names them, "#rome · #person").
+    /// then pages that share its tags (the reason names them, "#rome · #person"), at most
+    /// `furtherLimit` each.
     static func furtherGroups(_ refs: [BrainRef]) -> (sources: [BrainRef], tagged: [BrainRef]) {
-        (refs.filter { $0.reason == "source" }, refs.filter { $0.reason != "source" })
+        (Array(refs.filter { $0.reason == "source" }.prefix(furtherLimit)),
+         Array(refs.filter { $0.reason != "source" }.prefix(furtherLimit)))
     }
+
+    static let furtherLimit = 3
 
     /// Whether a page's tags open its module's list filtered to them: the lists with a tag bar.
     static func tagsFilter(_ module: BrainModuleID) -> Bool {
@@ -366,12 +370,8 @@ struct BrainReaderView: View {
                 Label { Text(verbatim: "This page moved or was removed") } icon: { Image(systemName: "doc.questionmark") }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this page") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load this page", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded(let page):
             BrainReaderContent(
@@ -431,6 +431,8 @@ struct BrainReaderContent: View {
     private static let hubPagesAnchor = "hub-pages"
     /// The page's diagram sheet, while open.
     @State private var showsDiagram = false
+    /// A link in the page another app would open, waiting on the confirmation.
+    @State private var pendingExternalLink: URL?
 
     init(page: BrainPage, person: BrainPersonPage?, layout: BrainReaderPageLayout, isShowingCachedCopy: Bool,
          isMissing: Bool = false, push: @escaping (BrainRoute) -> Void, rating: BrainPageRating? = nil,
@@ -460,6 +462,7 @@ struct BrainReaderContent: View {
                         proxy.scrollTo(BrainArticleDigestView.ideaAnchor(focusIdea), anchor: .top)
                     }
                 }
+                .confirmsExternalLink($pendingExternalLink)
         }
     }
 
@@ -575,7 +578,7 @@ struct BrainReaderContent: View {
     }
 
     /// Opens a page's `brain://` links in the reader, drops ones the app can't resolve, and
-    /// hands any other URL to the system.
+    /// hands any other URL to the system, asking first for a scheme `ExternalLinkPolicy` doesn't trust.
     private var brainLinks: OpenURLAction {
         OpenURLAction { url in
             switch BrainReaderLayout.linkAction(for: url) {
@@ -584,8 +587,11 @@ struct BrainReaderContent: View {
                 return .handled
             case .discard:
                 return .discarded
-            case .system:
+            case .system where ExternalLinkPolicy.opensWithoutAsking(url):
                 return .systemAction
+            case .system:
+                pendingExternalLink = url
+                return .handled
             }
         }
     }

@@ -127,6 +127,7 @@ struct MealsHomeView: View {
                             .font(AppFont.footnote(weight: .semibold))
                             .frame(minHeight: 32)
                     }
+                    .tint(paper.glow)
                     .accessibilityLabel(Text(verbatim: "\(main.name) recipe"))
                 }
                 if !home.tomorrowPrep.isEmpty { tomorrowPrep(home.tomorrowPrep) }
@@ -194,13 +195,11 @@ struct MealsHomeView: View {
                         }
                     } label: {
                         Text(verbatim: "Swap night")
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .foregroundStyle(paper.glow)
-                            .padding(.horizontal, 18)
-                            .frame(minHeight: 44)
-                            .background(paper.wash, in: Capsule())
-                            .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
+                            .bodyTapHeight()
                     }
+                    .menuStyle(.button)
+                    .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+                    .environment(\.hxPaper, paper)
                     .accessibilityHint(Text(verbatim: "Trades tonight's meal with another night"))
                 }
             }
@@ -384,9 +383,8 @@ struct MealsHomeView: View {
     }
 }
 
-/// One day of the week: its date, the meal (main, then sides), and its `DeckDot` (`MealsCopy.dayDot`):
-/// filled once logged, ringed tonight, dashed ahead, a faint ring for a past night never logged. An
-/// open night offers a plus.
+/// One day of the week: its date, the meal (main, then sides), and its `DeckDot` (`MealsCopy.dayDot`),
+/// drawn as the planner's review draws days. An open night offers a plus beside its mark.
 private struct MealsDayRow: View {
     let day: MealsDay
     /// The phone's day, YYYY-MM-DD.
@@ -404,7 +402,7 @@ private struct MealsDayRow: View {
                 Text(verbatim: MealsCopy.dayNumber(day.day))
                     .font(AppFont.display(style: .subheadline, weight: .semibold))
             }
-            .foregroundStyle(isToday ? paper.glow : Color.hxTextSecondary)
+            .foregroundStyle(isToday ? Color.hxTextPrimary : Color.hxTextSecondary)
             .frame(width: 34)
             meal
             Spacer(minLength: 8)
@@ -446,11 +444,7 @@ private struct MealsDayRow: View {
         if let serves = day.night.flatMap({ MealsCopy.serves($0.servings) }), day.logged == nil {
             HXChip(paper: paper, label: serves)
         }
-        if let dot = MealsCopy.dayDot(day, today: today) {
-            DeckDot(state: dot, ink: paper.glow, column: 22, size: 22)
-                .accessibilityElement()
-                .accessibilityLabel(Text(verbatim: MealsCopy.dayDotLabel(dot)))
-        } else {
+        if day.night == nil && day.logged == nil {
             Button(action: onAdd) {
                 Image(systemName: "plus.circle")
                     .font(AppFont.title3())
@@ -460,25 +454,31 @@ private struct MealsDayRow: View {
             .foregroundStyle(Color.accentColor)
             .accessibilityLabel(Text(verbatim: "Plan \(MealsCopy.weekdayName(day.day))"))
         }
+        let dot = MealsCopy.dayDot(day, today: today)
+        DeckDot(state: dot, ink: paper.glow, column: 22, size: 22)
+            .accessibilityElement()
+            .accessibilityLabel(Text(verbatim: MealsCopy.dayDotLabel(day, today: today)))
+            // "Nothing planned" is already the row's words.
+            .accessibilityHidden(dot == "off")
     }
 }
 
 extension MealsCopy {
-    /// A week row's `DeckDot` state: done once logged; for a planned night, today, ahead, or missed
-    /// (past and never logged). Nil for an open night, which shows a plus instead.
-    static func dayDot(_ day: MealsDay, today: String) -> String? {
+    /// A week row's `DeckDot` state, as the planner's review draws days (`reviewDot`): done once
+    /// logged, a heavy ring tonight and for a past night planned but never logged (it needs a look),
+    /// dashed ahead, and the small off mark with nothing planned.
+    static func dayDot(_ day: MealsDay, today: String) -> String {
         if day.logged != nil { return "done" }
-        guard day.night != nil else { return nil }
-        if day.day == today { return "today" }
-        return day.day > today ? "ahead" : "missed"
+        guard day.night != nil else { return "off" }
+        return day.day > today ? "ahead" : "today"
     }
 
-    static func dayDotLabel(_ state: String) -> String {
-        switch state {
+    static func dayDotLabel(_ day: MealsDay, today: String) -> String {
+        switch dayDot(day, today: today) {
         case "done": "Logged"
-        case "today": "Tonight"
+        case "today": day.day == today ? "Tonight" : "Needs a look"
         case "ahead": "Planned"
-        default: "Not logged"
+        default: "Nothing planned"
         }
     }
 

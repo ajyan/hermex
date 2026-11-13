@@ -4,7 +4,7 @@ import SwiftUI
 /// the stories, the mock and the one-pager for that interview, and the screen's one filled button), then the
 /// Pipeline, then whether you're interview-ready and today's run with an outlined Start. With none booked it
 /// falls back to today's run: interview-ready, today's run (its one action), then the Pipeline. Below either:
-/// the weak spots (open gaps and missed lessons), practice out loud (the voice mock ladders, a due one marked,
+/// the weak spots (open gaps and lessons back in reviews), practice out loud (the voice mock ladders, a due one marked,
 /// and the story bank), then the course, folded to the unit being taught.
 /// Pushed as `.brainRoute(.prep(.home))`; owns no `NavigationStack`.
 struct PrepHomeView: View {
@@ -130,7 +130,7 @@ struct PrepHomeView: View {
     }
 }
 
-/// Today's run action as a small accent capsule: Start or Resume push the run;
+/// Today's run action as a capsule in the Prep paper: Start or Resume push the run;
 /// Done is shown disabled once nothing is left today.
 struct PrepRunButton: View {
     let action: PrepCopy.RunAction
@@ -153,18 +153,20 @@ struct PrepRunButton: View {
         }
     }
 
+    /// Filled in the Prep glow as the card's primary; the wash and edge as its secondary; a faint wash when off.
     private func label(_ title: String, enabled: Bool) -> some View {
+        let paper = HermexPaper.prep
         let filled = enabled && prominent
         return Text(verbatim: title)
             .font((fullWidth ? AppFont.body(weight: .semibold) : BrainStyle.rowSubtitle.weight(.semibold)))
-            .foregroundStyle(filled ? Color.hxOnAccent : enabled ? Color.accentColor : Color.hxTextSecondary)
+            .foregroundStyle(filled ? paper.onGlow : enabled ? paper.glow : paper.secondaryInk)
             .lineLimit(fullWidth ? 2 : 1)
             .fixedSize(horizontal: !fullWidth, vertical: true)
             .padding(.horizontal, BrainStyle.l)
             .padding(.vertical, BrainStyle.s)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: BrainStyle.minTapTarget)
-            .background(filled ? Color.accentColor : enabled ? Color.clear : Color.hxSeparator.opacity(0.6), in: Capsule())
-            .overlay { if enabled && !prominent { Capsule().strokeBorder(Color.accentColor, lineWidth: 1) } }
+            .background(filled ? paper.glow : enabled ? paper.wash : paper.glow.opacity(0.15), in: Capsule())
+            .overlay { if enabled && !prominent { Capsule().strokeBorder(paper.edge, lineWidth: 0.5) } }
             .contentShape(Capsule())
     }
 }
@@ -269,7 +271,7 @@ struct PrepWeakSpotsSection: View {
             .buttonStyle(.plain)
         case .lesson(let lesson):
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lessonRun(lesson.id)))) {
-                BrainRow(leading: { PrepMissedLessonMark() }, title: lesson.title, subtitle: "Missed last recall",
+                BrainRow(leading: { PrepMissedLessonMark() }, title: lesson.title, subtitle: "In reviews",
                          trailing: "Try it now", trailingTint: Color.accentColor)
             }
             .buttonStyle(.plain)
@@ -278,7 +280,8 @@ struct PrepWeakSpotsSection: View {
     }
 }
 
-/// A lesson whose last recall missed: an amber dashed ring, beside the gaps' amber dots.
+/// A lesson back in reviews (its last recall missed): an amber dashed ring, since it needs care, beside
+/// the gaps' amber dots.
 private struct PrepMissedLessonMark: View {
     var body: some View {
         Circle()
@@ -367,7 +370,7 @@ struct PrepGapView: View {
             HStack(spacing: BrainStyle.s) {
                 HXChip(paper: .prep, label: statusWord(gap)) { EmptyView() }
                 if let stage = PrepCopy.stageChip(gap.stage) {
-                    HXChip(paper: .plain, label: stage) { EmptyView() }
+                    HXChip(paper: .prep, label: stage) { EmptyView() }
                 }
             }
             if !gap.summary.isEmpty {
@@ -421,7 +424,8 @@ struct PrepGapView: View {
                         BrainRow(
                             title: card.title,
                             subtitle: card.due.map { PrepCopy.dueLine($0) },
-                            badge: card.isCoachWritten ? "Atlas" : nil
+                            badge: card.isCoachWritten ? "Atlas" : nil,
+                            badgePaper: .prep
                         )
                     }
                 }

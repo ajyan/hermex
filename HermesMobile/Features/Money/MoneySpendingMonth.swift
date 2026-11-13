@@ -180,7 +180,7 @@ struct MoneySpendingMonthSections<BeforeLog: View>: View {
         let isOpen = picked == category.key
         return VStack(spacing: 0) {
             Button {
-                withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { picked = isOpen ? nil : category.key }
+                withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { picked = isOpen ? nil : category.key }
             } label: {
                 HStack(spacing: 10) {
                     MoneySeriesDot(group: category.key)
@@ -248,7 +248,7 @@ struct MoneySpendingMonthSections<BeforeLog: View>: View {
                 }
                 if rows.count > shown.count || showsAllLog && rows.count > Self.logPreview {
                     Button(showsAllLog ? "Show fewer" : "Show all \(rows.count)") {
-                        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { showsAllLog.toggle() }
+                        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsAllLog.toggle() }
                     }
                     .font(AppFont.subheadline(weight: .medium))
                     .padding(.horizontal, 12)

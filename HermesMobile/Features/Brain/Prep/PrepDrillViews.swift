@@ -91,7 +91,8 @@ struct PrepChoiceView: View {
                 if isCorrect {
                     Image(systemName: "checkmark").foregroundStyle(Color.hxSuccess)
                 } else if isWrongPick {
-                    Image(systemName: "xmark").foregroundStyle(Color.hxDanger)
+                    // A miss, like every Prep miss: ◌ in the warning color, never red.
+                    Image(systemName: "circle.dashed").foregroundStyle(Color.hxWarning)
                 }
             }
             .font(BrainStyle.rowTitle.weight(.semibold))

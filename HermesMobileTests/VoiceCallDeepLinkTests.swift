@@ -32,4 +32,40 @@ final class VoiceCallDeepLinkTests: XCTestCase {
         XCTAssertTrue(NewChatRequest(startsCall: true).startsCall)
         XCTAssertFalse(NewChatRequest().startsCall)
     }
+
+    // MARK: - Start gate
+
+    func testACallNeverStartsWhileAppLockCoversTheApp() {
+        XCTAssertFalse(VoiceCallStartGate(isAppLocked: true, waitsForTap: false, tapped: false).mayStart)
+        XCTAssertFalse(VoiceCallStartGate(isAppLocked: true, waitsForTap: true, tapped: true).mayStart)
+        XCTAssertTrue(VoiceCallStartGate(isAppLocked: false, waitsForTap: false, tapped: false).mayStart)
+    }
+
+    func testACallFromAnotherAppsLinkWaitsForStartCall() {
+        XCTAssertFalse(VoiceCallStartGate(isAppLocked: false, waitsForTap: true, tapped: false).mayStart)
+        XCTAssertTrue(VoiceCallStartGate(isAppLocked: false, waitsForTap: true, tapped: true).mayStart)
+    }
+
+    @MainActor
+    func testTheLaunchMarkIsTakenOnce() {
+        VoiceCallLaunch.request(waitsForTap: true)
+        XCTAssertTrue(VoiceCallLaunch.takeWaitsForTap())
+        XCTAssertFalse(VoiceCallLaunch.takeWaitsForTap(), "A later call from inside the app starts as before")
+        VoiceCallLaunch.request(waitsForTap: false)
+        XCTAssertFalse(VoiceCallLaunch.takeWaitsForTap())
+    }
+
+    // MARK: - Ask Atlas widget
+
+    @MainActor
+    func testTheWidgetsCallAndDictateButtonsRouteAsIntents() async throws {
+        AppIntentRouter.installWidgetLaunch()
+        defer { AppIntentRouter.shared.pendingDeepLink = nil }
+
+        _ = try await AtlasWidgetLaunchIntent(.call).perform()
+        XCTAssertEqual(AppIntentRouter.shared.pendingDeepLink, HermesDeepLink.newCallURL)
+
+        _ = try await AtlasWidgetLaunchIntent(.voiceChat).perform()
+        XCTAssertEqual(AppIntentRouter.shared.pendingDeepLink, HermesDeepLink.newChatVoiceURL)
+    }
 }

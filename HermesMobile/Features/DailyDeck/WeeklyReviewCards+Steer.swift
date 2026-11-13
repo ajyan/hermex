@@ -57,7 +57,7 @@ struct WeekKeepsakesCard: View {
                     } else {
                         Text(verbatim: "Write to yourself a year from now")
                             .font(AppFont.footnote())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                     }
                 }
                 .multilineTextAlignment(.leading)

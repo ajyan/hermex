@@ -43,12 +43,8 @@ struct BrainShelfView: View {
                 Text(verbatim: "This server doesn't serve the Second Brain. It needs the Brain API from your hermes-webui fork.")
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load \(kind.title)") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load \(kind.title)", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded:
             BrainShelfPage(kind: kind, cards: viewModel.cards, isShowingCachedCopy: viewModel.isShowingCachedCopy)
