@@ -29,9 +29,7 @@ struct YearOfWeeksView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header(reviewed: tiles.filter { if case .reviewed = $0.state { true } else { false } }.count, total: tiles.count)
                 if let loadError = model.loadError {
-                    Text(verbatim: loadError)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                    HXFailedView(title: loadError, style: .inline) { Task { await model.load() } }
                         .padding(.top, 8)
                 }
                 LazyVGrid(columns: columns, spacing: 4) {

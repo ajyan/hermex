@@ -67,7 +67,7 @@ struct MealsHomeView: View {
                 Text(verbatim: "This server doesn't serve Meals. It needs the Meals API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load Meals", message: message) {
+            HXFailedView(title: "Couldn't load Meals", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let home):

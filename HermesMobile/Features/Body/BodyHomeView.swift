@@ -60,7 +60,7 @@ struct BodyHomeView: View {
                 Text(verbatim: "This server doesn't serve Body. It needs the Body API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load Body", message: message) {
+            HXFailedView(title: "Couldn't load Body", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let home):

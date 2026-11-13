@@ -179,12 +179,8 @@ struct DailyDeckView: View {
                 }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load the brief") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Retry") }
+            HXFailedView(title: "Couldn't load the brief", message: message) {
+                Task { await viewModel.load() }
             }
         case .ready:
             deck

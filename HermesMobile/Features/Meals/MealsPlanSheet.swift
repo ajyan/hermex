@@ -150,7 +150,7 @@ private struct PlanLoadState<Value: Equatable, Content: View>: View {
                 Text(verbatim: "This server doesn't serve the weekend planner. It needs the Meals API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this step", message: message) { Task { await retry() } }
+            HXFailedView(title: "Couldn't load this step", message: message) { Task { await retry() } }
         case .loaded(let value):
             content(value)
         }

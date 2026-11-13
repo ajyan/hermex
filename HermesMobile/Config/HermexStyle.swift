@@ -378,6 +378,59 @@ extension HXChip where Trailing == EmptyView {
     }
 }
 
+/// What couldn't load, why, and Try again. `.screen` fills a screen whose content never loaded;
+/// `.inline` is one row inside a screen that still shows what it has (a section that failed, or a
+/// refresh that failed over older data).
+struct HXFailedView: View {
+    enum Style { case screen, inline }
+
+    static let retryLabel = "Try again"
+
+    let title: String
+    var message: String?
+    var style: Style = .screen
+    let retry: () -> Void
+
+    var body: some View {
+        switch style {
+        case .screen:
+            ContentUnavailableView {
+                Label { Text(verbatim: title) } icon: { Image(systemName: "exclamationmark.triangle") }
+            } description: {
+                if let message { Text(verbatim: message) }
+            } actions: {
+                Button(action: retry) { Text(verbatim: Self.retryLabel) }
+            }
+        case .inline:
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.hxWarning)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: title)
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                    if let message {
+                        Text(verbatim: message)
+                            .font(AppFont.caption())
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button(action: retry) {
+                    Text(verbatim: Self.retryLabel)
+                        .font(AppFont.footnote(weight: .semibold))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text(verbatim: "\(Self.retryLabel): \(title)"))
+            }
+            .font(AppFont.footnote())
+        }
+    }
+}
+
 /// Chips left to right, wrapping onto new rows. A chip wider than the row (large text) is
 /// offered the row's width so it truncates instead of running off the edge.
 struct FlowRow: Layout {

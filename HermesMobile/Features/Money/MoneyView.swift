@@ -74,12 +74,8 @@ struct MoneyView: View {
                 Button { Task { await viewModel.load() } } label: { Text(verbatim: "Check Again") }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load Money") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try Again") }
+            HXFailedView(title: "Couldn't load Money", message: message) {
+                Task { await viewModel.load() }
             }
         case .ready:
             if let snapshot = viewModel.snapshot { ready(snapshot) }

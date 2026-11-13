@@ -66,7 +66,7 @@ struct MealsDishView: View {
                 Text(verbatim: "This server doesn't have that dish, or doesn't serve Recipes.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load the recipe", message: message) {
+            HXFailedView(title: "Couldn't load the recipe", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let recipe):
