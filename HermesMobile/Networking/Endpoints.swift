@@ -288,6 +288,9 @@ enum Endpoint {
     /// POST `{date, text, question?}` for instant feedback, POST `{date, hanzi, got}` for a recall.
     case mandarinAnswer
     case mandarinRecall
+    /// The Status screen (`api/vault_status.py` on this user's webui fork): GET the watcher's and
+    /// health checks' verdicts from the vault ledger as six tiles. Stock servers answer 404.
+    case atlasStatus
 
     var path: String {
         switch self {
@@ -713,6 +716,8 @@ enum Endpoint {
             return "/api/mandarin/answer"
         case .mandarinRecall:
             return "/api/mandarin/recall"
+        case .atlasStatus:
+            return "/api/atlas/status"
         }
     }
 

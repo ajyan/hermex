@@ -94,6 +94,7 @@ struct ChatShellView: View {
     @State private var feedbackAvailability: FeedbackAvailability
     /// The drawer rows' trailing notes for this server, refreshed when the drawer opens.
     @State private var drawerNotes: DrawerNotesModel
+    @State private var drawerStatus: AtlasStatusDrawerModel
     /// Today's Daily Ask, one per server: the Prep gate and the Brain tile read it.
     @State private var dailyAsk: DailyAskModel
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
@@ -164,6 +165,8 @@ struct ChatShellView: View {
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
         _drawerNotes = State(initialValue: DrawerNotesModel(loader: APIClientDrawerNotesLoader(server: server)))
+        _drawerStatus = State(initialValue: AtlasStatusDrawerModel(
+            client: APIClientAtlasStatusAdapter(apiClient: APIClient(baseURL: server))))
         _feedbackAvailability = State(initialValue: FeedbackAvailability(
             client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server)),
             labels: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
@@ -416,7 +419,10 @@ struct ChatShellView: View {
                 // keyboard typing into the hidden search field.
                 if !isOpen { searchFieldIsFocused = false }
                 if isOpen { showPendingAutoArchiveToast() }
-                if isOpen, !viewModel.isViewingCachedData { drawerNotes.refreshIfStale() }
+                if isOpen, !viewModel.isViewingCachedData {
+                    drawerNotes.refreshIfStale()
+                    drawerStatus.refreshIfStale()
+                }
                 guard ShellNavigationState.drawerOpenRequestsRefresh(wasOpen: wasOpen, isOpen: isOpen) else { return }
                 refreshAfterReturningIfNeeded()
             }
@@ -706,6 +712,11 @@ struct ChatShellView: View {
                           onOpen: { navigation.push($0) },
                           ask: askAtlas)
                 .id(route)
+        case .status:
+            AtlasStatusView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
+        case .statusTile(let id):
+            AtlasStatusTileView(id: id, server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)
+                .id(id)
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
         case .brainRoute(let route):
@@ -933,6 +944,7 @@ struct ChatShellView: View {
             sessions: drawerSessions,
             isSearching: isSearchingSessions,
             notes: drawerNotes.notes,
+            status: drawerStatus.note,
             selectedSessionID: navigation.selectedSessionID,
             showsMessageCount: showsSessionMessageCount,
             showsWorkspace: showsSessionWorkspace,
