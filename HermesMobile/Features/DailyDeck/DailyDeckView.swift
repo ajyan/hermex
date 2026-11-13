@@ -93,7 +93,7 @@ struct DailyDeckView: View {
                         Toggle(isOn: Binding(get: { notifies }, set: { on in Task { await DailyBriefReminder.setEnabled(on) } })) {
                             Label { Text(verbatim: "Notify Me at 8:00") } icon: { Image(systemName: "bell") }
                         }
-                        Button { Task { await viewModel.load() } } label: {
+                        Button { Task { await viewModel.reload() } } label: {
                             Label { Text(verbatim: "Reload") } icon: { Image(systemName: "arrow.clockwise") }
                         }
                         if viewModel.workspace != nil {
@@ -110,11 +110,13 @@ struct DailyDeckView: View {
             }
             .hxKeyboardDoneButton()
             .feedbackContext(feedbackContext)
+            // Runs again each time the screen comes back (from a Goal, Brain, Meals or Body page a card
+            // opened): the deck, its page and its cards stay, and are read again in place once stale.
             .task {
                 if let review = DailyBriefLaunch.take() {
                     await viewModel.show(date: review.date, kind: review.kind)
                 } else {
-                    await viewModel.load()
+                    await viewModel.appeared()
                 }
                 await DailyBriefReminder.enableOnFirstOpen()
             }
@@ -124,8 +126,10 @@ struct DailyDeckView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 viewModel.scenePhaseChanged(active: phase == .active)
-                // Left open overnight, the brief moves on to the new day's deck.
-                if phase == .active { Task { await viewModel.refreshDay() } }
+                // Left open overnight, the brief moves on to the new day's deck; a stale deck reads again in place.
+                if phase == .active {
+                    Task { if viewModel.state == .ready { await viewModel.appeared() } else { await viewModel.refreshDay() } }
+                }
             }
             // Time on each card, for the style learner (DeckSignals.usage).
             .onChange(of: viewModel.currentCardID, initial: true) { _, id in viewModel.showCard(id) }
@@ -179,12 +183,8 @@ struct DailyDeckView: View {
                 }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load the brief") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Retry") }
+            HXFailedView(title: "Couldn't load the brief", message: message) {
+                Task { await viewModel.load() }
             }
         case .ready:
             deck
@@ -196,7 +196,7 @@ struct DailyDeckView: View {
             Section {
                 ForEach(paths, id: \.self) { path in
                     Button { Task { await viewModel.chooseWorkspace(path) } } label: {
-                        Text(verbatim: path).font(AppFont.body()).foregroundStyle(.primary)
+                        Text(verbatim: path).font(AppFont.body()).foregroundStyle(Color.hxTextPrimary)
                     }
                 }
             } header: {
@@ -205,11 +205,11 @@ struct DailyDeckView: View {
         }
     }
 
+    /// Where you are in the deck is the header's "3 of 10", as on the Brain review; the stack itself
+    /// gives VoiceOver Next and Previous Card.
     private var deck: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            progress(count: viewModel.visiblePages.count)
-            DeckStackView(viewModel: viewModel, feedbackCard: $feedbackCard, file: file)
-        }
+        DeckStackView(viewModel: viewModel, feedbackCard: $feedbackCard, file: file)
+            .padding(.top, 8)
     }
 
     /// "Oct 9 · 3 of 10 · Filed": which day (when it isn't today), where you are, and whether
@@ -226,32 +226,6 @@ struct DailyDeckView: View {
         if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isSealedWeekly, edited: viewModel.hasChanges)) }
         if viewModel.isOfflineCopy { parts.append("Offline copy") }
         return parts.joined(separator: " · ")
-    }
-
-    private func progress(count: Int) -> some View {
-        VStack(spacing: 6) {
-            ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isSealedWeekly).ink } ?? .secondary)
-                .accessibilityValue(Text(verbatim: progressSubtitle))
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.index)
-        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: count)
-        .accessibilityElement(children: .combine)
-        // Swipe up or down on the counter to move through the deck.
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment: step(1)
-            case .decrement: step(-1)
-            @unknown default: break
-            }
-        }
-    }
-
-    private func step(_ delta: Int) {
-        let target = min(max(viewModel.index + delta, 0), max(viewModel.visiblePages.count - 1, 0))
-        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) { viewModel.index = target }
     }
 
     private func file() {

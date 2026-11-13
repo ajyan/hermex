@@ -102,7 +102,7 @@ struct PrepLessonCardsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Text(verbatim: cards.theCase.ask)
                 .font(BrainStyle.rowTitle)
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(HermexPaper.prep.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
         case .point(let index):
             if cards.idea.indices.contains(index) {
@@ -129,11 +129,12 @@ struct PrepLessonCardsView: View {
             }
         case .code:
             if let code = cards.code {
-                PrepCodeBlock(code: code)
+                // The chat's code view: language, wrap and copy, highlighted.
+                ChatCodeBlock(language: code.lang, content: code.body, isStreaming: false)
                 if let caption = code.caption {
                     Text(verbatim: caption)
                         .font(BrainStyle.rowTitle)
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(HermexPaper.prep.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -147,7 +148,7 @@ struct PrepLessonCardsView: View {
         case .lockIn:
             Text(verbatim: PrepCopy.lockInPrompt(cards.idea.count))
                 .font(BrainStyle.rowTitle)
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(HermexPaper.prep.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: BrainStyle.l) {
                 ForEach(Array(cards.idea.enumerated()), id: \.offset) { index, bullet in
@@ -244,7 +245,7 @@ struct PrepTakeaway: View {
                                 .fixedSize(horizontal: false, vertical: true)
                             Text(verbatim: PrepCopy.takeawayLine(bullet.text))
                                 .font(AppFont.body())
-                                .foregroundStyle(Color.hxTextSecondary)
+                                .foregroundStyle(HermexPaper.prep.secondaryInk)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -294,29 +295,5 @@ struct PrepLessonDiagramButton: View {
                 DiagramSheet(title: diagram.title) { [loader, topic = diagram.topic] in try await loader(topic) }
             }
         }
-    }
-}
-
-/// The "In code" artifact: monospaced on an inset, small enough that an authored 46-column line fits a phone card;
-/// anything wider scrolls sideways inside the block, never the card.
-struct PrepCodeBlock: View {
-    let code: PrepLessonCards.Code
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            Text(verbatim: code.body)
-                .font(AppFont.mono(style: .caption))
-                .foregroundStyle(Color.hxTextPrimary)
-                .fixedSize(horizontal: true, vertical: true)
-                .textSelection(.enabled)
-                .padding(BrainStyle.m)
-        }
-        .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.hxCanvas, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
-            .strokeBorder(HermexPaper.prep.edge, lineWidth: 1))
-        .accessibilityLabel(Text(verbatim: "Code, \(code.lang): \(code.body)"))
     }
 }

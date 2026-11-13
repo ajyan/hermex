@@ -77,6 +77,24 @@ final class MealsModelsTests: XCTestCase {
         // 11 pm in New York is already the next day in UTC: the phone's day wins.
         let late = ISO8601DateFormatter().date(from: "2026-11-04T04:00:00Z")!
         XCTAssertEqual(MealsCopy.localDay(late, calendar: calendar), "2026-11-03")
+        XCTAssertEqual(MealsCopy.dayNumber("2026-11-03"), "3")
+        XCTAssertEqual(MealsCopy.weekdayName("2026-11-03"), "Tuesday")
+        XCTAssertEqual(MealsCopy.monthDay("2026-10-31"), "Oct 31")
+    }
+
+    /// The week rows and the planner's review draw days as `DeckDot`s, like the season page.
+    func testDaysDrawAsDeckDots() throws {
+        let home = try Self.home()
+        let dots = home.days.map { MealsCopy.dayDot($0, today: home.day) }
+        // Mon logged, Tue tonight, Wed planned ahead, the rest open (the off mark, beside a plus).
+        XCTAssertEqual(dots, ["done", "today", "ahead", "off", "off", "off", "off"])
+        // A past night planned but never logged needs a look: the planner's heavy ring, never missed.
+        let pastPlan = MealsDay(day: "2026-11-02", night: home.days[1].night, logged: nil)
+        XCTAssertEqual(MealsCopy.dayDot(pastPlan, today: "2026-11-03"), "today")
+        XCTAssertEqual(MealsCopy.dayDotLabel(pastPlan, today: "2026-11-03"), "Needs a look")
+        XCTAssertEqual(MealsCopy.dayDotLabel(home.days[1], today: home.day), "Tonight")
+        XCTAssertEqual(["logged", "out", "open", "skipped", "ahead", "none"].map(MealsCopy.reviewDot),
+                       ["done", "done", "today", "skip", "ahead", "off"])
     }
 }
 
@@ -178,6 +196,52 @@ final class MealsHomeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.saveError, "Couldn't save that. Try again.")
         await vm.eatTonight()
         XCTAssertNil(vm.logDraft, "no sheet before the server has the night")
+    }
+
+    func testNotEatenPostsAnEmptyLogForThatDayAndShowsTheServersWeek() async throws {
+        let home = try MealsModelsTests.home()
+        let unlogged = MealsHome(day: home.day, week: home.week,
+                                 days: home.days.map { MealsDay(day: $0.day, night: $0.night, logged: nil) },
+                                 tonight: home.tonight, tonightLogged: false, tomorrowPrep: home.tomorrowPrep)
+        let client = FakeMealsClient()
+        client.homeResults = [.success(home)]
+        client.writeResults = [.success(unlogged)]
+        let vm = viewModel(client)
+        await vm.load()
+        await vm.unlog("2026-11-02")
+        XCTAssertEqual(client.logRequests, [.notEaten(day: "2026-11-02", today: "2026-11-03")])
+        XCTAssertEqual(vm.state, .loaded(unlogged))
+        XCTAssertNil(vm.saveError)
+    }
+
+    func testNotEatenSkipsADayWithNothingLogged() async throws {
+        let client = FakeMealsClient()
+        client.homeResults = [.success(try MealsModelsTests.home())]
+        let vm = viewModel(client)
+        await vm.load()
+        await vm.unlog("2026-11-03")
+        XCTAssertTrue(client.logRequests.isEmpty)
+    }
+
+    func testNotEatenSendsNoDishesAndNoServings() throws {
+        let body = try JSONEncoder().encode(MealsLogRequest.notEaten(day: "2026-11-02", today: "2026-11-03"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["day"] as? String, "2026-11-02")
+        XCTAssertEqual(json["today"] as? String, "2026-11-03")
+        XCTAssertEqual((json["dishes"] as? [Any])?.count, 0)
+        XCTAssertNil(json["servings"])
+    }
+
+    func testAFailedNotEatenKeepsTheLogAndSaysSo() async throws {
+        let home = try MealsModelsTests.home()
+        let client = FakeMealsClient()
+        client.homeResults = [.success(home)]
+        client.writeResults = [.failure(APIError.http(statusCode: 400, body: nil))]
+        let vm = viewModel(client)
+        await vm.load()
+        await vm.unlog("2026-11-02")
+        XCTAssertEqual(vm.state, .loaded(home))
+        XCTAssertEqual(vm.saveError, "Couldn't save that. Try again.")
     }
 
     func testAnEditThatChangesNothingIsNotSent() async throws {

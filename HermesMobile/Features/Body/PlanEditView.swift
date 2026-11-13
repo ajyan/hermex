@@ -91,7 +91,7 @@ struct PlanEditView: View {
                 Text(verbatim: "This server doesn't serve Body. It needs the Body API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load the plan", message: message) {
+            HXFailedView(title: "Couldn't load the plan", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded:
@@ -115,8 +115,6 @@ struct PlanEditView: View {
             .foregroundStyle(Color.hxDanger)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color.hxDanger.opacity(0.10), in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             .padding(.horizontal, BrainStyle.l)
             .padding(.top, 8)
             .accessibilityAddTraits(.isStaticText)

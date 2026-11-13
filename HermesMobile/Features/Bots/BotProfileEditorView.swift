@@ -97,14 +97,14 @@ import SwiftUI
                 sectionLabel("Description")
                 card {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Description").font(AppFont.caption()).foregroundStyle(.secondary)
+                        Text("Description").font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                         TextField("Description", text: Binding(get: { editor.draft.description }, set: { editor.setDescription($0) }), axis: .vertical)
                             .lineLimit(2...4)
                     }
                     .padding(16)
                     Divider().padding(.leading, 16)
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Instructions").font(AppFont.caption()).foregroundStyle(.secondary)
+                        Text("Instructions").font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                         TextEditor(text: Binding(get: { editor.draft.instructions }, set: { editor.setInstructions($0) }))
                             .frame(minHeight: 130)
                             .scrollContentBackground(.hidden)
@@ -134,7 +134,7 @@ import SwiftUI
                         VStack(alignment: .leading, spacing: 2) {
                             Text(editor.connection.name)
                             Text(editor.connection.address.host ?? editor.connection.address.absoluteString)
-                                .font(AppFont.caption()).foregroundStyle(.secondary)
+                                .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                         }
                         Spacer()
                     }
@@ -168,7 +168,7 @@ import SwiftUI
                 Text(editor.draft.appearance.title.isEmpty ? editor.profile.name : editor.draft.appearance.title)
                     .font(AppFont.display(style: .title2)).multilineTextAlignment(.center)
                 if !editor.draft.description.isEmpty {
-                    Text(editor.draft.description).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                    Text(editor.draft.description).font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary)
                         .multilineTextAlignment(.center).lineLimit(3)
                 }
                 Text(verbatim: "\(editor.profile.id) · \(editor.connection.name)")
@@ -253,7 +253,7 @@ import SwiftUI
                         .foregroundStyle(resultColor(editor.outcomes[field]!)).frame(width: 20)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(field.title).font(AppFont.subheadline(weight: .semibold))
-                        Text(resultText(editor.outcomes[field]!)).font(AppFont.caption()).foregroundStyle(.secondary)
+                        Text(resultText(editor.outcomes[field]!)).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                         if editor.outcomes[field] == .conflict {
                             Button("Reload") { Task { await editor.reloadAppearance() } }.font(AppFont.caption(weight: .semibold))
                         }
@@ -280,7 +280,7 @@ import SwiftUI
                                      set: { editor.setEnabled($0, field: field, id: item.id) })) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.name)
-                        if let detail = item.detail, !detail.isEmpty { Text(detail).font(AppFont.caption()).foregroundStyle(.secondary) }
+                        if let detail = item.detail, !detail.isEmpty { Text(detail).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary) }
                     }
                 }
             }
@@ -316,7 +316,7 @@ import SwiftUI
 
     private func editorField(_ title: LocalizedStringKey, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(AppFont.caption()).foregroundStyle(.secondary)
+            Text(title).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
             TextField(title, text: text, axis: .vertical).lineLimit(1...3)
         }
         .padding(16)
@@ -326,13 +326,13 @@ import SwiftUI
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: systemImage).foregroundStyle(.secondary).frame(width: 24)
+                Image(systemName: systemImage).foregroundStyle(Color.hxTextSecondary).frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).foregroundStyle(.primary)
-                    if let subtitle, !subtitle.isEmpty { Text(subtitle).font(AppFont.caption()).foregroundStyle(.secondary).lineLimit(1) }
+                    if let subtitle, !subtitle.isEmpty { Text(subtitle).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary).lineLimit(1) }
                 }
                 Spacer(minLength: 8)
-                Text(value).font(AppFont.subheadline()).foregroundStyle(.secondary).lineLimit(1)
+                Text(value).font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
                 Image(systemName: "chevron.forward").font(AppFont.caption(weight: .semibold)).foregroundStyle(.tertiary)
             }
             .padding(16).contentShape(Rectangle())

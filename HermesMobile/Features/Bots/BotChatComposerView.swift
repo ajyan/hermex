@@ -660,7 +660,7 @@ struct BotComposerPillView: View {
         .padding(.horizontal, 14).padding(.vertical, 9)
         .background(.regularMaterial, in: Capsule())
         .overlay(Capsule().stroke(.primary.opacity(0.10), lineWidth: 1))
-        .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+        .hxShadow(.float)
         .padding(.horizontal, 24)
         .accessibilityIdentifier("bot-chat-status")
     }

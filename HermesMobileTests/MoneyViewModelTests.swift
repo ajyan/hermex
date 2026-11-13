@@ -29,7 +29,8 @@ final class MoneyViewModelTests: XCTestCase {
         XCTAssertEqual(model.snapshot?.netWorth ?? 0, 184320.12, accuracy: 0.001)
         XCTAssertNotNil(model.market)
         XCTAssertEqual(model.points.first?.d, "2026-10-05")
-        XCTAssertEqual(client.readPaths, [MoneyPaths.snapshot, MoneyPaths.market, MoneyPaths.spending])
+        XCTAssertEqual(Set(client.readPaths), [MoneyPaths.snapshot, MoneyPaths.market, MoneyPaths.spending])
+        XCTAssertEqual(client.readPaths.count, 3, "each file read once, together")
         XCTAssertNotNil(model.spending)
     }
 
@@ -54,7 +55,17 @@ final class MoneyViewModelTests: XCTestCase {
         client.workspaces = ["/a", "/b"]
         let model = makeModel(client, workspace: nil)
         await model.load()
-        XCTAssertEqual(model.state, .needsWorkspace)
+        XCTAssertEqual(model.state, .needsWorkspace(["/a", "/b"]))
+    }
+
+    func testChoosingTheVaultHereLoadsAndSharesItWithTheBrief() async throws {
+        let client = try MockMoneyClient.withFixtures()
+        client.workspaces = ["/a", "/b"]
+        let model = makeModel(client, workspace: nil)
+        await model.load()
+        await model.chooseWorkspace("/b")
+        XCTAssertEqual(model.state, .ready)
+        XCTAssertEqual(DailyDeckStore(defaults: defaults).workspace(for: server), "/b")
     }
 
     func testReusesDeckSession() async throws {
@@ -78,8 +89,9 @@ final class MoneyViewModelTests: XCTestCase {
         client.sessionsVanish = true
         let model = makeModel(client, session: "deck-session")
         await model.load()
-        XCTAssertEqual(client.createdSessions, 1)
-        XCTAssertEqual(client.readSessions, ["deck-session", "new-session-1"])
+        XCTAssertEqual(client.createdSessions, 1, "the three reads that lost it share one replacement")
+        XCTAssertEqual(Set(client.readSessions), ["deck-session", "new-session-1"])
+        XCTAssertEqual(client.readSessions.count, 6, "each read retries once")
         guard case .failed = model.state else { return XCTFail("expected failed, got \(model.state)") }
     }
 
@@ -91,6 +103,59 @@ final class MoneyViewModelTests: XCTestCase {
         await model.load()
         XCTAssertEqual(model.state, .ready)
         XCTAssertEqual(model.snapshot?.netWorth ?? 0, 184320.12, accuracy: 0.001)
+        XCTAssertNotNil(model.refreshError, "the screen says the numbers didn't refresh")
+        client.failReads = false
+        await model.load()
+        XCTAssertNil(model.refreshError)
+    }
+
+    func testUnreadableSpendingSaysSoInsteadOfVanishing() async throws {
+        let client = try MockMoneyClient.withFixtures()
+        client.files[MoneyPaths.spending] = "{ not json"
+        let model = makeModel(client)
+        await model.load()
+        XCTAssertEqual(model.state, .ready)
+        XCTAssertNil(model.spending)
+        XCTAssertNotNil(model.spendingError)
+    }
+
+    func testAFailedSpendingRefreshKeepsTheLastRead() async throws {
+        let client = try MockMoneyClient.withFixtures()
+        let model = makeModel(client)
+        await model.load()
+        let read = try XCTUnwrap(model.spending)
+        client.files[MoneyPaths.spending] = "{ not json"
+        await model.load()
+        XCTAssertEqual(model.spending, read)
+        XCTAssertNotNil(model.spendingError)
+        client.files[MoneyPaths.spending] = nil
+        await model.load()
+        XCTAssertNil(model.spending, "no spending file is no card, not an error")
+        XCTAssertNil(model.spendingError)
+    }
+
+    func testPointsAreKeptPerRangeAndSnapshot() async throws {
+        let model = makeModel(try MockMoneyClient.withFixtures())
+        XCTAssertEqual(model.points, [])
+        await model.load()
+        let snapshot = try XCTUnwrap(model.snapshot)
+        let lastDay = try XCTUnwrap(snapshot.lastDay)
+        XCTAssertEqual(model.points, MoneyRange.week.points(in: snapshot.series, today: lastDay))
+        model.range = .month
+        XCTAssertEqual(model.points, MoneyRange.month.points(in: snapshot.series, today: lastDay))
+        model.range = .all
+        XCTAssertEqual(model.points, MoneyRange.all.points(in: snapshot.series, today: lastDay))
+    }
+
+    func testIsScrubbingChangesOnlyAtTheStartAndEndOfADrag() async throws {
+        let model = makeModel(try MockMoneyClient.withFixtures())
+        await model.load()
+        XCTAssertFalse(model.isScrubbing)
+        model.scrub(to: model.points[1].date)
+        model.scrub(to: model.points[2].date)
+        XCTAssertTrue(model.isScrubbing)
+        model.scrub(to: nil)
+        XCTAssertFalse(model.isScrubbing)
     }
 
     func testFirstLoadFailureShowsTheError() async throws {
@@ -162,16 +227,38 @@ final class MoneyViewModelTests: XCTestCase {
 }
 
 final class MockMoneyClient: MoneyDataClient, @unchecked Sendable {
-    var files: [String: String]
-    var workspaces = ["/vault"]
-    /// Every read answers "Session not found", as a server that keeps losing sessions would.
-    var sessionsVanish = false
-    var failReads = false
-    private(set) var createdSessions = 0
-    private(set) var readPaths: [String] = []
-    private(set) var readSessions: [String] = []
+    /// Money reads its three files at once, so every field is behind this lock.
+    private let lock = NSLock()
+    private var _files: [String: String]
+    private var _workspaces = ["/vault"]
+    private var _sessionsVanish = false
+    private var _failReads = false
+    private var _createdSessions = 0
+    private var _readPaths: [String] = []
+    private var _readSessions: [String] = []
 
-    init(files: [String: String]) { self.files = files }
+    var files: [String: String] {
+        get { lock.withLock { _files } }
+        set { lock.withLock { _files = newValue } }
+    }
+    var workspaces: [String] {
+        get { lock.withLock { _workspaces } }
+        set { lock.withLock { _workspaces = newValue } }
+    }
+    /// Every read answers "Session not found", as a server that keeps losing sessions would.
+    var sessionsVanish: Bool {
+        get { lock.withLock { _sessionsVanish } }
+        set { lock.withLock { _sessionsVanish = newValue } }
+    }
+    var failReads: Bool {
+        get { lock.withLock { _failReads } }
+        set { lock.withLock { _failReads = newValue } }
+    }
+    var createdSessions: Int { lock.withLock { _createdSessions } }
+    var readPaths: [String] { lock.withLock { _readPaths } }
+    var readSessions: [String] { lock.withLock { _readSessions } }
+
+    init(files: [String: String]) { _files = files }
 
     static func withFixtures() throws -> MockMoneyClient {
         MockMoneyClient(files: [
@@ -184,20 +271,24 @@ final class MockMoneyClient: MoneyDataClient, @unchecked Sendable {
     func workspacePaths() async throws -> [String] { workspaces }
 
     func createSession(workspace: String) async throws -> String {
-        // Ends an unbounded retry loop with a failure instead of a hang.
-        guard createdSessions < 5 else { throw URLError(.cannotConnectToHost) }
-        createdSessions += 1
-        return "new-session-\(createdSessions)"
+        try lock.withLock {
+            // Ends an unbounded retry loop with a failure instead of a hang.
+            guard _createdSessions < 5 else { throw URLError(.cannotConnectToHost) }
+            _createdSessions += 1
+            return "new-session-\(_createdSessions)"
+        }
     }
 
     func renameSession(id: String, title: String) async throws {}
 
     func fileContent(sessionID: String, path: String) async throws -> String {
-        readPaths.append(path)
-        readSessions.append(sessionID)
-        if sessionsVanish { throw APIError.http(statusCode: 404, body: #"{"error": "Session not found"}"#) }
-        if failReads { throw URLError(.timedOut) }
-        guard let text = files[path] else { throw APIError.http(statusCode: 404, body: #"{"error": "File not found"}"#) }
-        return text
+        try lock.withLock {
+            _readPaths.append(path)
+            _readSessions.append(sessionID)
+            if _sessionsVanish { throw APIError.http(statusCode: 404, body: #"{"error": "Session not found"}"#) }
+            if _failReads { throw URLError(.timedOut) }
+            guard let text = _files[path] else { throw APIError.http(statusCode: 404, body: #"{"error": "File not found"}"#) }
+            return text
+        }
     }
 }

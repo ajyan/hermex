@@ -41,7 +41,7 @@ import SwiftUI
                     }
                     if let source = creator.source {
                         Text("Copies \(source.name)’s instructions, settings and skills. Its chat stays with the original.")
-                            .font(AppFont.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary).multilineTextAlignment(.center)
                             .padding(.top, 10).padding(.horizontal, 12)
                     }
 
@@ -50,7 +50,7 @@ import SwiftUI
                     sectionLabel("Setup")
                     card {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Role").font(AppFont.caption()).foregroundStyle(.secondary)
+                            Text("Role").font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                             TextField("What this bot is for (optional)", text: Binding(get: { creator.draft.role }, set: { creator.setRole($0) }), axis: .vertical)
                                 .lineLimit(1...3)
                         }
@@ -203,11 +203,11 @@ import SwiftUI
                     Image(systemName: icon(creator.outcomes[step]!)).foregroundStyle(color(creator.outcomes[step]!)).frame(width: 20)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(step.title).font(AppFont.subheadline(weight: .semibold))
-                        Text(text(creator.outcomes[step]!)).font(AppFont.caption()).foregroundStyle(.secondary)
+                        Text(text(creator.outcomes[step]!)).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                     }
                 }
             }
-            if let note = creator.note { Text(note).font(AppFont.caption()).foregroundStyle(.secondary) }
+            if let note = creator.note { Text(note).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16).hxCard()
@@ -259,13 +259,13 @@ import SwiftUI
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: systemImage).foregroundStyle(.secondary).frame(width: 24)
+                Image(systemName: systemImage).foregroundStyle(Color.hxTextSecondary).frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).foregroundStyle(.primary)
-                    if let subtitle, !subtitle.isEmpty { Text(subtitle).font(AppFont.caption()).foregroundStyle(.secondary).lineLimit(1) }
+                    if let subtitle, !subtitle.isEmpty { Text(subtitle).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary).lineLimit(1) }
                 }
                 Spacer(minLength: 8)
-                Text(value).font(AppFont.subheadline()).foregroundStyle(.secondary).lineLimit(1)
+                Text(value).font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
                 Image(systemName: "chevron.forward").font(AppFont.caption(weight: .semibold)).foregroundStyle(.tertiary)
             }
             .padding(16).contentShape(Rectangle())

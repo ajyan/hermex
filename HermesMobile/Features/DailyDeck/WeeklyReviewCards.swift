@@ -55,7 +55,7 @@ struct WeekCoverCard: View {
                         Text(verbatim: editedTitle == nil ? "Atlas's title, tap to change" : "Your title, tap to change")
                     } icon: { Image(systemName: "pencil") }
                         .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -68,7 +68,7 @@ struct WeekCoverCard: View {
                 // "This week was about: <question>", when the week had a question.
                 Text(verbatim: recap)
                     .font(AppFont.footnote())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
             }
@@ -104,9 +104,10 @@ struct WeekCoverCard: View {
                 WeekPhotoView(viewModel: viewModel, palette: palette, hasPhoto: $hasPhoto)
                     .overlay {
                         if isBusyWithPhoto {
-                            RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
-                                .fill(.ultraThinMaterial)
-                                .overlay { ProgressView() }
+                            // The image stays visible under an opaque spinner badge (no material over content).
+                            ProgressView()
+                                .padding(10)
+                                .background(Color.hxSurface, in: Circle())
                         }
                     }
                     .contentShape(Rectangle())
@@ -177,7 +178,7 @@ struct WeekCoverCard: View {
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(verbatim: moment.day)
                 .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
                 .frame(minWidth: 32, alignment: .leading)
             VStack(alignment: .leading, spacing: 6) {
                 Text(verbatim: moment.line)
@@ -245,7 +246,7 @@ struct WeekCoverCard: View {
                             .foregroundStyle(Color.hxTextPrimary)
                         Text(verbatim: noteIsOpen ? "You wrote this a year ago" : "Sealed a year ago · tap to open")
                             .font(AppFont.footnote())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                     }
                     Spacer(minLength: 0)
                 }

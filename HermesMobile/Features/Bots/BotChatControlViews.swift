@@ -21,7 +21,7 @@ struct BotComposerSettings: View {
                         supportsEffort: settings.supportsEffort
                     ),
                     modelGroups: settings.catalog.groups, favoriteModelKeys: [], recentModelKeys: [],
-                    isDisabled: !settings.mayChangeModel, color: .secondary,
+                    isDisabled: !settings.mayChangeModel, color: .hxTextSecondary,
                     controlFont: AppFont.subheadline(), chevronFont: AppFont.caption2(),
                     onSelectModel: { selectModel($0, context: owner) }, onSelectEffort: { change(.effort($0), context: owner) },
                     onShowAllModels: { sheetContext = owner; preparePresentation(); showsModels = true }
@@ -30,7 +30,7 @@ struct BotComposerSettings: View {
             if let workspace = settings.workspace {
                 ComposerWorkspaceSelectorButton(
                     title: workspace.lastPathComponentFallback,
-                    isDisabled: !settings.mayChangeWorkspace, color: .secondary,
+                    isDisabled: !settings.mayChangeWorkspace, color: .hxTextSecondary,
                     controlFont: AppFont.subheadline(), chevronFont: AppFont.caption2()
                 ) { sheetContext = owner; preparePresentation(); showsWorkspace = true }
             }
@@ -38,7 +38,7 @@ struct BotComposerSettings: View {
                 Button { change(.fast(!fast), context: owner) } label: {
                     ComposerInlineControlLabel(
                         title: fast ? String(localized: "Fast") : String(localized: "Normal"),
-                        systemImage: "bolt", showsChevron: false, color: .secondary,
+                        systemImage: "bolt", showsChevron: false, color: .hxTextSecondary,
                         controlFont: AppFont.subheadline(), chevronFont: AppFont.caption2()
                     )
                 }

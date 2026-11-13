@@ -91,7 +91,8 @@ struct PrepChoiceView: View {
                 if isCorrect {
                     Image(systemName: "checkmark").foregroundStyle(Color.hxSuccess)
                 } else if isWrongPick {
-                    Image(systemName: "xmark").foregroundStyle(Color.hxDanger)
+                    // A miss, like every Prep miss: ◌ in the warning color, never red.
+                    Image(systemName: "circle.dashed").foregroundStyle(Color.hxWarning)
                 }
             }
             .font(BrainStyle.rowTitle.weight(.semibold))
@@ -367,7 +368,7 @@ struct PrepJudgmentLessonCards: View {
                 if checkDone {
                     PrepPrimaryButton(title: "Done") {
                         checkAnswer = ""
-                        withAnimation(reduceMotion ? nil : .default) { checkDone = false }
+                        withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { checkDone = false }
                     }
                 } else {
                     TextField(text: $checkAnswer, axis: .vertical) { Text(verbatim: "Answer with what you just learned") }
@@ -407,7 +408,7 @@ struct PrepJudgmentLessonCards: View {
 
     private func done() {
         checkFocused = false
-        withAnimation(reduceMotion ? nil : .default) { checkDone = true }
+        withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { checkDone = true }
     }
 
     /// The lesson's text with inline bold and code intact; a parse failure shows the plain text.
@@ -574,7 +575,7 @@ private struct PrepGradingLabel: View {
                     .monospacedDigit()
                     .opacity(0.7)
                     .contentTransition(.numericText(countsDown: false))
-                    .animation(reduceMotion ? nil : .default, value: seconds)
+                    .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: seconds)
             }
         }
         .accessibilityElement(children: .ignore)

@@ -391,7 +391,7 @@ struct VoiceCallView: View {
                 startMessage ?? "",
                 isPresented: Binding(get: { startMessage != nil }, set: { if !$0 { startMessage = nil } })
             ) {
-                Button("Retry") { startOver() }
+                Button("Try again") { startOver() }
                 Button("Back to chat", role: .cancel) { onClose() }
             }
     }
@@ -665,7 +665,7 @@ struct VoiceCallView: View {
     private var permissionSheet: some View {
         VStack(spacing: 20) {
             Image(systemName: "mic.slash")
-                .font(.largeTitle)
+                .font(AppFont.display(style: .largeTitle, weight: .regular))
                 .foregroundStyle(Color.hxWarning)
                 .accessibilityHidden(true)
             Text("Atlas needs the microphone and speech recognition for calls")

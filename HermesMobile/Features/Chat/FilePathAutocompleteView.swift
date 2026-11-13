@@ -47,7 +47,7 @@ struct FilePathAutocompleteView: View {
             in: RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous)
         )
         .clipShape(RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
-        .shadow(color: Color.black.opacity(0.15), radius: 12, y: 4)
+        .hxShadow(.float)
         .frame(height: panelHeight)
         .task(id: query) {
             await load(query)

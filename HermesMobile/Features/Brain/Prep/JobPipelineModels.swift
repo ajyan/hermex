@@ -528,12 +528,14 @@ struct APIClientJobPipelineAdapter: JobPipelineDataClient {
     }
 }
 
-/// The search at a glance, for Prep's Your search and the Brief's search card. Quiet: a server without the
-/// pipeline (404) or a failure just leaves `pipeline` nil and the section hidden.
+/// The search at a glance, for Prep's Your search and the Brief's search card. A server without the pipeline
+/// (404) leaves `pipeline` nil and the section hidden; any other failed first load sets `loadFailed`, so Prep
+/// can offer a retry. A failed reload keeps the pipeline already on screen.
 @MainActor
 @Observable
 final class JobPipelineModel {
     private(set) var pipeline: JobPipeline?
+    private(set) var loadFailed = false
     private(set) var pending = false
     private(set) var error: String?
 
@@ -547,8 +549,15 @@ final class JobPipelineModel {
     func load() async {
         generation += 1
         let token = generation
-        guard let next = try? await client.pipeline(), token == generation, !Task.isCancelled else { return }
-        pipeline = next
+        do {
+            let next = try await client.pipeline()
+            guard token == generation, !Task.isCancelled else { return }
+            pipeline = next
+            loadFailed = false
+        } catch {
+            guard token == generation, !(error is CancellationError), !Task.isCancelled else { return }
+            loadFailed = pipeline == nil && (error as? APIError)?.isNotFound != true
+        }
     }
 
     /// Adds an application; returns its id once the server saved it, so the caller can open it.

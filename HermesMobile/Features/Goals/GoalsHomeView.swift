@@ -10,7 +10,6 @@ struct GoalsHomeView: View {
     private let server: URL
     private let onNewGoal: () -> Void
     private let onOpen: (ShellPushDestination) -> Void
-    @Environment(\.colorScheme) private var colorScheme
     @State private var showsAgentGoals = false
 
     init(server: URL, onAPIError: @escaping (Error) -> Void, onNewGoal: @escaping () -> Void,
@@ -57,16 +56,16 @@ struct GoalsHomeView: View {
                 Text(verbatim: "This server doesn't serve goals. It needs the goals API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load goals", message: message) {
+            HXFailedView(title: "Couldn't load goals", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
                     if viewModel.refreshFailed {
-                        Text(verbatim: GoalDetailViewModel.refreshFailed)
-                            .font(BrainStyle.meta)
-                            .foregroundStyle(Color.hxDanger)
+                        HXFailedView(title: "Couldn't refresh goals", style: .inline) {
+                            Task { await viewModel.load() }
+                        }
                     }
                     if let error = viewModel.error {
                         Text(verbatim: error)
@@ -174,11 +173,9 @@ struct GoalsHomeView: View {
     private func followUps(_ home: GoalsHome) -> some View {
         VStack(spacing: 0) {
             ForEach(home.goals) { goal in
-                let tint = GoalTint(GoalPaper.palette(for: goal), scheme: colorScheme)
                 ForEach(goal.week.commitments.filter(\.isItem)) { row in
                     GoalItemFollowUp(
                         label: "\(GoalsCopy.shortName(row.action)) counted",
-                        tint: tint,
                         isPending: viewModel.isPending(goal.slug, .commitment(row.id)),
                         recentDate: viewModel.recentItemDate(slug: goal.slug, commitment: row.id),
                         actions: viewModel.itemActions(slug: goal.slug, commitment: row.id)
@@ -227,8 +224,7 @@ private struct GoalsAgentList: View {
                     Text(verbatim: goal.title)
                 }
             }
-            .navigationTitle(Text(verbatim: "Atlas's projects"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Atlas's projects")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }

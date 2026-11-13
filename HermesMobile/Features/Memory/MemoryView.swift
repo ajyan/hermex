@@ -245,7 +245,9 @@ private struct MemoryEditSheet: View {
     let onSave: (String) async -> Bool
 
     @State private var content: String
+    @State private var isConfirmingDiscard = false
     @Environment(\.dismiss) private var dismiss
+    private let initialContent: String
 
     init(
         section: MemorySection,
@@ -258,6 +260,7 @@ private struct MemoryEditSheet: View {
         self.isSaving = isSaving
         self.errorMessage = errorMessage
         self.onSave = onSave
+        self.initialContent = initialContent
         _content = State(initialValue: initialContent)
     }
 
@@ -291,7 +294,11 @@ private struct MemoryEditSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if content != initialContent {
+                            isConfirmingDiscard = true
+                        } else {
+                            dismiss()
+                        }
                     }
                     .disabled(isSaving)
                 }
@@ -313,6 +320,11 @@ private struct MemoryEditSheet: View {
                     .disabled(isSaving)
                 }
             }
+            .hxDiscardChangesGuard(
+                hasChanges: isSaving || content != initialContent,
+                isConfirmingDiscard: $isConfirmingDiscard,
+                onDiscard: { dismiss() }
+            )
         }
         .adaptiveFormPresentation()
     }

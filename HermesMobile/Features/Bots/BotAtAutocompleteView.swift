@@ -77,7 +77,7 @@ struct BotAtAutocompleteView: View {
         .clipShape(RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
         .adaptiveGlass(.regular, fallbackMaterial: .ultraThinMaterial,
                        in: RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .hxShadow(.float)
         .accessibilityIdentifier("bot-at-autocomplete")
     }
 
@@ -85,7 +85,7 @@ struct BotAtAutocompleteView: View {
         Text(title)
             .font(AppFont.caption2(weight: .semibold))
             .textCase(.uppercase)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.hxTextSecondary)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: headerHeight)
@@ -107,7 +107,7 @@ struct BotAtAutocompleteView: View {
         if matches.isEmpty {
             Text("Searching files…")
                 .font(AppFont.subheadline())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: rowHeight)

@@ -96,7 +96,7 @@ struct DeckCalendarView: View {
                     weekdayHeader
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 6) {
                         ForEach(Array(DailyDeckJournal.grid(year: year, month: month).enumerated()), id: \.offset) { _, day in
-                            if let day { dayCell(day) } else { Color.clear.frame(height: 48) }
+                            if let day { dayCell(day) } else { Color.clear.frame(height: BrainStyle.minTapTarget) }
                         }
                     }
                     legend
@@ -105,8 +105,7 @@ struct DeckCalendarView: View {
                 .padding(16)
             }
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: "Journal"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Journal")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }
@@ -161,7 +160,7 @@ struct DeckCalendarView: View {
             ForEach(0..<7, id: \.self) { i in
                 Text(verbatim: symbols[(i + first) % 7])
                     .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -174,23 +173,13 @@ struct DeckCalendarView: View {
         let hasDeck = viewModel.availableDates.contains(key)
         let isToday = key == viewModel.today
         return NavigationLink(value: key) {
-            VStack(spacing: 3) {
-                Text(verbatim: "\(day)")
-                    .font(AppFont.body(weight: isToday ? .semibold : nil))
-                    .foregroundStyle(hasEntry ? Color.hxTextPrimary : Color.hxTextSecondary)
+            JournalDayCell(day: day, hasEntry: hasEntry, isToday: isToday) {
                 // Filed is an outcome, so the dot is the done color; Nous blue is for controls.
                 Circle()
                     .strokeBorder(viewModel.filedDates.contains(key) ? Color.hxSuccess : Color.hxTextSecondary, lineWidth: hasDeck ? 1.2 : 0)
                     .background(Circle().fill(viewModel.filedDates.contains(key) ? Color.hxSuccess : .clear))
                     .frame(width: 6, height: 6)
                     .opacity(hasDeck ? 1 : 0)
-            }
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .background(hasEntry ? Color.hxSurface : Color.clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
-            .overlay {
-                if isToday {
-                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous).strokeBorder(Color.accentColor, lineWidth: 1.5)
-                }
             }
         }
         .buttonStyle(.plain)
@@ -226,12 +215,12 @@ struct DeckCalendarView: View {
                         } label: {
                             HStack {
                                 Image(systemName: "calendar.badge.clock").foregroundStyle(Color.accentColor)
-                                Text(verbatim: "Weekly reviews").foregroundStyle(.primary)
-                                Text(verbatim: "\(weekly.count)").foregroundStyle(.secondary).monospacedDigit()
+                                Text(verbatim: "Weekly reviews").foregroundStyle(Color.hxTextPrimary)
+                                Text(verbatim: "\(weekly.count)").foregroundStyle(Color.hxTextSecondary).monospacedDigit()
                                 Spacer()
                                 Image(systemName: "chevron.down")
                                     .font(AppFont.footnote(weight: .semibold))
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(Color.hxTextSecondary)
                                     .rotationEffect(.degrees(weeksOpen ? 0 : -90))
                             }
                             .font(AppFont.body())
@@ -277,14 +266,14 @@ struct DeckCalendarView: View {
         HStack {
             Image(systemName: symbol)
                 .foregroundStyle(Color.accentColor)
-            Text(verbatim: title).foregroundStyle(.primary)
+            Text(verbatim: title).foregroundStyle(Color.hxTextPrimary)
             Spacer()
             if let status {
                 Label { Text(verbatim: status.label) } icon: { Image(systemName: status.symbol) }
                     .font(AppFont.footnote())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
             }
-            Image(systemName: "chevron.forward").font(AppFont.footnote(weight: .semibold)).foregroundStyle(.tertiary)
+            Image(systemName: "chevron.forward").font(AppFont.footnote(weight: .semibold)).foregroundStyle(Color.hxTextSecondary)
         }
         .font(AppFont.body())
         .padding(.horizontal, 14)
@@ -310,7 +299,7 @@ struct DeckCalendarView: View {
             Label { Text(verbatim: "Brief not filed") } icon: { Circle().strokeBorder(Color.hxTextSecondary, lineWidth: 1.2).frame(width: 6, height: 6) }
         }
         .font(AppFont.caption())
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.hxTextSecondary)
     }
 
     private var monthTitle: String {
@@ -347,8 +336,7 @@ private struct DayLogView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: DailyDeckPaths.label(day)))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(DailyDeckPaths.label(day))
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
                 if viewModel.availableDates.contains(day) {
@@ -368,11 +356,14 @@ private struct DayLogView: View {
         switch state {
         case .loading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .unavailable, .failed:
+        case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No journal entry") } icon: { Image(systemName: "book.closed") }
-            } description: {
-                if case .failed(let message) = state { Text(verbatim: message) }
+            }
+        case .failed(let message):
+            HXFailedView(title: "Couldn't load the journal entry", message: message) {
+                state = .loading
+                Task { await load() }
             }
         case .loaded(let body):
             ScrollView {
@@ -388,6 +379,8 @@ private struct DayLogView: View {
         do {
             state = .loaded(try await viewModel.journalEntry(for: day))
         } catch is CancellationError {
+        } catch DailyDeckJournalError.missing {
+            state = .unavailable
         } catch {
             state = .failed(error.localizedDescription)
         }

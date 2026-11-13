@@ -8,17 +8,11 @@ import SwiftUI
 
 // MARK: Shared
 
-/// The values' papers on a monthly card: each value wears the paper of the kind of thing it's about.
+/// The values' paper on a review card: the review's own.
 enum MonthValues {
     static func paper(_ value: String) -> HermexPaper {
-        switch value {
-        case "present": .past
-        case "people": .quote
-        case "dad": .advisor
-        case "potential": .notes
-        case "body": .training
-        default: .dusk
-        }
+        // Every value wears the review's dusk; its name tells them apart.
+        .dusk
     }
 }
 
@@ -102,7 +96,7 @@ struct MonthCoverCard: View {
                         Text(verbatim: editedTitle == nil ? "Atlas's title, tap to change" : "Your title, tap to change")
                     } icon: { Image(systemName: "pencil") }
                         .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -167,7 +161,7 @@ struct MonthCoverCard: View {
                 .foregroundStyle(palette.ink)
             Text(verbatim: total.label)
                 .font(AppFont.footnote(weight: .medium))
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -177,7 +171,7 @@ struct MonthCoverCard: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(verbatim: moment.day)
                 .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
                 .frame(minWidth: 46, alignment: .leading)
             VStack(alignment: .leading, spacing: 6) {
                 Text(verbatim: moment.line)
@@ -263,7 +257,7 @@ struct MonthWeeksCard: View {
                 if let range = week.range {
                     Text(verbatim: range)
                         .font(AppFont.footnote(weight: .medium))
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 if let line = week.line {
                     Text(verbatim: line)
@@ -385,7 +379,7 @@ private struct MonthCalendar: View {
                     ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { _, letter in
                         Text(verbatim: letter)
                             .font(AppFont.caption2(weight: .semibold))
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(paper.secondaryInk)
                             .frame(width: dot)
                     }
                 }
@@ -476,7 +470,7 @@ struct MonthInsightCard: View {
                     }
                     Text(verbatim: stat.label)
                         .font(AppFont.subheadline(weight: .medium))
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 .accessibilityElement(children: .combine)
                 .padding(.top, 24)
@@ -535,7 +529,7 @@ struct MonthDayStrip: View {
                 Text(verbatim: "\(count)")
             }
             .font(AppFont.caption2(weight: .medium))
-            .foregroundStyle(Color.hxTextSecondary)
+            .foregroundStyle(paper.secondaryInk)
         }
         .accessibilityHidden(true)
     }
@@ -554,7 +548,7 @@ struct MonthWeekScores: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(verbatim: "Your weekly scores")
                 .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
             HStack(spacing: 8) {
                 ForEach(Array(scores.enumerated()), id: \.offset) { _, score in
                     ZStack {
@@ -564,7 +558,7 @@ struct MonthWeekScores: View {
                         Text(verbatim: score.map(String.init) ?? "–")
                             .font(AppFont.footnote(weight: .bold))
                             .monospacedDigit()
-                            .foregroundStyle(score == nil ? Color.hxTextSecondary : palette.ink)
+                            .foregroundStyle(score == nil ? palette.secondaryInk : palette.ink)
                     }
                     .frame(width: stop, height: stop)
                 }
@@ -615,7 +609,7 @@ struct MonthDayRows: View {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(verbatim: day.day)
                     .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
                     .frame(minWidth: 34, alignment: .leading)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(verbatim: day.line)
@@ -630,7 +624,7 @@ struct MonthDayRows: View {
                 Spacer(minLength: 4)
                 Image(systemName: starred ? "star.fill" : "star")
                     .font(AppFont.body(weight: .semibold))
-                    .foregroundStyle(starred ? palette.ink : palette.ink.opacity(0.45))
+                    .foregroundStyle(palette.ink)
                     .scaleEffect(starred ? 1.15 : 1)
                     .frame(minWidth: 32, minHeight: 32)
             }
@@ -661,7 +655,7 @@ struct MonthWeekDots: View {
                 ForEach(Array(letters.enumerated()), id: \.offset) { _, letter in
                     Text(verbatim: letter)
                         .font(AppFont.caption2(weight: .semibold))
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(paper.secondaryInk)
                         .frame(maxWidth: .infinity)
                 }
                 Color.clear.frame(width: 26, height: 1)
@@ -716,7 +710,7 @@ struct MonthLetterFromPast: View {
                             .foregroundStyle(Color.hxTextPrimary)
                         Text(verbatim: isOpen ? (note.title ?? "You wrote this a year ago") : "Sealed a year ago · tap to open")
                             .font(AppFont.footnote())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                     }
                     Spacer(minLength: 0)
                 }

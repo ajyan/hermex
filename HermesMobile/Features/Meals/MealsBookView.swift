@@ -60,7 +60,7 @@ struct MealsBookView: View {
                 Text(verbatim: "This server doesn't serve Recipes. It needs the Meals API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load Recipes", message: message) {
+            HXFailedView(title: "Couldn't load Recipes", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let book):
@@ -85,7 +85,7 @@ struct MealsBookView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
                 .accessibilityHidden(true)
             TextField(text: $viewModel.query) { Text(verbatim: "Search recipes") }
                 .textInputAutocapitalization(.never)
@@ -93,7 +93,7 @@ struct MealsBookView: View {
                 .submitLabel(.search)
             if !viewModel.query.isEmpty {
                 Button { viewModel.query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Color.hxTextSecondary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(verbatim: "Clear search"))
@@ -173,6 +173,7 @@ struct MealsBookView: View {
                         .font(AppFont.subheadline(weight: .semibold))
                         .frame(minHeight: 44)
                 }
+                .tint(paper.glow)
             }
         }
     }
@@ -227,8 +228,7 @@ struct MealsBookView: View {
                 Button { open(dish.slug) } label: {
                     BrainRow(
                         leading: {
-                            BrainModuleIcon(systemName: dish.isSide ? "leaf" : "fork.knife",
-                                            paper: dish.isWant ? nil : paper)
+                            BrainModuleIcon(systemName: dish.isSide ? "leaf" : "fork.knife", paper: paper)
                         },
                         title: dish.name,
                         subtitle: MealsCopy.bookLine(dish)

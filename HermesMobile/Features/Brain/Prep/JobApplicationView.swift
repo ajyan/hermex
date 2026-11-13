@@ -47,7 +47,7 @@ struct JobApplicationView: View {
             ContentUnavailableView(label: { Label { Text(verbatim: "Not in your pipeline") } icon: { Image(systemName: "briefcase") } },
                                    description: { Text(verbatim: "This application isn't on the server anymore.") })
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this application", message: message) { Task { await model.load() } }
+            HXFailedView(title: "Couldn't load this application", message: message) { Task { await model.load() } }
         case .loaded(let app):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
@@ -75,7 +75,7 @@ struct JobApplicationView: View {
             if !detail.isEmpty {
                 Text(verbatim: detail.joined(separator: " · "))
                     .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(HermexPaper.prep.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }, content: {
@@ -421,7 +421,7 @@ struct JobOnePagerView: View {
             ContentUnavailableView(label: { Label { Text(verbatim: "Not in your pipeline") } icon: { Image(systemName: "doc.text") } },
                                    description: { Text(verbatim: "This application isn't on the server anymore.") })
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load the one-pager", message: message) { Task { await model.load() } }
+            HXFailedView(title: "Couldn't load the one-pager", message: message) { Task { await model.load() } }
         case .loaded(let app):
             if let page = app.onepager {
                 ScrollView {

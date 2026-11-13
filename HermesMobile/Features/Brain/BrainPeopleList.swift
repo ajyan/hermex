@@ -4,6 +4,26 @@ import SwiftUI
 
 /// The People screen's sections above Everyone, shaped from `GET /api/brain/people/home`
 /// with the day math done once, when the home loads.
+/// The People list's Everyone rows, kept for a list revision, a search and a relationship, so a body pass that
+/// changes none of them (a section loading, a scroll) reuses the last rows instead of filtering or searching again.
+@MainActor
+final class BrainPeopleRowsMemo {
+    private var key: (revision: Int, query: String, relationship: String?)?
+    private var rows: [BrainItem] = []
+
+    /// A search covers everyone; without one, Everyone narrowed to `relationship`.
+    func rows(for viewModel: BrainListViewModel, query: String, relationship: String?) -> [BrainItem] {
+        if let key, key.revision == viewModel.revision, key.query == query, key.relationship == relationship {
+            return rows
+        }
+        rows = query.isEmpty
+            ? BrainPeopleLayout.filtered(viewModel.everyone, relationship: relationship)
+            : BrainPeopleSearch.matches(viewModel.everyone, query: query)
+        key = (viewModel.revision, query, relationship)
+        return rows
+    }
+}
+
 enum BrainPeopleLayout {
     struct Row: Equatable, Identifiable {
         let id: String

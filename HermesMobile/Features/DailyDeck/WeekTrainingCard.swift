@@ -56,7 +56,7 @@ final class WeekTrainingModel {
 }
 
 /// The Sunday review's training card: Baki's read of the week's lifting as a headline and a few
-/// bullets, then a compact row per proposal with Use and Not now. Its kind label stands in for the
+/// bullets, then each proposal as a compact `CoachProposalCard` (Use, Not now). Its kind label stands in for the
 /// corner mark, as on the deck's other act cards.
 struct WeekTrainingCard: View {
     let card: DeckCard
@@ -87,16 +87,13 @@ struct WeekTrainingCard: View {
                 .padding(.top, 14)
             }
             if !proposals.isEmpty {
-                Text(verbatim: "Baki suggests")
-                    .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(palette.secondaryInk)
-                    .padding(.top, 22)
-                    .padding(.bottom, 4)
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(proposals) { proposal in
-                    Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5)
-                    row(proposal)
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(proposals) { proposal in
+                        Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5)
+                        row(proposal)
+                    }
                 }
+                .padding(.top, 18)
             }
             if let error = model.error {
                 Label { Text(verbatim: error) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
@@ -110,42 +107,14 @@ struct WeekTrainingCard: View {
         .task(id: card.id) { await model.reconcile() }
     }
 
+    /// Baki's proposal as Body home and the finish screen draw it, in this card's paper.
     private func row(_ proposal: BodyProposal) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: proposal.title)
-                .font(AppFont.body(weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(Array(proposal.why.enumerated()), id: \.offset) { _, reason in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(verbatim: "•").accessibilityHidden(true)
-                    Text(verbatim: reason).fixedSize(horizontal: false, vertical: true)
-                }
-                .font(AppFont.subheadline())
-                .foregroundStyle(Color.hxTextSecondary)
-            }
-            if model.canDecide {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) { buttons(proposal) }
-                    VStack(spacing: 8) { buttons(proposal) }
-                }
-                .environment(\.hxPaper, palette.colors)
-                .disabled(model.deciding.contains(proposal.id))
-            }
-        }
-        .padding(.vertical, 12)
-    }
-
-    @ViewBuilder
-    private func buttons(_ proposal: BodyProposal) -> some View {
-        Button { Task { await model.decide(proposal, accept: true) } } label: {
-            Text(verbatim: "Use").bodyTapHeight()
-        }
-        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
-        .accessibilityLabel(Text(verbatim: "Use: \(proposal.title)"))
-        Button { Task { await model.decide(proposal, accept: false) } } label: {
-            Text(verbatim: "Not now").bodyTapHeight()
-        }
-        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-        .accessibilityLabel(Text(verbatim: "Not now: \(proposal.title)"))
+        CoachProposalCard(
+            proposal: proposal, style: .compact, paper: palette.colors,
+            isBusy: model.deciding.contains(proposal.id), canDecide: model.canDecide,
+            use: { Task { await model.decide(proposal, accept: true) } },
+            notNow: { Task { await model.decide(proposal, accept: false) } },
+            ask: nil)
+            .padding(.vertical, 12)
     }
 }

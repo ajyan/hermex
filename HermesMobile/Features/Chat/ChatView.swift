@@ -177,6 +177,7 @@ private struct ListenPlaybackBar: View {
                         .foregroundStyle(.white)
                 }
                 .frame(width: 34, height: 34)
+                .chatMinimumHitTarget(horizontalPadding: 5, verticalPadding: 5, in: Circle())
             }
             .buttonStyle(.chatTactile(.icon))
             .disabled(!isReady)
@@ -232,6 +233,7 @@ private struct ListenPlaybackBar: View {
                 .frame(minWidth: 36, minHeight: 30)
                 .padding(.horizontal, 6)
                 .background(Color(.secondarySystemBackground), in: Capsule())
+                .chatMinimumHitTarget(horizontalPadding: 0, verticalPadding: 7, in: Capsule())
         }
         .disabled(!isReady)
         .accessibilityLabel(String(localized: "Playback speed"))
@@ -245,6 +247,7 @@ private struct ListenPlaybackBar: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 30, height: 30)
                 .contentShape(Circle())
+                .chatMinimumHitTarget(horizontalPadding: 7, verticalPadding: 7, in: Circle())
         }
         .buttonStyle(.chatTactile(.icon))
         .accessibilityLabel(String(localized: "Stop audio"))
@@ -255,7 +258,7 @@ struct ChatView: View {
     private let bottomAnchorID = "chat-bottom-anchor"
     private let transcriptSpacing: CGFloat = 8
     private let composerAccessoryVerticalSpacing: CGFloat = 8
-    private let approvalBypassStatusSpacerHeight: CGFloat = 38
+    private let approvalBypassStatusSpacerHeight: CGFloat = 44
     /// The composer and its status stack keep 16 pt side insets of their own;
     /// this cap lines those insets up with the transcript's reading column.
     private let composerMaximumWidth = ChatReadingWidth.maximumWidth(horizontalPadding: 16)
@@ -307,6 +310,9 @@ struct ChatView: View {
     /// Called with the session ID and stored title after the server confirms a
     /// rename from the chat title, so the session list can show it.
     let onSessionRenamed: (String, String) -> Void
+    /// The drawer row's session actions (pin, move, export, archive, delete),
+    /// shown in the More menu when the shell hosts this chat.
+    let sessionMenu: (() -> SessionRowContextMenu)?
     @Environment(\.openBrainRoute) private var openBrainRoute
 
     /// The composer's draft. Never read it in `body` or wrap it in a get/set
@@ -372,6 +378,7 @@ struct ChatView: View {
     @State private var pendingClearConfirmation: PendingClearConfirmation?
     @State private var goalDraft = ""
     @State private var showsGoalSheet = false
+    @State private var isTurningOffApprovalBypass = false
     @State private var activeGitSheet: ActiveGitSheet?
     @State private var turnDiffPresentation: TurnDiffPresentation?
     @State private var viewModel: ChatViewModel
@@ -443,7 +450,8 @@ struct ChatView: View {
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
         restoresDraftSettings: Bool = false,
         onConversationStarted: @escaping () -> Void = {},
-        onSessionRenamed: @escaping (String, String) -> Void = { _, _ in }
+        onSessionRenamed: @escaping (String, String) -> Void = { _, _ in },
+        sessionMenu: (() -> SessionRowContextMenu)? = nil
     ) {
         self.session = session
         self.server = server
@@ -461,6 +469,7 @@ struct ChatView: View {
         self.restoresDraftSettings = restoresDraftSettings
         self.onConversationStarted = onConversationStarted
         self.onSessionRenamed = onSessionRenamed
+        self.sessionMenu = sessionMenu
         _draftMessage = State(initialValue: initialDraft)
         _draftQuotes = State(initialValue: initialQuotes)
         _initialAttachments = State(initialValue: initialAttachments)
@@ -1019,6 +1028,10 @@ struct ChatView: View {
                                 }
 
                                 FeedbackMenuItem()
+
+                                if let sessionMenu {
+                                    Section { sessionMenu() }
+                                }
                             } label: {
                                 Label("More", systemImage: "ellipsis")
                             }
@@ -1138,7 +1151,7 @@ struct ChatView: View {
                 }
                 // On the sheet: an alert on the chat cannot present over it.
                 .alert(
-                    String(localized: "Session Action Failed"),
+                    String(localized: "Session action failed"),
                     isPresented: Binding(
                         get: { titleRenameAlertMessage != nil },
                         set: { if !$0 { titleRenameAlertMessage = nil } }
@@ -1156,10 +1169,15 @@ struct ChatView: View {
             // The navy canvas behind every chat state (empty, loading, transcript), not the
             // system's pure black.
             .background(Color.hxCanvas.ignoresSafeArea())
+            .focusedSceneValue(\.chatKeyboardActions, ChatKeyboardActions(
+                isStreaming: viewModel.activeStreamID != nil,
+                isCancellingStream: viewModel.isCancellingStream,
+                stopResponse: { Task { await cancelStream() } }
+            ))
             .feedbackContext(FeedbackContext(
                 feature: "Chat", screen: "Chat", item: displayTitle, state: ["session_id": transcriptMediaSessionID]))
             .alert(
-                "Discard Later Messages?",
+                "Discard later messages?",
                 isPresented: $showEditDiscardConfirmation
             ) {
                 Button("Cancel", role: .cancel) {
@@ -1174,7 +1192,7 @@ struct ChatView: View {
                 Text(editDiscardWarningMessage)
             }
             .alert(
-                "Discard Later Messages?",
+                "Discard later messages?",
                 isPresented: $showRegenerateDiscardConfirmation
             ) {
                 Button("Cancel", role: .cancel) {
@@ -1190,13 +1208,13 @@ struct ChatView: View {
                 Text(regenerateDiscardWarningMessage)
             }
             .alert(
-                "Start New Session?",
+                "Start a new chat?",
                 isPresented: $showProfileNewSessionConfirmation
             ) {
                 Button("Cancel", role: .cancel) {
                     pendingProfileSelection = nil
                 }
-                Button("Start New Session") {
+                Button("Start new chat") {
                     if let profile = pendingProfileSelection {
                         Task { await switchProfile(profile, startNewSession: true) }
                     }
@@ -1213,7 +1231,7 @@ struct ChatView: View {
             )
             .notificationOfferAlert($pendingNotificationOffer)
             .alert(
-                "Message Action Failed",
+                "Message action failed",
                 isPresented: Binding(
                     get: { viewModel.messageActionErrorMessage != nil },
                     set: { isPresented in
@@ -1600,6 +1618,7 @@ struct ChatView: View {
                         } action: { height in
                             pinnedNoticeStackHeight = height
                         }
+                        .allowsHitTesting(false)
                         .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
 
@@ -1610,18 +1629,24 @@ struct ChatView: View {
                         } action: { height in
                             activeRunStatusHeight = height
                         }
+                        .allowsHitTesting(false)
                         .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
 
                 if showsApprovalBypassStatus {
-                    ApprovalBypassStatusPill()
-                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                    ApprovalBypassStatusPill(isTurningOff: isTurningOffApprovalBypass) {
+                        isTurningOffApprovalBypass = true
+                        Task {
+                            await viewModel.disableApprovalBypassForCurrentSession()
+                            isTurningOffApprovalBypass = false
+                        }
+                    }
+                    .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
             }
             .padding(.horizontal)
             .frame(maxWidth: composerMaximumWidth)
             .padding(.bottom, composerHeight + 8 + clarificationFootprintHeight)
-            .allowsHitTesting(false)
             .zIndex(8)
             .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: composerAccessoryVisibleItemCount)
             .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: activeRunStatusPresentation)
@@ -3706,7 +3731,7 @@ private struct ClearConversationAlertModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.alert(
-            "Clear Conversation?",
+            "Clear conversation?",
             isPresented: Binding(
                 get: { pending != nil },
                 set: { isPresented in

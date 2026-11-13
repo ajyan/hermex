@@ -188,6 +188,27 @@ final class KanbanCardEditorStateTests: XCTestCase {
         XCTAssertEqual(reload.title, "Changed remotely")
     }
 
+    func testUnsavedChangesTrackEditsAgainstTheOpeningFieldsAndReload() async {
+        let create = makeCreateState(client: CardEditorClient())
+        XCTAssertFalse(create.hasUnsavedChanges)
+        create.title = "New work"
+        XCTAssertTrue(create.hasUnsavedChanges)
+        create.title = ""
+        XCTAssertFalse(create.hasUnsavedChanges)
+
+        let edit = makeEditState(client: CardEditorClient(detailResults: [.success(.remoteChanged)]))
+        XCTAssertFalse(edit.hasUnsavedChanges)
+        edit.prerequisiteID = ""
+        XCTAssertTrue(edit.hasUnsavedChanges)
+        edit.prerequisiteID = "CARD-0"
+        edit.title = "Local draft"
+        await edit.save(allowsMutation: true)
+        XCTAssertEqual(edit.submission, .conflict)
+
+        edit.reloadServerVersion()
+        XCTAssertFalse(edit.hasUnsavedChanges)
+    }
+
     func testPreflightReadFailureIsNotReportedAsUncertainWrite() async {
         let client = CardEditorClient(detailResults: [
             .failure(APIError.network(underlying: URLError(.notConnectedToInternet)))

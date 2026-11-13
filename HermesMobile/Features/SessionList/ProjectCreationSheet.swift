@@ -114,13 +114,16 @@ private struct ProjectFormSheet: View {
                         .disabled(isSaving)
                 }
 
-                Section("Color") {
+                Section {
                     LazyVGrid(columns: colorColumns, alignment: .leading, spacing: 16) {
                         ForEach(ProjectCreationPalette.approvedColors) { option in
                             colorButton(for: option)
                         }
                     }
                     .padding(.vertical, 4)
+                } header: {
+                    HXSectionHeader(title: String(localized: "Color"))
+                        .textCase(nil)
                 }
             }
             .scrollContentBackground(.hidden)

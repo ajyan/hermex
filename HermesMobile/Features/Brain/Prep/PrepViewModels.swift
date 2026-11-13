@@ -51,27 +51,31 @@ final class PrepHomeViewModel {
         self.onAPIError = onAPIError
     }
 
-    func load() async {
+    /// When the last full load landed. Prep home's appear runs a full load only when this is missing or old.
+    @ObservationIgnored private(set) var lastFullLoad: Date?
+
+    /// Whether Prep home's appear needs everything (the first load, or the last full one is `maxAge` old) rather
+    /// than `refresh()`'s home and course.
+    func needsFullLoad(now: Date = .now, maxAge: TimeInterval = 600) -> Bool {
+        guard let lastFullLoad, case .loaded = state else { return true }
+        return now.timeIntervalSince(lastFullLoad) >= maxAge
+    }
+
+    /// Everything home shows: home and the course together, the gaps beside them, then the stories.
+    func load(now: Date = .now) async {
         generation += 1
         let token = generation
         async let gapsLoad = try? await client.gaps()
         do {
-            let home = try await client.home()
-            var course: PrepCourse?
-            if let summary = home.course {
-                course = (try? await client.course()) ?? summary
-            }
+            let (home, course) = try await fetchHomeAndCourse()
             let gaps = await gapsLoad
             guard token == generation, !Task.isCancelled else { return }
             self.gaps = gaps
             self.course = course
             state = .loaded(home)
+            lastFullLoad = now
         } catch {
-            guard token == generation, !prepIsCancellation(error) else { return }
-            onAPIError(error)
-            // A failed quiet refresh keeps what is on screen; only a first load shows the failure.
-            if case .loaded = state { return }
-            state = prepFailureState(error)
+            fail(error, token: token)
             return
         }
         // Stories trail home's first paint: a slow or failed call never delays or fails it.
@@ -80,6 +84,38 @@ final class PrepHomeViewModel {
         let loaded = try? await client.stories()
         guard token == generation, storiesToken == storiesGeneration, !Task.isCancelled else { return }
         stories = loaded
+    }
+
+    /// Only what a run moves: home (the streak, today's run, readiness) and the course path. Prep home's appear
+    /// calls this on the way back from a run or a lesson while the last full load is fresh.
+    func refresh() async {
+        generation += 1
+        let token = generation
+        do {
+            let (home, course) = try await fetchHomeAndCourse()
+            guard token == generation, !Task.isCancelled else { return }
+            self.course = course
+            state = .loaded(home)
+        } catch {
+            fail(error, token: token)
+        }
+    }
+
+    /// Home and the full course in parallel. The course only counts when home says the server has one; when the
+    /// full path fails, home's summary (units without lessons) stands in.
+    private func fetchHomeAndCourse() async throws -> (PrepHome, PrepCourse?) {
+        async let courseLoad = try? await client.course()
+        let home = try await client.home()
+        let full = await courseLoad
+        return (home, home.course.map { full ?? $0 })
+    }
+
+    private func fail(_ error: Error, token: Int) {
+        guard token == generation, !prepIsCancellation(error) else { return }
+        onAPIError(error)
+        // A failed quiet refresh keeps what is on screen; only a first load shows the failure.
+        if case .loaded = state { return }
+        state = prepFailureState(error)
     }
 
     func isActing(on candidateID: String) -> Bool {
@@ -1109,24 +1145,14 @@ enum PrepCopy {
 
     /// A yyyy-MM-dd day as "today", "yesterday", "10 days ago", "3 weeks ago"; the raw text when it doesn't parse.
     static func daysAgo(_ iso: String, today: Date = .now, calendar: Calendar = .current) -> String {
-        let format = DateFormatter()
-        format.calendar = calendar
-        format.timeZone = calendar.timeZone
-        format.locale = Locale(identifier: "en_US_POSIX")
-        format.dateFormat = "yyyy-MM-dd"
-        guard let day = format.date(from: String(iso.prefix(10))) else { return iso }
+        guard let day = parseDay(iso, calendar: calendar) else { return iso }
         let days = calendar.dateComponents([.day], from: day, to: calendar.startOfDay(for: today)).day ?? 0
         return BrainPersonLayout.relative(daysAgo: days)
     }
 
     /// When a gap's card comes back for review: "due today", "due tomorrow", "due in 4 days", "overdue".
     static func dueLine(_ iso: String, today: Date = .now, calendar: Calendar = .current) -> String {
-        let format = DateFormatter()
-        format.calendar = calendar
-        format.timeZone = calendar.timeZone
-        format.locale = Locale(identifier: "en_US_POSIX")
-        format.dateFormat = "yyyy-MM-dd"
-        guard let day = format.date(from: String(iso.prefix(10))) else { return "Due \(iso)" }
+        guard let day = parseDay(iso, calendar: calendar) else { return "Due \(iso)" }
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: day).day ?? 0
         switch days {
         case ..<0: return "Overdue"
@@ -1171,10 +1197,10 @@ enum PrepCopy {
 
     static func runProgressLine(done: Int, total: Int) -> String { "Today's run · \(done) of \(total)" }
 
-    /// An open unit folded to one row: what waits in it. "4 missed last recall · boss back in a few days".
+    /// An open unit folded to one row: what waits in it. "4 in reviews · unit check back in a few days".
     static func foldedUnitLine(_ unit: PrepUnit) -> String {
         let reviewing = unit.lessons.filter { $0.state == .shaky }.count
-        var parts = reviewing > 0 ? ["\(reviewing) missed last recall"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
+        var parts = reviewing > 0 ? ["\(reviewing) in reviews"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
         switch unit.boss {
         case .ready: parts.append("unit check due")
         case .resting: parts.append("unit check \(backLine(unit.bossBack))")
@@ -1194,26 +1220,41 @@ enum PrepCopy {
 
     /// When a resting unit check returns: "back tomorrow", "back Tuesday", "back Nov 9"; "resting" without a date.
     static func backLine(_ back: String?, today: Date = .now, calendar: Calendar = .current) -> String {
-        let format = DateFormatter()
-        format.calendar = calendar
-        format.timeZone = calendar.timeZone
-        format.locale = Locale(identifier: "en_US_POSIX")
-        format.dateFormat = "yyyy-MM-dd"
-        guard let back, let day = format.date(from: back) else { return "resting" }
+        guard let back, back.count == 10, let day = parseDay(back, calendar: calendar) else { return "resting" }
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: day).day ?? 0
         if days <= 0 { return "back today" }
         if days == 1 { return "back tomorrow" }
-        let out = DateFormatter()
-        out.calendar = calendar
-        out.timeZone = calendar.timeZone
-        out.locale = Locale(identifier: "en_US")
-        out.dateFormat = days < 7 ? "EEEE" : "MMM d"
-        return "back \(out.string(from: day))"
+        let parts = calendar.dateComponents([.weekday, .month, .day], from: day)
+        if days < 7, let weekday = parts.weekday { return "back \(englishSymbols.weekdaySymbols[weekday - 1])" }
+        return "back \(englishSymbols.shortMonthSymbols[(parts.month ?? 1) - 1]) \(parts.day ?? 1)"
+    }
+
+    /// English day and month names, built once: Prep's copy is English-only.
+    private static let englishSymbols: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US")
+        return calendar
+    }()
+
+    /// The start of a leading `yyyy-MM-dd` on `calendar`; nil when it isn't a real day. Calendar math rather than a
+    /// `DateFormatter`, which is costly to build and these run per row.
+    static func parseDay(_ iso: String, calendar: Calendar) -> Date? {
+        let numbers = iso.prefix(10).split(separator: "-").compactMap { Int($0) }
+        guard iso.count >= 10, numbers.count == 3 else { return nil }
+        let components = DateComponents(year: numbers[0], month: numbers[1], day: numbers[2])
+        guard components.isValidDate(in: calendar) else { return nil }
+        return calendar.date(from: components)
+    }
+
+    /// `date` as `yyyy-MM-dd` on `calendar`.
+    static func isoDay(_ date: Date, calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 1970, parts.month ?? 1, parts.day ?? 1)
     }
     static func lessonStateWord(_ state: PrepLessonState) -> String {
         switch state {
         case .ready: "interview-ready"
-        case .shaky: "missed last recall"
+        case .shaky: "in reviews"
         case .learned: "learned"
         case .next: "next"
         case .locked, .unknown: "locked"
@@ -1342,13 +1383,8 @@ enum PrepCopy {
         guard let lastDay else { return false }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
         guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return false }
-        return lastDay < formatter.string(from: yesterday)
+        return lastDay < isoDay(yesterday, calendar: calendar)
     }
 
     static func percent(_ score: Double) -> String { "\(Int((score * 100).rounded()))%" }
@@ -1392,10 +1428,10 @@ enum PrepCopy {
         }
     }
 
-    /// The weak spots' header count: "10 gaps · 3 missed lessons", "1 gap", "None open".
+    /// The weak spots' header count: "10 gaps · 3 lessons in reviews", "1 gap", "None open".
     static func weakSpotsHeader(gaps: Int, missed: Int) -> String {
         let parts = [gaps == 0 ? nil : gaps == 1 ? "1 gap" : "\(gaps) gaps",
-                     missed == 0 ? nil : missed == 1 ? "1 missed lesson" : "\(missed) missed lessons"].compactMap { $0 }
+                     missed == 0 ? nil : missed == 1 ? "1 lesson in reviews" : "\(missed) lessons in reviews"].compactMap { $0 }
         return parts.isEmpty ? "None open" : parts.joined(separator: " · ")
     }
 

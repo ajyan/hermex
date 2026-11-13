@@ -286,8 +286,7 @@ struct FeedbackDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: sheet == .plan ? "Plan" : "Build report"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(sheet == .plan ? "Plan" : "Build report")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { self.sheet = nil } label: { Text(verbatim: "Done") }

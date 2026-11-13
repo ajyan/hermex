@@ -81,7 +81,7 @@ struct WorkoutView: View {
                 Text(verbatim: "This server doesn't serve Body. It needs the Body API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load the workout", message: message) {
+            HXFailedView(title: "Couldn't load the workout", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let session):
@@ -236,17 +236,10 @@ struct WorkoutView: View {
     // MARK: Banners
 
     private var notSavedRow: some View {
-        HStack(spacing: 10) {
-            Text(verbatim: "Not saved yet. Your sets are kept on this phone.")
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-            Spacer(minLength: 8)
-            Button { viewModel.saveNow() } label: {
-                Text(verbatim: "Retry").font(AppFont.subheadline(weight: .semibold))
-            }
-            .buttonStyle(.borderless)
-            .frame(minHeight: 44)
+        HXFailedView(title: "Not saved yet", message: "Your sets are kept on this phone.", style: .inline) {
+            viewModel.saveNow()
         }
+        .buttonStyle(.borderless)
     }
 
     private var finishedRow: some View {
@@ -258,18 +251,18 @@ struct WorkoutView: View {
 
     @ViewBuilder
     private var sleepBanner: some View {
-        let notes = HermexPaper.notes
+        let paper = HermexPaper.training
         if viewModel.sleepBanner == .asking {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "moon.fill")
                         .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(notes.glow)
+                        .foregroundStyle(paper.glow)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: viewModel.sleepOffer.map(WorkoutCopy.sleepTitle) ?? "Rough night")
                             .font(AppFont.display(style: .headline, weight: .semibold))
-                            .foregroundStyle(notes.glow)
+                            .foregroundStyle(paper.glow)
                         Text(verbatim: "Drop one set from each lift? The warm-up and finisher stay.")
                             .font(AppFont.subheadline())
                             .foregroundStyle(Color.hxTextPrimary)
@@ -284,26 +277,26 @@ struct WorkoutView: View {
                 }
             }
             .padding(14)
-            .glowSurface(notes, cornerRadius: HXRadius.lg, opaque: true)
+            .glowSurface(paper, cornerRadius: HXRadius.lg, opaque: true)
         } else {
-            undoBanner("One set dropped from each lift.", paper: notes) { viewModel.undoSleepOffer() }
+            undoBanner("One set dropped from each lift.", paper: paper) { viewModel.undoSleepOffer() }
         }
     }
 
     @ViewBuilder
     private var hingeBanner: some View {
-        let notes = HermexPaper.notes
+        let paper = HermexPaper.training
         if viewModel.hingeBanner == .asking {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "sunrise.fill")
                         .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(notes.glow)
+                        .foregroundStyle(paper.glow)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: WorkoutCopy.hingeTitle(minutes: viewModel.hingeMinutes))
                             .font(AppFont.display(style: .headline, weight: .semibold))
-                            .foregroundStyle(notes.glow)
+                            .foregroundStyle(paper.glow)
                         Text(verbatim: WorkoutCopy.hingeQuestion(viewModel.hingeNames))
                             .font(AppFont.subheadline())
                             .foregroundStyle(Color.hxTextPrimary)
@@ -318,9 +311,9 @@ struct WorkoutView: View {
                 }
             }
             .padding(14)
-            .glowSurface(notes, cornerRadius: HXRadius.lg, opaque: true)
+            .glowSurface(paper, cornerRadius: HXRadius.lg, opaque: true)
         } else {
-            undoBanner("Moved to the end of the main lifts.", paper: notes) { viewModel.undoMoveHinge() }
+            undoBanner("Moved to the end of the main lifts.", paper: paper) { viewModel.undoMoveHinge() }
         }
     }
 
@@ -334,7 +327,6 @@ struct WorkoutView: View {
                 Text(verbatim: "Undo").font(AppFont.subheadline(weight: .semibold))
             }
             .buttonStyle(.borderless)
-            .tint(.accentColor)
             .frame(minHeight: 44)
         }
         .padding(.horizontal, 14)
@@ -366,11 +358,22 @@ struct WorkoutCardPiece: View {
     let position: Position
 
     var body: some View {
+        let paper = HermexPaper.training
         let top = position == .top ? HXRadius.xl : 0
         let bottom = position == .bottom ? HXRadius.xl : 0
-        UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom,
-                               bottomTrailingRadius: bottom, topTrailingRadius: top, style: .continuous)
-            .fill(HermexPaper.training.card)
+        let shape = UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom,
+                                           bottomTrailingRadius: bottom, topTrailingRadius: top, style: .continuous)
+        // The edge hairline runs only along the card's outside: a slice's stroke reaches past its
+        // open ends and is clipped there, so no line is drawn between slices. No paper shadow, since
+        // each slice would cast its own across the seams.
+        shape
+            .fill(paper.card)
+            .overlay {
+                shape.strokeBorder(paper.edge, lineWidth: 0.5)
+                    .padding(.top, position == .top ? 0 : -1)
+                    .padding(.bottom, position == .bottom ? 0 : -1)
+            }
+            .clipped()
             .padding(.horizontal, WorkoutLayout.gutter)
             .padding(.top, position == .top ? WorkoutLayout.rowGap : 0)
             .padding(.bottom, position == .bottom ? WorkoutLayout.rowGap : 0)
@@ -478,7 +481,7 @@ struct WorkoutCardFooter: View, Equatable {
                     Spacer(minLength: 8)
                     Button { viewModel.removeHurt(at: hurt.index) } label: { Text(verbatim: "Undo") }
                         .buttonStyle(.borderless)
-                        .tint(.accentColor)
+                        .tint(HermexPaper.training.glow)
                         .frame(minHeight: 44)
                         .accessibilityLabel(Text(verbatim: "Undo \(hurt.text)"))
                 }

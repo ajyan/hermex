@@ -380,7 +380,7 @@ struct PrepLessonView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this lesson", message: message) {
+            HXFailedView(title: "Couldn't load this lesson", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let lesson):

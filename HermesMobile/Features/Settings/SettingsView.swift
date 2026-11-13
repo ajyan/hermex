@@ -2831,11 +2831,11 @@ private struct AutoArchiveSettingsCard: View {
                 isConfirmingReset = true
             }
             .confirmationDialog(
-                String(localized: "Reset Learned Preferences"),
+                String(localized: "Reset learned preferences?"),
                 isPresented: $isConfirmingReset,
                 titleVisibility: .visible
             ) {
-                Button(String(localized: "Reset Learned Preferences"), role: .destructive) {
+                Button(String(localized: "Reset"), role: .destructive) {
                     AutoArchiveStore().resetModel(for: server)
                 }
             } message: {

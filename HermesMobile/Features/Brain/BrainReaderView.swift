@@ -1,6 +1,32 @@
 import SwiftData
 import SwiftUI
 
+/// What the reader derives from one loaded page: the line under the title, a hub's pages, the article digest,
+/// the link cards, and the mention sections less a person timeline's journal days. Built once per page load by
+/// `BrainPageViewModel`, not on every reader render.
+struct BrainReaderPageLayout {
+    let meta: String
+    let hubPages: [BrainRef]
+    let digest: BrainArticleDigest?
+    let linkCards: [BrainRef]
+    let backlinks: [BrainRef]
+    let unlinkedRefs: [BrainRef]
+    let unlinkedTotal: Int
+
+    init(page: BrainPage, person: BrainPersonPage?) {
+        hubPages = BrainConnectionsLayout.hubPages(page)
+        meta = BrainReaderLayout.metaLine(for: page.item, hubPageCount: hubPages.count, nested: page.hub != nil)
+        digest = BrainReaderLayout.digest(for: page)
+        linkCards = BrainConnectionsLayout.linkCards(page)
+        let personLayout = person?.layout
+        backlinks = personLayout?.remainingMentions(page.backlinks, total: page.backlinks.count).refs ?? page.backlinks
+        let unlinked = personLayout?.remainingMentions(page.unlinked, total: page.unlinkedCount)
+            ?? (refs: page.unlinked, total: page.unlinkedCount)
+        unlinkedRefs = unlinked.refs
+        unlinkedTotal = unlinked.total
+    }
+}
+
 /// The reader's pure layout decisions, kept out of the views so they can be tested.
 enum BrainReaderLayout {
     /// Backlinks shown before "Show all N".
@@ -33,10 +59,14 @@ enum BrainReaderLayout {
     }
 
     /// Further reading split as the server sends it: the page's sources (reason "source"),
-    /// then pages that share its tags (the reason names them, "#rome · #person").
+    /// then pages that share its tags (the reason names them, "#rome · #person"), at most
+    /// `furtherLimit` each.
     static func furtherGroups(_ refs: [BrainRef]) -> (sources: [BrainRef], tagged: [BrainRef]) {
-        (refs.filter { $0.reason == "source" }, refs.filter { $0.reason != "source" })
+        (Array(refs.filter { $0.reason == "source" }.prefix(furtherLimit)),
+         Array(refs.filter { $0.reason != "source" }.prefix(furtherLimit)))
     }
+
+    static let furtherLimit = 3
 
     /// Whether a page's tags open its module's list filtered to them: the lists with a tag bar.
     static func tagsFilter(_ module: BrainModuleID) -> Bool {
@@ -340,17 +370,14 @@ struct BrainReaderView: View {
                 Label { Text(verbatim: "This page moved or was removed") } icon: { Image(systemName: "doc.questionmark") }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this page") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load this page", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded(let page):
             BrainReaderContent(
                 page: page,
                 person: viewModel.person,
+                layout: viewModel.readerLayout ?? BrainReaderPageLayout(page: page, person: viewModel.person),
                 isShowingCachedCopy: viewModel.isShowingCachedCopy,
                 isMissing: viewModel.isMissing,
                 push: push,
@@ -383,21 +410,20 @@ struct BrainReaderContent: View {
     /// Opens a person page's Edit facts sheet; nil where the facts can't be edited.
     var onEditFacts: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Built once per page: the line under the title.
-    private let meta: String
-    /// Built once per page: a hub's own pages (In this hub).
-    private let hubPages: [BrainRef]
-    /// Articles and video notes in the summary outline read as a digest.
-    private let digest: BrainArticleDigest?
-    /// Built once per page: the linked-page cards.
-    private let linkCards: [BrainRef]
     /// Built once per page load, by the view model: a structured person page's header, chips,
     /// Catch up, About and timeline, its words already parsed.
     private let person: BrainPersonPage?
+    /// Built once per page load, by the view model: the meta line, hub pages, digest, link cards and mentions.
+    private let layout: BrainReaderPageLayout
+    private var meta: String { layout.meta }
+    private var hubPages: [BrainRef] { layout.hubPages }
+    /// Articles and video notes in the summary outline read as a digest.
+    private var digest: BrainArticleDigest? { layout.digest }
+    private var linkCards: [BrainRef] { layout.linkCards }
     /// The mention sections, less the journal days a person's timeline already shows.
-    private let backlinks: [BrainRef]
-    private let unlinkedRefs: [BrainRef]
-    private let unlinkedTotal: Int
+    private var backlinks: [BrainRef] { layout.backlinks }
+    private var unlinkedRefs: [BrainRef] { layout.unlinkedRefs }
+    private var unlinkedTotal: Int { layout.unlinkedTotal }
     @State private var showsAllBacklinks = false
     @State private var showsAllHubPages = false
     /// Bumped by the hub's meta line; scrolls down to its pages.
@@ -408,8 +434,8 @@ struct BrainReaderContent: View {
     /// A link in the page another app would open, waiting on the confirmation.
     @State private var pendingExternalLink: URL?
 
-    init(page: BrainPage, person: BrainPersonPage?, isShowingCachedCopy: Bool, isMissing: Bool = false,
-         push: @escaping (BrainRoute) -> Void, rating: BrainPageRating? = nil,
+    init(page: BrainPage, person: BrainPersonPage?, layout: BrainReaderPageLayout, isShowingCachedCopy: Bool,
+         isMissing: Bool = false, push: @escaping (BrainRoute) -> Void, rating: BrainPageRating? = nil,
          focusIdea: Int? = nil, onEditFacts: (() -> Void)? = nil) {
         self.onEditFacts = onEditFacts
         self.page = page
@@ -418,31 +444,21 @@ struct BrainReaderContent: View {
         self.push = push
         self.rating = rating
         self.focusIdea = focusIdea
-        self.hubPages = BrainConnectionsLayout.hubPages(page)
-        self.meta = BrainReaderLayout.metaLine(for: page.item, hubPageCount: hubPages.count, nested: page.hub != nil)
-        self.digest = BrainReaderLayout.digest(for: page)
-        self.linkCards = BrainConnectionsLayout.linkCards(page)
         self.person = person
-        let personLayout = person?.layout
-        self.backlinks = personLayout?.remainingMentions(page.backlinks, total: page.backlinks.count).refs
-            ?? page.backlinks
-        let unlinked = personLayout?.remainingMentions(page.unlinked, total: page.unlinkedCount)
-            ?? (refs: page.unlinked, total: page.unlinkedCount)
-        self.unlinkedRefs = unlinked.refs
-        self.unlinkedTotal = unlinked.total
+        self.layout = layout
     }
 
     var body: some View {
         ScrollViewReader { proxy in
             scrollContent
                 .onChange(of: jumpsToHubPages) { _, _ in
-                    withAnimation(reduceMotion ? nil : .default) {
+                    withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) {
                         proxy.scrollTo(Self.hubPagesAnchor, anchor: .top)
                     }
                 }
                 .task(id: page.item.id) {
                     guard let focusIdea, digest?.ideas.contains(where: { $0.number == focusIdea }) == true else { return }
-                    withAnimation(reduceMotion ? nil : .default) {
+                    withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) {
                         proxy.scrollTo(BrainArticleDigestView.ideaAnchor(focusIdea), anchor: .top)
                     }
                 }
