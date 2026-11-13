@@ -186,7 +186,7 @@ struct MealsSeasonView: View {
                 Text(verbatim: "This server doesn't serve the season record. It needs the Meals API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load the season", message: message) { Task { await model.load() } }
+            HXFailedView(title: "Couldn't load the season", message: message) { Task { await model.load() } }
         case .loaded(let record):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {

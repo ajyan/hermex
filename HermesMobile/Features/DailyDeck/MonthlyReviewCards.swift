@@ -8,17 +8,11 @@ import SwiftUI
 
 // MARK: Shared
 
-/// The values' papers on a monthly card: each value wears the paper of the kind of thing it's about.
+/// The values' paper on a review card: the review's own.
 enum MonthValues {
     static func paper(_ value: String) -> HermexPaper {
-        switch value {
-        case "present": .past
-        case "people": .quote
-        case "dad": .advisor
-        case "potential": .notes
-        case "body": .training
-        default: .dusk
-        }
+        // Every value wears the review's dusk; its name tells them apart.
+        .dusk
     }
 }
 

@@ -234,8 +234,7 @@ struct BrainPersonFactsSheet: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(Text(verbatim: "Edit facts"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Edit facts")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Cancel") }

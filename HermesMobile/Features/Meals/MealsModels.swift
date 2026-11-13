@@ -185,8 +185,16 @@ struct MealsNightBody: Encodable, Equatable {
 struct MealsLogRequest: Encodable, Equatable {
     let day: String
     let today: String
-    let servings: Int
+    /// Left out of the body when nil.
+    let servings: Int?
     let dishes: [MealsLogDish]
+
+    /// Not eaten after all: no dishes, so the server keeps nothing logged for `day`. The fork's
+    /// `vault_meals.log` must accept an empty `dishes` for this (it answers 400 until it does), and
+    /// `meals.log_night` then drops the day's non-estimated history rows, as logging again does.
+    static func notEaten(day: String, today: String) -> MealsLogRequest {
+        MealsLogRequest(day: day, today: today, servings: nil, dishes: [])
+    }
 }
 
 struct MealsLogDish: Encodable, Equatable {
@@ -219,23 +227,33 @@ enum MealsCopy {
         return Calendar(identifier: .gregorian).date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
     }
 
-    private static func formatted(_ day: String, _ format: String) -> String {
-        guard let date = date(day) else { return day }
+    /// A fixed-format formatter for server days, made once per format (week rows draw several a frame).
+    static func dayFormatter(_ format: String) -> DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = format
+        return formatter
+    }
+
+    private static let weekdayFormatter = dayFormatter("EEE")
+    private static let weekdayNameFormatter = dayFormatter("EEEE")
+    private static let dayNumberFormatter = dayFormatter("d")
+    private static let shortFormatter = dayFormatter("EEE, MMM d")
+
+    static func formatted(_ day: String, _ formatter: DateFormatter) -> String {
+        guard let date = date(day) else { return day }
         return formatter.string(from: date)
     }
 
     /// "Tue"
-    static func weekday(_ day: String) -> String { formatted(day, "EEE") }
+    static func weekday(_ day: String) -> String { formatted(day, weekdayFormatter) }
     /// "Tuesday"
-    static func weekdayName(_ day: String) -> String { formatted(day, "EEEE") }
+    static func weekdayName(_ day: String) -> String { formatted(day, weekdayNameFormatter) }
     /// "3"
-    static func dayNumber(_ day: String) -> String { formatted(day, "d") }
+    static func dayNumber(_ day: String) -> String { formatted(day, dayNumberFormatter) }
     /// "Tue, Nov 3"
-    static func short(_ day: String) -> String { formatted(day, "EEE, MMM d") }
+    static func short(_ day: String) -> String { formatted(day, shortFormatter) }
 
     static func serves(_ servings: Int) -> String? {
         servings == defaultServings ? nil : "Serves \(servings)"

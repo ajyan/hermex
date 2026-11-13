@@ -8,6 +8,8 @@ struct GitBranchPickerButton: View {
     let isLoading: Bool
     let isSwitching: Bool
     let isDisabled: Bool
+    /// Why the branch list failed to load, if it did.
+    var errorMessage: String? = nil
     let onSelect: (GitCheckoutTarget) -> Void
     let onCreate: (GitCheckoutTarget) -> Void
     let onRefresh: () -> Void
@@ -47,6 +49,7 @@ struct GitBranchPickerButton: View {
                 currentBranch: currentBranch,
                 isLoading: isLoading,
                 isSwitching: isSwitching,
+                errorMessage: errorMessage,
                 onSelect: { target in
                     showsPicker = false
                     onSelect(target)
@@ -68,6 +71,7 @@ private struct GitBranchPickerSheet: View {
     let currentBranch: String
     let isLoading: Bool
     let isSwitching: Bool
+    let errorMessage: String?
     let onSelect: (GitCheckoutTarget) -> Void
     let onCreate: (GitCheckoutTarget) -> Void
     let onRefresh: () -> Void
@@ -91,13 +95,15 @@ private struct GitBranchPickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(localBranches, id: \.name) { branch in
-                        branchButton(branch, mode: .local)
+                if !localBranches.isEmpty {
+                    Section {
+                        ForEach(localBranches, id: \.name) { branch in
+                            branchButton(branch, mode: .local)
+                        }
+                    } header: {
+                        HXSectionHeader(title: String(localized: "Local"))
+                            .textCase(nil)
                     }
-                } header: {
-                    HXSectionHeader(title: String(localized: "Local"))
-                        .textCase(nil)
                 }
 
                 if !remoteBranches.isEmpty {
@@ -135,10 +141,31 @@ private struct GitBranchPickerSheet: View {
             .hxNavigationTitle(String(localized: "Branches"))
             .searchable(text: $searchText, prompt: "Search branches")
             .overlay {
-                if isLoading, branches == nil { ProgressView() }
+                if isLoading, branches == nil {
+                    ProgressView()
+                } else if let errorMessage, !isLoading {
+                    ContentUnavailableView {
+                        Label("Couldn't load branches", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(errorMessage)
+                    } actions: {
+                        Button("Try again", action: onRefresh)
+                            .buttonStyle(.borderedProminent)
+                    }
+                } else if branches != nil, localBranches.isEmpty, remoteBranches.isEmpty {
+                    if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        ContentUnavailableView(
+                            "No branches yet",
+                            systemImage: "arrow.triangle.branch",
+                            description: Text("Create one with New branch.")
+                        )
+                    } else {
+                        ContentUnavailableView.search(text: searchText)
+                    }
+                }
             }
         }
-        .alert("New Branch", isPresented: $showsCreatePrompt) {
+        .alert("New branch", isPresented: $showsCreatePrompt) {
             TextField("hermex/my-feature", text: $newBranchName)
             Button("Cancel", role: .cancel) {}
             Button("Create") {

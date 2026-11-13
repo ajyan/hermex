@@ -222,13 +222,13 @@ private struct BotReactionControls: View {
                     .frame(width: 28, height: 28)
                     .chatMinimumHitTarget(in: Rectangle())
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.hxTextSecondary)
             .disabled(!isEnabled)
             .accessibilityLabel("More")
         }
         if let onCopy {
             ChatCopyButton(action: onCopy)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
         }
         if let content {
             ForEach(content.reactions, id: \.self) { reaction in

@@ -399,14 +399,9 @@ extension MealsCopy {
     }
 
     /// "Oct 31"
-    static func monthDay(_ day: String) -> String {
-        guard let date = date(day) else { return day }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
+    static func monthDay(_ day: String) -> String { formatted(day, monthDayFormatter) }
+
+    private static let monthDayFormatter = dayFormatter("MMM d")
 
     /// "fall and winter", "spring, summer and fall"
     static func listed(_ words: [String]) -> String {

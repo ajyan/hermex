@@ -23,7 +23,7 @@ struct BotMentionAutocompleteView: View {
         .adaptiveGlass(.regular, fallbackMaterial: .ultraThinMaterial,
                        in: RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .hxShadow(.float)
         .frame(height: min(280, CGFloat(completions.count) * rowHeight))
     }
 }
@@ -45,11 +45,11 @@ struct BotMentionRow: View {
                 avatar
                     .accessibilityHidden(true)
                 Text(verbatim: "@" + item.tag)
-                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                    .font(AppFont.mono(style: .subheadline, weight: .semibold))
                     .foregroundStyle(.primary).lineLimit(1).layoutPriority(2)
                 Spacer(minLength: 8)
                 Text(verbatim: item.profile.name)
-                    .font(AppFont.caption()).foregroundStyle(.secondary).lineLimit(1)
+                    .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
             .contentShape(Rectangle())

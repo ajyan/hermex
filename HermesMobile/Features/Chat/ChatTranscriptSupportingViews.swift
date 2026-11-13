@@ -1254,7 +1254,7 @@ struct PinnedLocalNoticeStack: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .shadow(color: Color.black.opacity(0.12), radius: 10, y: 4)
+        .hxShadow(.float)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(notices.joined(separator: "\n"))
     }

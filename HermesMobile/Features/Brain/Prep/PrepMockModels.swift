@@ -186,13 +186,8 @@ struct PrepMocks: Decodable, Hashable, Sendable {
     /// days (by the local day it started), otherwise the kind graded longest ago, a kind never graded
     /// first, behavioral before design.
     func weeklyDue(now: Date = .now, calendar: Calendar = .current) -> PrepMockKind? {
-        let format = DateFormatter()
-        format.calendar = calendar
-        format.timeZone = calendar.timeZone
-        format.locale = Locale(identifier: "en_US_POSIX")
-        format.dateFormat = "yyyy-MM-dd"
         guard let earlier = calendar.date(byAdding: .day, value: -Self.weeklyDays, to: now) else { return nil }
-        let since = format.string(from: earlier)
+        let since = PrepCopy.isoDay(earlier, calendar: calendar)
         let lastGraded = Dictionary(grouping: recent.filter { $0.status == "graded" }, by: \.kind)
             .mapValues { $0.compactMap { $0.ts.map { String($0.prefix(10)) } }.max() ?? "" }
         guard !lastGraded.values.contains(where: { $0 > since }) else { return nil }

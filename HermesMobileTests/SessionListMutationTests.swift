@@ -2855,6 +2855,40 @@ final class SessionListMutationTests: XCTestCase {
         )
     }
 
+    func testArchiveNeedsAWritableLiveSession() {
+        XCTAssertTrue(SessionRowActionPolicy.canArchive(SessionSummary(sessionId: "normal"), isViewingCachedData: false))
+        XCTAssertFalse(SessionRowActionPolicy.canArchive(SessionSummary(sessionId: "normal"), isViewingCachedData: true))
+        XCTAssertFalse(SessionRowActionPolicy.canArchive(SessionSummary(sessionId: "ro", readOnly: true), isViewingCachedData: false))
+        XCTAssertFalse(SessionRowActionPolicy.canArchive(SessionSummary(sessionId: nil), isViewingCachedData: false))
+    }
+
+    @MainActor
+    func testDeleteConfirmationNamesTheChat() {
+        let session = SessionSummary(sessionId: "s1", title: "Trip plans")
+        XCTAssertEqual(
+            SessionActionConfirmations.deleteTitle(for: session),
+            "Delete \"\(SessionRowView.displayTitle(for: session))\"?"
+        )
+        XCTAssertEqual(SessionActionConfirmations.deleteTitle(for: nil), "Delete chat?")
+    }
+
+    @MainActor
+    func testStopShortcutsNeedARunningStreamAndEscapeYieldsToTheDrawer() {
+        var stops = 0
+        let streaming = ChatKeyboardActions(isStreaming: true, isCancellingStream: false, stopResponse: { stops += 1 })
+        XCTAssertTrue(streaming.canStopResponse)
+        XCTAssertTrue(streaming.canStopWithEscape(isDrawerOpen: false))
+        XCTAssertFalse(streaming.canStopWithEscape(isDrawerOpen: true))
+        streaming.stopResponse()
+        XCTAssertEqual(stops, 1)
+
+        let cancelling = ChatKeyboardActions(isStreaming: true, isCancellingStream: true, stopResponse: {})
+        XCTAssertFalse(cancelling.canStopResponse)
+        let idle = ChatKeyboardActions(isStreaming: false, isCancellingStream: false, stopResponse: {})
+        XCTAssertFalse(idle.canStopResponse)
+        XCTAssertFalse(idle.canStopWithEscape(isDrawerOpen: false))
+    }
+
     @MainActor
     func testOpeningExternalSessionImportsAndCachesAuthoritativeSession() async throws {
         let context = try makeContext()

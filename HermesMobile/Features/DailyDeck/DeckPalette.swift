@@ -77,7 +77,7 @@ struct DeckPalette: Equatable {
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
     static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
-    static let lookingBack = DeckPalette(.past, symbol: "arrow.uturn.backward.circle", name: "Looking back", shortName: "Back")
+    static let lookingBack = DeckPalette(.dusk, symbol: "arrow.uturn.backward.circle", name: "Looking back", shortName: "Back")
     static let lookingAhead = DeckPalette(.dusk, symbol: "sunrise", name: "Looking ahead", shortName: "Ahead")
     static let mandarin = DeckPalette(.mandarin, symbol: "character.bubble", name: "Mandarin practice", shortName: "Mandarin")
     static let dinner = DeckPalette(.meal, symbol: "fork.knife", name: "Last night's dinner", shortName: "Dinner")
@@ -90,7 +90,7 @@ struct DeckPalette: Equatable {
     static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
     // A weekly review's Wrapped cards. Themes quote your own past words; mood reads like a
     // check-in; lessons come from your notes; the goals card wears its goal's paper.
-    static let theme = DeckPalette(.past, symbol: "quote.bubble", name: "Theme", shortName: "Theme")
+    static let theme = DeckPalette(.dusk, symbol: "quote.bubble", name: "Theme", shortName: "Theme")
     static let mood = DeckPalette(.advisor, symbol: "waveform.path", name: "Energy and mood", shortName: "Mood")
     static let lessons = DeckPalette(.notes, symbol: "lightbulb", name: "Lessons", shortName: "Lessons")
     static let recap = DeckPalette(.plain, symbol: "list.bullet", name: "Recap", shortName: "Recap")
@@ -135,7 +135,14 @@ struct DeckPalette: Equatable {
         case .close: ("checkmark.seal", "Close")
         default: ("sunset", "Your month")
         }
-        return DeckPalette(HermexPaper.named(card.color) ?? .dusk, symbol: symbol, name: name, shortName: "Month")
+        // A review is one place, so its cards wear its dusk whatever color the vault names; sleep and the
+        // letter keep the papers of where they live (Body, People).
+        let paper: HermexPaper = switch card.type {
+        case .monthSleep: .training
+        case .weekLetter: .advisor
+        default: .dusk
+        }
+        return DeckPalette(paper, symbol: symbol, name: name, shortName: "Month")
     }
 
     static func of(_ card: DeckCard) -> DeckPalette {

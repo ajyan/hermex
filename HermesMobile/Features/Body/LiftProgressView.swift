@@ -48,7 +48,7 @@ struct LiftProgressView: View {
                 Text(verbatim: "This server doesn't have a lift with that name. It may have been removed from the plan.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this lift", message: message) {
+            HXFailedView(title: "Couldn't load this lift", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let lift):

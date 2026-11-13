@@ -155,7 +155,7 @@ extension AgentRunActivityBot {
             if let photo {
                 Image(uiImage: photo).resizable().scaledToFill()
                     .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             } else {
                 BotAvatarMarkView(name: profile.id, appearance: BotProfileAppearance(profile: profile), size: 40)
             }

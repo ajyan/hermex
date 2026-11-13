@@ -91,7 +91,7 @@ struct PrepMockBriefView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load mocks", message: message) {
+            HXFailedView(title: "Couldn't load mocks", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let mocks):
@@ -246,7 +246,7 @@ struct PrepMockResultView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this mock", message: message) {
+            HXFailedView(title: "Couldn't load this mock", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let mocks):

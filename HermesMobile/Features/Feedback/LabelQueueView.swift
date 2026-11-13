@@ -69,7 +69,9 @@ struct LabelQueueView: View {
             ContentUnavailableView {
                 Label { Text(verbatim: "Open the Daily Brief once first") } icon: { Image(systemName: "sun.horizon") }
             } description: {
-                Text(verbatim: "Recent cards are read through the Daily Brief's session. Open it, then come back.")
+                Text(verbatim: "Recent cards are read through the Daily Brief's session. Let today's brief load, then try again.")
+            } actions: {
+                Button { viewModel.start() } label: { Text(verbatim: HXFailedView.retryLabel) }
             }
         case .failed(let message):
             ContentUnavailableView {

@@ -57,7 +57,7 @@ struct GoalsHomeView: View {
                 Text(verbatim: "This server doesn't serve goals. It needs the goals API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load goals", message: message) {
+            HXFailedView(title: "Couldn't load goals", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let home):
@@ -227,8 +227,7 @@ private struct GoalsAgentList: View {
                     Text(verbatim: goal.title)
                 }
             }
-            .navigationTitle(Text(verbatim: "Atlas's projects"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Atlas's projects")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }

@@ -114,12 +114,12 @@ struct BotRoomActionCard: View {
                 onStop: { Task { await reader.stop() } }, onConnection: { _ in })
         } else {
             VStack(alignment: .leading, spacing: 12) {
-                Text(identity).font(AppFont.caption()).foregroundStyle(.secondary)
+                Text(identity).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                 if action.isRetry {
                     Button("Retry") { Task { await reader.act(action) } }.disabled(!reader.mayAct(action))
                 } else {
                     Label("Needs attention. Answer the request in Hermes Desktop on this same connection.", systemImage: "desktopcomputer")
-                        .font(.callout)
+                        .font(AppFont.subheadline())
                 }
             }
             .padding(16).frame(maxWidth: 560, alignment: .leading)

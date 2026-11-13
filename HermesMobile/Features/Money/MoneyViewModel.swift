@@ -20,8 +20,8 @@ protocol MoneyDataClient: Sendable {
 enum MoneyState: Equatable {
     case idle
     case loading
-    /// The server has several workspaces and the Daily Brief hasn't picked the vault yet.
-    case needsWorkspace
+    /// The server has several workspaces (these) and the Daily Brief hasn't picked the vault yet.
+    case needsWorkspace([String])
     /// The vault has no snapshot: the money job hasn't run.
     case noSnapshot
     case ready
@@ -35,15 +35,31 @@ final class MoneyViewModel {
     private(set) var snapshot: MoneySnapshot?
     /// The market note, only when it describes the snapshot's week.
     private(set) var market: MoneyMarketNote?
-    /// Spending, when the vault's money run has written it; Money works without it.
+    /// Spending, when the vault's money run has written it; Money works without it. A failed read
+    /// keeps the last one.
     private(set) var spending: MoneySpending?
+    /// Why the last spending read or decode failed; nil once it reads (or isn't there).
+    private(set) var spendingError: String?
+    /// Why the last refresh failed while older numbers stay on screen; nil after a load that works.
+    private(set) var refreshError: String?
     var range: MoneyRange = .week {
-        didSet { if range != oldValue { scrubbed = nil } }
+        didSet {
+            guard range != oldValue else { return }
+            scrub(to: nil)
+            updatePoints()
+        }
     }
+    /// The range's points, counted back from the snapshot's last day rather than the phone's, so
+    /// "this week" is the same seven days the market card splits. Kept per range and snapshot,
+    /// since the chart, headline and scrubbing all read it.
+    private(set) var points: [MoneyPoint] = []
     /// Amounts are hidden until revealed, and hidden again whenever the screen goes away.
     private(set) var isRevealed = false
-    /// The day under the finger while scrubbing the chart.
+    /// The day under the finger while scrubbing the chart. Only the headline and chart read it, so a
+    /// drag redraws those alone.
     private(set) var scrubbed: MoneyPoint?
+    /// True while a finger is on the chart; changes only when scrubbing starts or ends.
+    private(set) var isScrubbing = false
 
     let server: URL
     /// Reading the synthetic fixtures (Debug only), so a screenshot can never pass for real data.
@@ -52,6 +68,8 @@ final class MoneyViewModel {
     private let store: DailyDeckStore
     private let now: () -> Date
     private let today: String
+    /// A replacement for a lost session in flight, so reads that lose it together make one.
+    @ObservationIgnored private var replacement: (lost: String, task: Task<String, Error>)?
 
     init(server: URL, client: any MoneyDataClient, store: DailyDeckStore = DailyDeckStore(),
          now: @escaping () -> Date = Date.init, isFixture: Bool = false) {
@@ -81,11 +99,12 @@ final class MoneyViewModel {
 
     var isHidden: Bool { !isRevealed }
 
-    /// The range's points, counted back from the snapshot's last day rather than the phone's,
-    /// so "this week" is the same seven days the market card splits.
-    var points: [MoneyPoint] {
-        guard let snapshot else { return [] }
-        return range.points(in: snapshot.series, today: snapshot.lastDay ?? MoneyPoint.dayFormatter.date(from: today) ?? now())
+    private func updatePoints() {
+        guard let snapshot else {
+            points = []
+            return
+        }
+        points = range.points(in: snapshot.series, today: snapshot.lastDay ?? MoneyPoint.dayFormatter.date(from: today) ?? now())
     }
 
     /// What can't be trusted about the numbers right now: a snapshot past its daily run, or
@@ -120,53 +139,74 @@ final class MoneyViewModel {
 
     /// Selects the point nearest `date`, or ends scrubbing for nil.
     func scrub(to date: Date?) {
-        guard let date else {
-            scrubbed = nil
-            return
+        scrubbed = date.flatMap { date in
+            points.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
         }
-        scrubbed = points.min { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }
+        if isScrubbing != (scrubbed != nil) { isScrubbing = scrubbed != nil }
     }
 
+    /// Picks the vault for Money and the Daily Brief, which share it, then loads.
+    func chooseWorkspace(_ path: String) async {
+        store.setWorkspace(path, for: server)
+        await load()
+    }
+
+    /// Reads the snapshot, the market note and spending together. A failed refresh keeps what's on
+    /// screen and says so; only a first load shows the error in place of the screen.
     func load() async {
         if snapshot == nil { state = .loading }
         do {
-            guard let workspace = try await resolveWorkspace() else {
-                state = .needsWorkspace
-                return
-            }
+            guard let workspace = try await resolveWorkspace() else { return }
             let sessionID = try await session(workspace: workspace)
-            guard let text = try await read(MoneyPaths.snapshot, sessionID: sessionID) else {
+            async let snapshotText = read(MoneyPaths.snapshot, sessionID: sessionID)
+            async let marketText = read(MoneyPaths.market, sessionID: sessionID)
+            async let spendingText = read(MoneyPaths.spending, sessionID: sessionID)
+            guard let text = try await snapshotText else {
                 snapshot = nil
                 market = nil
                 spending = nil
+                spendingError = nil
+                refreshError = nil
+                updatePoints()
                 state = .noSnapshot
                 return
             }
             let decoded = try MoneySnapshot.decode(Data(text.utf8))
-            let note = (try? await read(MoneyPaths.market, sessionID: sessionID))
+            let note = (try? await marketText)
                 .flatMap { $0 }
                 .flatMap { try? MoneyMarketNote.decode(Data($0.utf8)) }
-            let spent = (try? await read(MoneyPaths.spending, sessionID: sessionID))
-                .flatMap { $0 }
-                .flatMap { try? MoneySpending.decode(Data($0.utf8)) }
+            do {
+                spending = try await spendingText.map { try MoneySpending.decode(Data($0.utf8)) }
+                spendingError = nil
+            } catch {
+                spendingError = error.localizedDescription
+            }
             snapshot = decoded
             market = note?.matches(decoded.week) == true ? note : nil
-            spending = spent
-            scrubbed = nil
+            refreshError = nil
+            scrub(to: nil)
+            updatePoints()
             state = .ready
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
-            // A failed refresh keeps the chart; only a first load shows the error.
-            if snapshot == nil || state != .ready { state = .failed(error.localizedDescription) }
+            if snapshot == nil || state != .ready {
+                state = .failed(error.localizedDescription)
+            } else {
+                refreshError = error.localizedDescription
+            }
         }
     }
 
-    /// The Daily Brief's vault workspace, or the server's only one.
+    /// The Daily Brief's vault workspace, or the server's only one. With several and none chosen,
+    /// asks which (`.needsWorkspace`) and returns nil.
     private func resolveWorkspace() async throws -> String? {
         if let stored = store.workspace(for: server) { return stored }
         let paths = try await client.workspacePaths()
-        guard paths.count == 1, let only = paths.first else { return nil }
+        guard paths.count == 1, let only = paths.first else {
+            state = .needsWorkspace(paths)
+            return nil
+        }
         store.setWorkspace(only, for: server)
         return only
     }
@@ -175,10 +215,16 @@ final class MoneyViewModel {
     /// on a day the Brief was opened. A session the server lost is replaced once.
     private func session(workspace: String, replacing lost: String? = nil) async throws -> String {
         if let stored = store.session(for: server, date: today), stored != lost { return stored }
-        let created = try await client.createSession(workspace: workspace)
-        store.setSession(created, for: server, date: today)
-        try? await client.renameSession(id: created, title: DailyDeckViewModel.sessionTitle(for: today))
-        return created
+        if let lost, let pending = replacement, pending.lost == lost { return try await pending.task.value }
+        let task = Task { () async throws -> String in
+            let created = try await self.client.createSession(workspace: workspace)
+            self.store.setSession(created, for: self.server, date: self.today)
+            try? await self.client.renameSession(id: created, title: DailyDeckViewModel.sessionTitle(for: self.today))
+            return created
+        }
+        if let lost { replacement = (lost, task) }
+        defer { if let lost, replacement?.lost == lost { replacement = nil } }
+        return try await task.value
     }
 
     /// A file's text, or nil when it doesn't exist. A lost session is replaced once, like the Brief's.

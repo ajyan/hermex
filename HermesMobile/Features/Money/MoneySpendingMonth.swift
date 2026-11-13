@@ -307,6 +307,10 @@ struct MoneyAskRow: View {
     let hidden: Bool
     /// The row's side padding: a card's inset, or none on a deck card that already has its margins.
     var inset: CGFloat = 12
+    /// The why's color: `hxTextSecondary` on Money's neutral cards, the paper's `secondaryInk` on a glow card.
+    var secondary: Color = .hxTextSecondary
+    /// The bubble's color: Nous blue on Money's screens, the card's ink on a Daily Brief card.
+    var control: Color = .accentColor
     let ask: () -> Void
 
     var body: some View {
@@ -327,13 +331,13 @@ struct MoneyAskRow: View {
                         .foregroundStyle(Color.hxTextPrimary)
                     Text(verbatim: hidden ? MoneySpendingCopy.masked(detail) : detail)
                         .font(AppFont.caption())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(secondary)
                         .multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 6)
                 Image(systemName: "bubble.left")
                     .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(control)
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, inset)

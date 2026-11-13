@@ -82,7 +82,7 @@ struct BotArtifactPreview: View {
                         Button("Try Again") { attempt += 1 }
                     }
                 } else {
-                    Text("Loading file...").foregroundStyle(.secondary)
+                    Text("Loading file...").foregroundStyle(Color.hxTextSecondary)
                 }
             }
             .hxNavigationTitle(reference.displayName)

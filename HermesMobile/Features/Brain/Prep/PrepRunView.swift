@@ -203,7 +203,7 @@ struct PrepRunView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load today's run", message: message) {
+            HXFailedView(title: "Couldn't load today's run", message: message) {
                 Task { await viewModel.load() }
             }
         case .rep(let rep, _):
@@ -440,7 +440,7 @@ struct PrepRunView: View {
                         isSubmitting: viewModel.isSubmitting,
                         dontKnow: { Task { await viewModel.dontKnow() } },
                         reread: viewModel.canReread ? {
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { viewModel.rereadLesson() }
+                            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { viewModel.rereadLesson() }
                         } : nil
                     )
                     .transition(.opacity)

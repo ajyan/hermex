@@ -35,8 +35,11 @@ struct PrepHomeView: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Home"))
             .background(Color.hxCanvas.ignoresSafeArea())
-            // Every appear refreshes quietly, so a finished run or graded mock shows on the way back.
-            .task { await load() }
+            // The first appear loads everything; coming back from a run refreshes home and the course only,
+            // until the last full load is ten minutes old. Pull to refresh always loads everything.
+            .task {
+                if viewModel.needsFullLoad() { await load() } else { await viewModel.refresh() }
+            }
     }
 
     private func load() async {
@@ -60,7 +63,7 @@ struct PrepHomeView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load Prep", message: message) {
+            HXFailedView(title: "Couldn't load Prep", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let home):
@@ -185,23 +188,6 @@ struct PrepUnavailableView: View {
             Label { Text(verbatim: "No Prep on this server") } icon: { Image(systemName: "target") }
         } description: {
             Text(verbatim: "This server doesn't serve interview prep. It needs the tutor API from your hermes-webui fork.")
-        }
-    }
-}
-
-/// A load failure with a retry.
-struct PrepFailedView: View {
-    let title: String
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        ContentUnavailableView {
-            Label { Text(verbatim: title) } icon: { Image(systemName: "exclamationmark.triangle") }
-        } description: {
-            Text(verbatim: message)
-        } actions: {
-            Button(action: retry) { Text(verbatim: "Try again") }
         }
     }
 }
@@ -351,7 +337,7 @@ struct PrepGapView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this gap", message: message) {
+            HXFailedView(title: "Couldn't load this gap", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let gap):

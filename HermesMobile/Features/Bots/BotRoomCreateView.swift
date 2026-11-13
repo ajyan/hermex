@@ -47,7 +47,7 @@ import SwiftUI
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("To:").foregroundStyle(.secondary)
+                    Text("To:").foregroundStyle(Color.hxTextSecondary)
                     if !creator.selected.isEmpty {
                         ViewThatFits(in: .horizontal) {
                             chips
@@ -111,9 +111,9 @@ import SwiftUI
                     .submitLabel(.done)
                     .onSubmit { if creator.mayCreate { Task { await creator.create() } } }
                 if !BotRoomRPC.validName(creator.name) {
-                    Text("Enter a name of up to 200 characters.").font(AppFont.caption()).foregroundStyle(.secondary)
+                    Text("Enter a name of up to 200 characters.").font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                 }
-                if let message = creator.message { Text(message).font(.callout) }
+                if let message = creator.message { Text(message).font(AppFont.subheadline()) }
                 Button(creator.busy ? "Creating…" : creator.locked ? "Try Again" : "Create") {
                     focused = nil
                     Task { await creator.create() }

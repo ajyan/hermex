@@ -22,8 +22,9 @@ struct ContextWindowIndicatorView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var showPopover = false
-    private let ringSize: CGFloat = 30
-    private let tapTargetSize: CGFloat = 44
+    /// Grows with the percentage text, up to the composer row's room.
+    @ScaledMetric(relativeTo: .caption2) private var ringSize: CGFloat = 30
+    private var tapTargetSize: CGFloat { max(44, ringSize + 8) }
 
     var body: some View {
         Button(action: showContextDetails) {
@@ -44,7 +45,10 @@ struct ContextWindowIndicatorView: View {
                 }
 
                 Text(presentation.percentageLabel)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppFont.caption2(weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.horizontal, 4)
                     .foregroundStyle(presentation.isInteractive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             }
             .frame(width: ringSize, height: ringSize)
@@ -61,6 +65,7 @@ struct ContextWindowIndicatorView: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .disabled(!presentation.isInteractive)
         .accessibilityLabel(presentation.isInteractive ? "Context usage" : "Context usage loading")
         .accessibilityValue(presentation.isInteractive ? "\(presentation.percentageLabel) percent" : "")

@@ -15,57 +15,81 @@ struct DeckFeedbackSheet: View {
     @State private var isAskingOwn = false
     @State private var ownQuestion = ""
 
+    /// Leaving would throw away a typed note: the sheet asks first.
+    private var hasNote: Bool { !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    @State private var confirmsDiscard = false
+
+    /// The card's own paper, which its reason chips wear; a neutral card's are plain, since its amber means waiting on you.
+    private var paper: HermexPaper {
+        let palette = DeckPalette.of(.card(card), inV2Weekly: viewModel.isSealedWeekly)
+        return palette.isNeutralCard ? .plain : palette.colors
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(verbatim: "What's off about this card?")
-                    .font(AppFont.headline())
-                ChipFlow(spacing: 8) {
-                    ForEach(DeckFeedback.reasons, id: \.id) { reason in
-                        chip(reason.id, label: reason.label)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(verbatim: "What's off about this card?")
+                        .font(AppFont.headline())
+                    FlowRow(spacing: 8) {
+                        ForEach(DeckFeedback.reasons, id: \.id) { reason in
+                            chip(reason.id, label: reason.label)
+                        }
                     }
-                }
-                TextField(text: $note, axis: .vertical) { Text(verbatim: "Anything else? (optional)") }
-                    .font(AppFont.body())
-                    .lineLimit(1...4)
-                    .padding(12)
-                    .withDictation($note)
+                    TextField(text: $note, axis: .vertical) { Text(verbatim: "Anything else? (optional)") }
+                        .font(AppFont.body())
+                        .lineLimit(1...4)
+                        .padding(12)
+                        .withDictation($note)
+                        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+
+                    VStack(spacing: 0) {
+                        if !card.altQuestions.isEmpty {
+                            row("Regenerate question", systemImage: "arrow.triangle.2.circlepath") {
+                                dismiss()
+                                withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) {
+                                    viewModel.regenerateQuestion(for: card)
+                                }
+                            }
+                            Divider()
+                        }
+                        row("Ask my own question", systemImage: "pencil") {
+                            ownQuestion = viewModel.question(for: card) ?? ""
+                            isAskingOwn = true
+                        }
+                    }
                     .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
 
-                VStack(spacing: 0) {
-                    if !card.altQuestions.isEmpty {
-                        row("Regenerate Question", systemImage: "arrow.triangle.2.circlepath") {
-                            dismiss()
-                            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) {
-                                viewModel.regenerateQuestion(for: card)
-                            }
-                        }
-                        Divider()
-                    }
-                    row("Ask My Own Question", systemImage: "pencil") {
-                        ownQuestion = viewModel.question(for: card) ?? ""
-                        isAskingOwn = true
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { verdictButtons }
+                        VStack(spacing: 8) { verdictButtons }
                     }
                 }
-                .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
-
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) { verdictButtons }
-                    VStack(spacing: 8) { verdictButtons }
+                .padding(20)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle("Not for me")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { if hasNote { confirmsDiscard = true } else { dismiss() } } label: { Text(verbatim: "Cancel") }
                 }
             }
-            .padding(20)
+            .confirmationDialog(Text(verbatim: "Discard your note?"), isPresented: $confirmsDiscard, titleVisibility: .visible) {
+                Button(role: .destructive) { dismiss() } label: { Text(verbatim: "Discard note") }
+                Button(role: .cancel) {} label: { Text(verbatim: "Keep editing") }
+            }
         }
-        .scrollBounceBehavior(.basedOnSize)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .alert(Text(verbatim: "Your Question"), isPresented: $isAskingOwn) {
+        .interactiveDismissDisabled(hasNote)
+        .alert(Text(verbatim: "Your question"), isPresented: $isAskingOwn) {
             TextField(text: $ownQuestion) { Text(verbatim: "What do you want to answer?") }
             Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
             Button {
                 viewModel.setOwnQuestion(ownQuestion, for: card)
                 dismiss()
-            } label: { Text(verbatim: "Use It") }
+            } label: { Text(verbatim: "Use it") }
         } message: {
             Text(verbatim: "It replaces this card's question and is filed with your answer.")
         }
@@ -73,14 +97,10 @@ struct DeckFeedbackSheet: View {
 
     @ViewBuilder
     private var verdictButtons: some View {
-        Button { send(.skip) } label: {
-            Text(verbatim: "Skip Card").frame(maxWidth: .infinity, minHeight: 36)
-        }
-        .buttonStyle(.bordered)
-        Button { send(.less) } label: {
-            Text(verbatim: "Less Like This").frame(maxWidth: .infinity, minHeight: 36)
-        }
-        .buttonStyle(.borderedProminent)
+        Button { send(.skip) } label: { Text(verbatim: "Skip card") }
+            .buttonStyle(.chatDecision(.secondary))
+        Button { send(.less) } label: { Text(verbatim: "Less like this") }
+            .buttonStyle(.chatDecision(.primary))
     }
 
     private func send(_ verdict: DeckFeedback.Verdict) {
@@ -88,17 +108,15 @@ struct DeckFeedbackSheet: View {
         onDismissCard(DeckFeedback(verdict: verdict, reasons: ordered, note: note))
     }
 
+    /// A reason as the card's chip; a chosen one carries a check.
     private func chip(_ id: String, label: String) -> some View {
         let isSelected = reasons.contains(id)
         return Button {
             if isSelected { reasons.remove(id) } else { reasons.insert(id) }
         } label: {
-            Text(verbatim: label)
-                .font(AppFont.subheadline(weight: .medium))
-                .padding(.horizontal, 12)
-                .frame(minHeight: 36)
-                .foregroundStyle(isSelected ? Color.hxOnAccent : Color.primary)
-                .background(isSelected ? Color.accentColor : Color.hxSurface, in: Capsule())
+            HXChip(paper: paper, symbol: isSelected ? "checkmark" : nil, label: label)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -114,48 +132,5 @@ struct DeckFeedbackSheet: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.accentColor)
-    }
-}
-
-/// Lays chips out left to right, wrapping to a new row when one won't fit.
-struct ChipFlow: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = rows(width: proposal.width ?? .infinity, subviews: subviews)
-        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
-        return CGSize(width: proposal.width ?? rows.map(\.width).max() ?? 0, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in rows(width: bounds.width, subviews: subviews) {
-            var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-
-    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
-
-    private func rows(width: CGFloat, subviews: Subviews) -> [Row] {
-        var rows: [Row] = [Row()]
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            let needed = rows[rows.count - 1].indices.isEmpty ? size.width : rows[rows.count - 1].width + spacing + size.width
-            if needed > width, !rows[rows.count - 1].indices.isEmpty {
-                rows.append(Row())
-            }
-            var row = rows[rows.count - 1]
-            row.width = row.indices.isEmpty ? size.width : row.width + spacing + size.width
-            row.height = max(row.height, size.height)
-            row.indices.append(index)
-            rows[rows.count - 1] = row
-        }
-        return rows
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The Sunday review's money card: the week's day-to-day spending against a usual week, the last eight
 /// weeks as one line, the week and the month against their averages, the top categories with their own
-/// lines, and what was out of the ordinary. The deck names only the week; the numbers come live from
+/// lines, and what was out of the ordinary; the open card's foot button opens Money. The deck names only the week; the numbers come live from
 /// `spending.json`, so they never sit in the deck file. Amounts open hidden, as everywhere in Money.
 struct WeekMoneyCard: View {
     let card: DeckCard
@@ -12,7 +12,6 @@ struct WeekMoneyCard: View {
     @State private var week: MoneySpending.WeekDetail?
     @State private var loaded = false
     @State private var revealed = false
-    @State private var spendingScreen: MoneyViewModel?
     @Environment(\.scenePhase) private var scenePhase
 
     /// A week already in hand (a render or preview) skips the read; `revealed` opens it with amounts shown.
@@ -59,7 +58,7 @@ struct WeekMoneyCard: View {
             } else if loaded {
                 Text(verbatim: "This week's spending isn't in yet. It comes in with the morning money run.")
                     .font(AppFont.body())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
             }
@@ -73,20 +72,6 @@ struct WeekMoneyCard: View {
         }
         .onChange(of: scenePhase) { _, phase in if phase != .active { revealed = false } }
         .onDisappear { revealed = false }
-        .sheet(item: $spendingScreen, onDismiss: { revealed = false }) { money in
-            NavigationStack {
-                MoneySpendingView(viewModel: money) { words in
-                    spendingScreen = nil
-                    viewModel.askAtlas?(words)
-                }
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button { spendingScreen = nil } label: { Text(verbatim: "Done") }
-                    }
-                }
-                .task { await money.load() }
-            }
-        }
     }
 
     @ViewBuilder
@@ -99,17 +84,17 @@ struct WeekMoneyCard: View {
         if let bills = MoneyWeekCopy.bills(week, hidden: hidden) {
             Text(verbatim: bills)
                 .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 4)
         }
         if week.trend.count > 1 {
             section("The last \(week.trend.count) weeks")
-            MoneyWeekTrendChart(trend: week.trend, usual: week.usual, hidden: hidden)
+            MoneyWeekTrendChart(trend: week.trend, usual: week.usual, hidden: hidden, secondary: palette.secondaryInk)
                 .padding(.top, 6)
             Text(verbatim: MoneyWeekCopy.trendCaption(usual: week.usual, hidden: hidden))
                 .font(AppFont.caption())
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
         }
@@ -138,17 +123,12 @@ struct WeekMoneyCard: View {
             ForEach(week.odd) { odd in
                 rule
                 let row = MoneyWeekCopy.odd(odd)
-                MoneyAskRow(title: row.title, detail: row.detail, group: odd.group, hidden: hidden, inset: 0) {
+                MoneyAskRow(title: row.title, detail: row.detail, group: odd.group, hidden: hidden, inset: 0,
+                            secondary: palette.secondaryInk, control: palette.ink) {
                     viewModel.askAtlas?(odd.question)
                 }
             }
         }
-        Button { spendingScreen = MoneyViewModel(server: viewModel.server) } label: {
-            Text(verbatim: "Open Spending").bodyTapHeight()
-        }
-        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-        .environment(\.hxPaper, palette.colors)
-        .padding(.top, 22)
     }
 
     private func section(_ title: String) -> some View {
@@ -168,7 +148,7 @@ struct WeekMoneyCard: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: title).font(AppFont.subheadline(weight: .medium)).foregroundStyle(Color.hxTextPrimary)
-                Text(verbatim: meta).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
+                Text(verbatim: meta).font(AppFont.caption()).foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 6)
@@ -191,7 +171,7 @@ struct WeekMoneyCard: View {
                 Text(verbatim: category.name).font(AppFont.subheadline(weight: .medium)).foregroundStyle(Color.hxTextPrimary)
                 let meta = MoneyWeekCopy.categoryMeta(category, hidden: hidden)
                 if !meta.isEmpty {
-                    Text(verbatim: meta).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
+                    Text(verbatim: meta).font(AppFont.caption()).foregroundStyle(palette.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -204,8 +184,4 @@ struct WeekMoneyCard: View {
         .padding(.vertical, 10)
         .accessibilityElement(children: .combine)
     }
-}
-
-extension MoneyViewModel: Identifiable {
-    nonisolated var id: ObjectIdentifier { ObjectIdentifier(self) }
 }
