@@ -1115,6 +1115,7 @@ struct MessageComposerView: View {
                 isLoading: gitViewModel.isLoadingBranches,
                 isSwitching: gitViewModel.isSwitchingBranch,
                 isDisabled: isReadOnly || isWaitingForStream,
+                errorMessage: gitViewModel.branchesError?.localizedDescription,
                 onSelect: onSelectGitBranch,
                 onCreate: onCreateGitBranch,
                 onRefresh: onRefreshGitBranches,
