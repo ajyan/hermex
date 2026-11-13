@@ -154,12 +154,10 @@ struct DeckMandarinCard: View {
             actions(primary: ("Warm up", "mic.fill", { change { practice.startWarmUp() } }))
                 .padding(.top, 20)
             Button { change { practice.step = .answer } } label: {
-                Text(verbatim: "Skip to answer")
-                    .font(AppFont.subheadline(weight: .medium))
-                    .foregroundStyle(palette.ink)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                MandarinPillLabel(text: "Skip to answer", palette: palette)
             }
             .buttonStyle(.plain)
+            .padding(.top, 8)
         }
     }
 
@@ -213,19 +211,14 @@ struct DeckMandarinCard: View {
                     secondary: ("Again", "arrow.counterclockwise", { Task { await practice.warm(item, got: false) } }),
                     busy: practice.isSavingRecall)
         } else {
-            MandarinMic(prompt: "Say it in Mandarin", palette: palette, onListen: { speaker.stop() }) { text in
+            MandarinMic(prompt: "Say it in Mandarin", palette: palette,
+                        alternative: ("Show me", { change { _ = revealed.insert(item.hanzi) } }),
+                        onListen: { speaker.stop() }) { text in
                 attempts[item.hanzi] = text
                 change { _ = revealed.insert(item.hanzi) }
                 return true
             }
             .id(item.hanzi)
-            Button { change { _ = revealed.insert(item.hanzi) } } label: {
-                Text(verbatim: "Show me")
-                    .font(AppFont.subheadline(weight: .medium))
-                    .foregroundStyle(palette.ink)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.plain)
         }
     }
 
@@ -279,10 +272,7 @@ struct DeckMandarinCard: View {
             }
             if case let .failed(message) = practice.answering { retryLine(message) }
             Button { change { retelling = false } } label: {
-                Text(verbatim: "Back to the feedback")
-                    .font(AppFont.subheadline(weight: .medium))
-                    .foregroundStyle(palette.ink)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                MandarinPillLabel(text: "Back to the feedback", palette: palette)
             }
             .buttonStyle(.plain)
             .disabled(practice.answering == .waiting)
@@ -584,6 +574,25 @@ struct MandarinCueChips: View {
     }
 }
 
+/// A secondary way on, as a pill in the card's wash: lighter than the 50 pt action row, so the
+/// mic or the filled button stays the one primary.
+struct MandarinPillLabel: View {
+    let text: String
+    let palette: DeckPalette
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(AppFont.subheadline(weight: .semibold))
+            .foregroundStyle(palette.ink)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(palette.colors.wash, in: Capsule())
+            .overlay(Capsule().strokeBorder(palette.edge, lineWidth: 0.5))
+    }
+}
+
 /// Speaking on the card: a big mic writes his Mandarin as he says it (zh-CN, on device), and stop hands
 /// the words to `onFinish`, or, when `confirms`, first shows what it heard to edit, say again or check.
 /// "Type instead" types. `onFinish` returns whether the words were taken, so a failed check keeps them
@@ -596,6 +605,8 @@ struct MandarinMic: View {
     var confirms = false
     /// What typing starts from when nothing is said yet: his earlier answer, to edit.
     var editing: String?
+    /// A second way on beside "Type instead", such as Show me; it stays while listening.
+    var alternative: (label: String, run: () -> Void)?
     /// Called as listening starts, so nothing on the card plays over the mic.
     var onListen: () -> Void = {}
     let onFinish: (String) async -> Bool
@@ -658,17 +669,31 @@ struct MandarinMic: View {
                 .font(AppFont.body())
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            if MandarinDictation.isAvailable, !isListening, !isBusy {
-                Button { startTyping(from: editing) } label: {
-                    Text(verbatim: "Type instead")
-                        .font(AppFont.footnote(weight: .medium))
-                        .foregroundStyle(palette.ink)
-                        .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
+            // Side by side, stacked when large text won't fit them in a row.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { otherWays }
+                VStack(spacing: 8) { otherWays }
             }
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// The pills under the mic: Type instead, and the step's alternative when it has one.
+    @ViewBuilder
+    private var otherWays: some View {
+        if MandarinDictation.isAvailable, !isListening, !isBusy {
+            Button { startTyping(from: editing) } label: {
+                MandarinPillLabel(text: "Type instead", palette: palette)
+            }
+            .buttonStyle(.plain)
+        }
+        if let alternative {
+            Button(action: alternative.run) {
+                MandarinPillLabel(text: alternative.label, palette: palette)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var typing: some View {
