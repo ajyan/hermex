@@ -25,15 +25,11 @@ struct DeckPageView: View {
 
     var body: some View {
         let palette = DeckPalette.of(page, inV2Weekly: viewModel.isSealedWeekly)
-        let words = Group {
-            switch page {
-            case .card(let card):
-                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback, isOpen: isOpen)
-            case .followUps(let cards):
-                FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
-            }
-        }
-        .opacity(contentOpacity)
+        // A swipe changes only `contentOpacity`, so the words compare equal and don't redraw each frame.
+        let words = DeckPageWords(page: page, palette: palette, viewModel: viewModel, file: file,
+                                  feedback: feedback, isOpen: isOpen)
+            .equatable()
+            .opacity(contentOpacity)
         if isOpen {
             words
         } else {
@@ -82,6 +78,32 @@ struct DeckPageView: View {
         return HXCardAction(title: DeckCard.openTitle(for: route)) {
             deck.opened("source", on: card.id)
             open(route)
+        }
+    }
+}
+
+/// A page's words without its surface. Equal while the page, its palette and the deck are, whatever
+/// closures it was handed: the stack rebuilds those on every frame of a swipe. What the words read
+/// from the deck redraws them through observation, as before.
+private struct DeckPageWords: View, Equatable {
+    let page: DeckPage
+    let palette: DeckPalette
+    let viewModel: DailyDeckViewModel
+    let file: () -> Void
+    let feedback: (() -> Void)?
+    let isOpen: Bool
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.page == rhs.page && lhs.palette == rhs.palette && lhs.viewModel === rhs.viewModel
+            && lhs.isOpen == rhs.isOpen && (lhs.feedback == nil) == (rhs.feedback == nil)
+    }
+
+    var body: some View {
+        switch page {
+        case .card(let card):
+            DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback, isOpen: isOpen)
+        case .followUps(let cards):
+            FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
         }
     }
 }
@@ -233,7 +255,7 @@ struct DeckCardView: View {
                              answered: viewModel.answer(for: card)?.text, onAnswer: answerMandarin)
         }
         if !card.isMandarin, let lead = text.lead {
-            Text(inlineMarkdown(lead))
+            Text(card.markdown(lead))
                 .font(DeckCardText.leadFont(for: card, lead: lead))
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -248,7 +270,7 @@ struct DeckCardView: View {
         }
         diagramButtons
         if !card.isMandarin, let detail = text.detail {
-            Text(inlineMarkdown(detail))
+            Text(card.markdown(detail))
                 .font(AppFont.body())
                 .lineSpacing(4)
                 .foregroundStyle(Color.hxTextPrimary)
@@ -311,7 +333,7 @@ struct DeckCardView: View {
         let idea = DeckIdea(card, palette: palette)
         DeckKindLabel(symbol: palette.symbol, text: idea.kindLine, ink: palette.secondaryInk)
         if let sentence = idea.sentence {
-            Text(inlineMarkdown(sentence))
+            Text(card.markdown(sentence))
                 .font(AppFont.display(style: .title2, weight: .bold))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -319,7 +341,7 @@ struct DeckCardView: View {
                 .textSelection(.enabled)
                 .accessibilityAddTraits(.isHeader)
         }
-        DeckIdeaBody(idea: idea, palette: palette)
+        DeckIdeaBody(idea: idea, palette: palette, markdown: card.markdown)
         diagramButtons
         if let question = viewModel.question(for: card) {
             Text(verbatim: question)
@@ -378,7 +400,7 @@ struct DeckCardView: View {
         let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
             : isYearAgo ? (card.title ?? text.lead) : text.lead
         if let title {
-            Text(inlineMarkdown(title))
+            Text(card.markdown(title))
                 .font(isYearAgo ? AppFont.serif(style: .title2) : AppFont.display(style: .title2, weight: .bold))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -450,7 +472,7 @@ struct DeckCardView: View {
                             .font(AppFont.footnote(weight: .semibold))
                             .foregroundStyle(palette.secondaryInk)
                     }
-                    Text(inlineMarkdown(context))
+                    Text(card.markdown(context))
                         .font(AppFont.body())
                         .lineSpacing(3)
                         .foregroundStyle(Color.hxTextPrimary)
@@ -465,7 +487,7 @@ struct DeckCardView: View {
                     Text(verbatim: "That day")
                         .font(AppFont.footnote(weight: .semibold))
                         .foregroundStyle(palette.secondaryInk)
-                    Text(inlineMarkdown(later))
+                    Text(card.markdown(later))
                         .font(AppFont.serif(style: .body))
                         .lineSpacing(3)
                         .foregroundStyle(Color.hxTextPrimary)
@@ -482,7 +504,7 @@ struct DeckCardView: View {
                     .padding(.top, 6)
             }
             if let detail = text.detail {
-                Text(inlineMarkdown(detail))
+                Text(card.markdown(detail))
                     .font(AppFont.body())
                     .lineSpacing(3)
                     .foregroundStyle(Color.hxTextPrimary)
