@@ -296,7 +296,7 @@ final class BotConnectionVersionTests: XCTestCase {
         XCTAssertEqual(stored.installID, install)
     }
 
-    func testAHostOmittingItsInstallIDKeepsTheStoredOne() async throws {
+    func testAHostOmittingItsInstallIDIsRefusedBeforeThePasswordIsSent() async throws {
         let store = BotConnectionStore(keychain: InMemoryKeychainStore())
         let install = String(repeating: "a", count: 32)
         let old = BotConnection(id: UUID(), name: "Home", address: URL(string: "https://hermes.example")!,
@@ -304,15 +304,14 @@ final class BotConnectionVersionTests: XCTestCase {
         try store.save(old, server: server)
         let wire = ConnectionSetupWire(); wire.serverInstallID = nil
         let model = BotConnectionSetup(server: server, store: store, makeWire: { wire.connection = $0; return wire },
-                                       discard: { _ in XCTFail("An omitted id is not another host") })
+                                       discard: { _ in XCTFail("Refusing never clears data on its own") })
         model.load(); model.password = "new"
         let succeeded = await model.connect()
-        XCTAssertTrue(succeeded)
-        XCTAssertEqual(wire.connection?.installID, install, "The saved address must prove the saved install")
-        let stored = try XCTUnwrap(store.load(server: server))
-        XCTAssertEqual(stored.id, old.id)
-        XCTAssertEqual(stored.password, "new")
-        XCTAssertEqual(stored.installID, install)
+        XCTAssertFalse(succeeded, "A host that can't prove the saved install never gets the password")
+        XCTAssertEqual(model.errorMessage, BotFailure.differentHost.localizedDescription)
+        XCTAssertTrue(model.offersHostReplacement)
+        XCTAssertEqual(wire.calls, 0)
+        XCTAssertEqual(try store.load(server: server), old, "Nothing is written under the saved connection")
     }
 
     func testASavedAddressReachingAnotherInstallIsRefusedUntilTheUserReplacesIt() async throws {
