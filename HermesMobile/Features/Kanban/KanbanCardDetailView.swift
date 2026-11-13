@@ -91,7 +91,7 @@ private struct KanbanCardDetailContent: View {
             )
         }
         .alert(
-            "Leave Running?",
+            "Leave running?",
             isPresented: Binding(
                 get: { pendingRunningAction != nil },
                 set: { if !$0 { pendingRunningAction = nil } }

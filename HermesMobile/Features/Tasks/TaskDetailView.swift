@@ -95,7 +95,7 @@ struct TaskDetailView: View {
                 retry: { Task { await viewModel.loadRunOutput(for: run) } }
             )
         }
-        .alert("Delete Task?", isPresented: $isConfirmingDelete) {
+        .alert("Delete task?", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive) {
                 Task { await deleteTask() }
             }

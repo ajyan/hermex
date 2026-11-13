@@ -111,7 +111,7 @@ struct WorkspaceManagerView: View {
                 WorkspaceAddSheet(viewModel: viewModel)
             }
             .alert(
-                "Rename Workspace",
+                "Rename workspace",
                 isPresented: renameAlertBinding
             ) {
                 TextField("Workspace name", text: $renameText)
@@ -129,7 +129,7 @@ struct WorkspaceManagerView: View {
                 }
             }
             .confirmationDialog(
-                "Remove Workspace?",
+                "Remove workspace?",
                 isPresented: removalDialogBinding,
                 titleVisibility: .visible,
                 presenting: viewModel.pendingRemoval
@@ -249,7 +249,7 @@ private struct WorkspaceAddSheet: View {
                 }
 
                 if !filteredSuggestions.isEmpty {
-                    Section("Suggestions") {
+                    Section {
                         ForEach(filteredSuggestions, id: \.self) { suggestion in
                             Button {
                                 path = suggestion
@@ -269,6 +269,9 @@ private struct WorkspaceAddSheet: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    } header: {
+                        HXSectionHeader(title: String(localized: "Suggestions"))
+                            .textCase(nil)
                     }
                 }
             }

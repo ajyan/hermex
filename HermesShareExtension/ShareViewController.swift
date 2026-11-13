@@ -2,8 +2,9 @@ import UIKit
 
 @MainActor
 final class ShareViewController: UIViewController {
-    private let statusLabel = UILabel()
     private var didStartOpening = false
+    private var didAppear = false
+    private var pendingAlert: (title: String, message: String)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -21,26 +22,18 @@ final class ShareViewController: UIViewController {
         }
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        didAppear = true
+        if let pendingAlert {
+            self.pendingAlert = nil
+            presentAlert(title: pendingAlert.title, message: pendingAlert.message)
+        }
+    }
+
     private func configureView() {
         view.backgroundColor = .clear
         view.isOpaque = false
-
-        statusLabel.text = "Opening Atlas..."
-        statusLabel.font = .preferredFont(forTextStyle: .headline)
-        statusLabel.textAlignment = .center
-        statusLabel.textColor = .secondaryLabel
-        statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.numberOfLines = 0
-        statusLabel.isHidden = true
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        view.addSubview(statusLabel)
-
-        NSLayoutConstraint.activate([
-            statusLabel.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
-            statusLabel.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
-            statusLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor)
-        ])
     }
 
     private func saveDraftAndOpenHermes() async {
@@ -48,31 +41,40 @@ final class ShareViewController: UIViewController {
         let draft = HermesShareDraft.draftText(textSnippets: input.textSnippets, urls: input.urls)
 
         guard !draft.isEmpty || !input.attachments.isEmpty else {
-            showStatus("Atlas accepts text, URLs, images, PDFs, and files up to 20 MB.")
-            completeRequest(after: 0.8)
+            showAlert(title: "Nothing to share", message: "Atlas accepts text, URLs, images, PDFs, and files up to 20 MB.")
             return
         }
 
         guard let directory = HermesShareDraft.containerURL() else {
-            showStatus("Could not access Atlas storage.")
-            completeRequest(after: 0.8)
+            showAlert(title: "Couldn't share to Atlas", message: "Atlas's storage isn't available. Open Atlas once, then share again.")
             return
         }
 
         do {
             try HermesShareDraft.savePendingImport(draft: draft, attachments: input.attachments, in: directory)
         } catch {
-            showStatus("Could not save shared content.")
-            completeRequest(after: 0.8)
+            showAlert(title: "Couldn't share to Atlas", message: "The shared content couldn't be saved. Try sharing it again.")
             return
         }
 
         openHermes()
     }
 
-    private func showStatus(_ text: String) {
-        statusLabel.text = text
-        statusLabel.isHidden = false
+    /// Errors stay on screen on an opaque alert until OK, which ends the share.
+    private func showAlert(title: String, message: String) {
+        guard didAppear else {
+            pendingAlert = (title, message)
+            return
+        }
+        presentAlert(title: title, message: message)
+    }
+
+    private func presentAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+        })
+        present(alert, animated: true)
     }
 
     private func openHermes() {
@@ -102,9 +104,8 @@ final class ShareViewController: UIViewController {
             return
         }
 
-        // Fallback if everything fails
-        showStatus("Shared content saved. Open Atlas manually.")
-        completeRequest(after: 1.5)
+        // Fallback if everything fails: the import is saved, so say how to reach it.
+        showAlert(title: "Saved for Atlas", message: "Open Atlas to finish sharing.")
     }
 
     private func openViaContainingApplication(_ url: URL) -> Bool {
@@ -183,10 +184,4 @@ final class ShareViewController: UIViewController {
         return false
     }
 
-    private func completeRequest(after delay: TimeInterval) {
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
-        }
-    }
 }

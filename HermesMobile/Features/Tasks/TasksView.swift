@@ -66,7 +66,7 @@ struct TasksView: View {
                     return didCreate
                 }
             }
-            .alert("Delete Task?", isPresented: deletionConfirmationBinding, presenting: jobPendingDeletion) { job in
+            .alert("Delete task?", isPresented: deletionConfirmationBinding, presenting: jobPendingDeletion) { job in
                 Button("Delete", role: .destructive) {
                     Task { await performAction { await viewModel.delete(job) } }
                 }
@@ -74,7 +74,7 @@ struct TasksView: View {
             } message: { job in
                 Text("“\(job.displayName)” will be removed from the Hermes server.")
             }
-            .alert("Could Not Update Task", isPresented: actionErrorBinding) {
+            .alert("Couldn't update task", isPresented: actionErrorBinding) {
                 Button("OK", role: .cancel) { viewModel.clearActionError() }
             } message: {
                 Text(viewModel.actionErrorMessage ?? "")

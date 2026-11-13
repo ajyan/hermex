@@ -279,7 +279,7 @@ struct KanbanStatusFocusView: View {
             }
         }
         .alert(
-            "Leave Running?",
+            "Leave running?",
             isPresented: Binding(
                 get: { pendingRunningAction != nil },
                 set: { if !$0 { pendingRunningAction = nil } }
@@ -294,7 +294,7 @@ struct KanbanStatusFocusView: View {
         } message: { _ in
             Text("Leaving Running may clear the Card's claim and worker state.")
         }
-        .alert("Archive Cards", isPresented: $confirmsBulkArchive) {
+        .alert("Archive Cards?", isPresented: $confirmsBulkArchive) {
             Button("Cancel", role: .cancel) {
                 selectionControlsAreFocused = true
             }
@@ -388,7 +388,7 @@ struct KanbanStatusFocusView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .alert("Run Dispatcher", isPresented: $confirmsRunDispatcher) {
+        .alert("Run the Dispatcher?", isPresented: $confirmsRunDispatcher) {
             Button("Cancel", role: .cancel) {}
             Button("Run Dispatcher", role: .destructive) {
                 Task { await model.runDispatcher() }
@@ -1584,7 +1584,7 @@ private struct KanbanBoardManagementView: View {
             Text("Atlas cannot restore an archived Board in-app.")
         }
         .alert(
-            "Make Active Board",
+            "Make active Board?",
             isPresented: Binding(
                 get: { pendingActivation != nil },
                 set: { if !$0 { pendingActivation = nil } }
@@ -1937,7 +1937,7 @@ private struct KanbanBulkActionsView: View {
                         .font(AppFont.headline())
                 }
 
-                Section("Change Status") {
+                Section {
                     Picker("Status", selection: $status) {
                         ForEach(statusOptions, id: \.self) { value in
                             Text(KanbanStatusPresentation(value).title).tag(value)
@@ -1948,9 +1948,12 @@ private struct KanbanBulkActionsView: View {
                     }
                     .disabled(!model.canSubmitBulkAction(.changeStatus(status)))
                     .frame(minHeight: 44)
+                } header: {
+                    HXSectionHeader(title: String(localized: "Change Status"))
+                        .textCase(nil)
                 }
 
-                Section("Assign Profile") {
+                Section {
                     Picker("Profile", selection: $profile) {
                         Text("Unassigned").tag(String?.none)
                         ForEach(model.profileOptions, id: \.self) { value in
@@ -1962,9 +1965,12 @@ private struct KanbanBulkActionsView: View {
                     }
                     .disabled(!model.canSubmitBulkAction(.assignProfile(profile)))
                     .frame(minHeight: 44)
+                } header: {
+                    HXSectionHeader(title: String(localized: "Assign Profile"))
+                        .textCase(nil)
                 }
 
-                Section("Set Priority") {
+                Section {
                     Stepper(value: $priority, in: -100...100) {
                         HStack {
                             Text("Priority")
@@ -1976,6 +1982,9 @@ private struct KanbanBulkActionsView: View {
                     }
                     .disabled(!model.canSubmitBulkAction(.setPriority(priority)))
                     .frame(minHeight: 44)
+                } header: {
+                    HXSectionHeader(title: String(localized: "Set Priority"))
+                        .textCase(nil)
                 }
 
                 Section {
@@ -2024,7 +2033,7 @@ private struct KanbanFiltersView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Profile") {
+                Section {
                     Picker("Assigned Profile", selection: $draft.profile) {
                         Text("All Profiles").tag(String?.none)
                         ForEach(model.profileOptions, id: \.self) { value in
@@ -2036,23 +2045,35 @@ private struct KanbanFiltersView: View {
                         .onChange(of: draft.onlyMine) { _, enabled in
                             if enabled { draft.profile = nil }
                         }
+                } header: {
+                    HXSectionHeader(title: String(localized: "Profile"))
+                        .textCase(nil)
                 }
 
-                Section("Tenant") {
+                Section {
                     Picker("Tenant", selection: $draft.tenant) {
                         Text("All Tenants").tag(String?.none)
                         ForEach(model.tenantOptions, id: \.self) { value in
                             Text(value).tag(Optional(value))
                         }
                     }
+                } header: {
+                    HXSectionHeader(title: String(localized: "Tenant"))
+                        .textCase(nil)
                 }
 
-                Section("Archived Cards") {
+                Section {
                     Toggle("Include Archived Cards", isOn: $draft.includesArchived)
+                } header: {
+                    HXSectionHeader(title: String(localized: "Archived Cards"))
+                        .textCase(nil)
                 }
 
-                Section("Display") {
+                Section {
                     Toggle("Group by Profile", isOn: $draft.groupsByProfile)
+                } header: {
+                    HXSectionHeader(title: String(localized: "Display"))
+                        .textCase(nil)
                 }
 
                 if model.hasActiveFilters {

@@ -247,7 +247,7 @@ struct ChatShellView: View {
                 }
                 .presentationDetents([.height(180), .medium])
             }
-            .alert("Session Action Failed", isPresented: sessionOpenErrorIsPresented) {
+            .alert("Session action failed", isPresented: sessionOpenErrorIsPresented) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(sessionOpenErrorMessage ?? "")
@@ -563,7 +563,8 @@ struct ChatShellView: View {
                 draftStore: draftStore,
                 onSessionRenamed: { sessionID, title in
                     viewModel.applyConfirmedRename(sessionID: sessionID, title: title, modelContext: modelContext)
-                }
+                },
+                sessionMenu: { openChatSessionMenu(for: session) }
             )
             .id(session.id)
         case .newChat(let route):
@@ -997,6 +998,26 @@ struct ChatShellView: View {
         )
     }
 
+    /// The drawer row's menu for the open chat, read from the live row so pin
+    /// and project state are current.
+    private func openChatSessionMenu(for session: SessionSummary) -> SessionRowContextMenu {
+        let current = viewModel.sessions.first { $0.sessionId == session.sessionId } ?? session
+        return SessionRowContextMenu(
+            session: current,
+            projects: viewModel.projects,
+            isViewingCachedData: viewModel.isViewingCachedData,
+            isRenamingSession: viewModel.isRenamingSession,
+            isCreatingProject: viewModel.isCreatingProject,
+            isMovingSession: viewModel.isMovingSession,
+            isLoadingProjects: viewModel.isLoadingProjects,
+            isMutating: viewModel.isMutating(current),
+            isUnread: false,
+            canToggleUnread: false,
+            actions: sessionRowActions(),
+            isInOpenChat: true
+        )
+    }
+
     private func sessionRowActions() -> SessionListRowActions {
         SessionListRowActions(
             retryLoad: {
@@ -1056,8 +1077,23 @@ struct ChatShellView: View {
             createNewChat: openNewChatFromKeyboard,
             searchSessions: openSearchFromKeyboard,
             openChat: openChatFromKeyboard(atPosition:),
-            openAdjacentChat: openAdjacentChatFromKeyboard(offset:)
+            openAdjacentChat: openAdjacentChatFromKeyboard(offset:),
+            isDrawerOpen: navigation.isDrawerOpen,
+            canArchiveChat: openChatSession.map {
+                SessionRowActionPolicy.canArchive($0, isViewingCachedData: viewModel.isViewingCachedData)
+                    && !viewModel.isMutating($0)
+            } ?? false,
+            archiveChat: {
+                guard let session = openChatSession else { return }
+                Task { await archive(session) }
+            }
         )
+    }
+
+    /// The live row for the chat on screen, when the root is a session.
+    private var openChatSession: SessionSummary? {
+        guard case .session(let session) = navigation.root else { return nil }
+        return viewModel.sessions.first { $0.sessionId == session.sessionId } ?? session
     }
 
     /// Chat shortcuts walk the drawer's rows as they appear, after search and
@@ -1237,6 +1273,7 @@ struct ChatShellView: View {
     /// The row menu's Summarize & Archive. A failure leaves the chat in place
     /// and says why in a toast that can retry.
     private func summarizeAndArchive(_ session: SessionSummary) async {
+        let archiveNumber = archiveToastRoute.archiveStarted()
         if let failure = await viewModel.summarizeAndArchive(session, modelContext: modelContext) {
             handleLastError()
             actionToast.show(
@@ -1259,6 +1296,9 @@ struct ChatShellView: View {
         guard !viewModel.sessions.contains(where: { $0.sessionId == session.sessionId }) else { return }
         removeSessionFromNavigation(session)
         SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
+        if archiveToastRoute.archiveConfirmed(archiveNumber, isListShowing: isArchiveToastHostShowing) {
+            showArchiveUndoToast(for: session)
+        }
     }
 
     /// Skipped while the list shows cached rows: the server was unreachable a
@@ -1330,7 +1370,7 @@ struct ChatShellView: View {
     }
 
     /// Restores the session in place. It does not reopen a chat the archive
-    /// closed; a failure shows the "Session Action Failed" alert.
+    /// closed; a failure shows the "Session action failed" alert.
     private func undoArchive(_ session: SessionSummary) async {
         let didUnarchive = await viewModel.unarchive(
             session,

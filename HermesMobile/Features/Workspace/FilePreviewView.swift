@@ -119,7 +119,7 @@ struct FilePreviewView: View {
             SelectableTextPresentationView(selection: selection)
         }
         .alert(
-            "Export Failed",
+            "Export failed",
             isPresented: Binding(
                 get: { exportErrorMessage != nil },
                 set: { isPresented in

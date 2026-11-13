@@ -199,7 +199,7 @@ struct DefaultProfilePickerView: View {
                         Text(details)
                             .font(AppFont.caption())
                             .foregroundStyle(
-                                selected ? Color(.systemBackground).opacity(0.7) : Color.secondary
+                                Color.hxTextSecondary
                             )
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     }
@@ -210,7 +210,7 @@ struct DefaultProfilePickerView: View {
                 if inFlight {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(selected ? Color(.systemBackground) : Color.primary)
+                        .tint(selected ? Color.accentColor : Color.primary)
                 } else if selected {
                     Image(systemName: "checkmark")
                         .font(AppFont.body(weight: .semibold))
@@ -531,11 +531,11 @@ private struct ProfileStatusBadge: View {
     var body: some View {
         Text(title)
             .font(AppFont.caption2(weight: .semibold))
-            .foregroundStyle(isInverted ? Color(.systemBackground) : Color.accentColor)
+            .foregroundStyle(Color.accentColor)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(
-                isInverted ? Color(.systemBackground).opacity(0.22) : Color.accentColor.opacity(0.12),
+                isInverted ? Color.hxSurface : Color.accentColor.opacity(0.12),
                 in: Capsule(style: .continuous)
             )
     }
