@@ -509,8 +509,7 @@ struct HermexAttachmentPanelSurface: ViewModifier {
                     Rectangle().fill(.regularMaterial)
                 }
             }
-            .shadow(color: .black.opacity(0.24), radius: 27, y: 12)
-            .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+            .hxShadow(.float)
     }
 }
 

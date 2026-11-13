@@ -11,13 +11,10 @@ extension ProjectSummary {
     var displayColor: Color {
         if let apiColor = Color(hexString: color) { return apiColor }
         let seed = (projectId ?? displayName).unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
-        switch seed % 5 {
-        case 0: return .green
-        case 1: return .blue
-        case 2: return .red
-        case 3: return .orange
-        default: return .primary
-        }
+        // Paper glows rather than system hues: no red that reads as an error,
+        // no blue that reads as a control, no amber that means waiting.
+        let papers: [HermexPaper] = [.wiki, .notes, .book, .reading, .video]
+        return papers[((seed % papers.count) + papers.count) % papers.count].glow
     }
 }
 
