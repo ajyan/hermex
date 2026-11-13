@@ -601,33 +601,62 @@ final class DailyDeckViewModel {
         return DailyDeckJournal.readable(text)
     }
 
+    /// How long a read of spending or sleep serves the sheets that open from the deck.
+    nonisolated static let sideReadLifetime: TimeInterval = 2 * 60
+    /// `journal/<year>`'s month folders, listed once per screen (until Reload or a new day).
+    @ObservationIgnored private var journalMonths: [Int: [String]] = [:]
+    @ObservationIgnored private var spendingRead: (at: Date, value: MoneySpending?)?
+    @ObservationIgnored private var sleepRead: (at: Date, value: SleepHistory?)?
+
+    private func clearReadCaches() {
+        journalMonths = [:]
+        spendingRead = nil
+        sleepRead = nil
+    }
+
+    private func isFresh(_ at: Date) -> Bool { now().timeIntervalSince(at) < Self.sideReadLifetime }
+
     /// The money run's spending (`finance/data/money/spending.json`), or nil before Money is set up.
     func spending() async throws -> MoneySpending? {
         guard let sessionID else { return nil }
+        if let spendingRead, isFresh(spendingRead.at) { return spendingRead.value }
+        let value: MoneySpending?
         do {
             let text = try await client.fileContent(sessionID: sessionID, path: MoneyPaths.spending)
-            return try MoneySpending.decode(Data(text.utf8))
+            value = try MoneySpending.decode(Data(text.utf8))
         } catch let error as APIError where error.isNotFound {
-            return nil
+            value = nil
         }
+        spendingRead = (now(), value)
+        return value
     }
 
     /// Every night's sleep numbers (`data/sleep/history.json`), or nil before the vault has written it.
     func sleepHistory() async throws -> SleepHistory? {
         guard let sessionID else { return nil }
+        if let sleepRead, isFresh(sleepRead.at) { return sleepRead.value }
+        let value: SleepHistory?
         do {
             let text = try await client.fileContent(sessionID: sessionID, path: SleepHistoryPaths.history)
-            return try SleepHistory.decode(Data(text.utf8))
+            value = try SleepHistory.decode(Data(text.utf8))
         } catch let error as APIError where error.isNotFound {
-            return nil
+            value = nil
         }
+        sleepRead = (now(), value)
+        return value
     }
 
     private func monthFolder(year: Int, month: Int, sessionID: String) async -> String? {
         let base = "journal/\(year)"
-        guard let names = try? await client.entryNames(sessionID: sessionID, path: base),
-              let folder = names.first(where: { $0.hasPrefix(String(format: "%02d-", month)) })
-        else { return nil }
+        let names: [String]
+        if let listed = journalMonths[year] {
+            names = listed
+        } else {
+            guard let listed = try? await client.entryNames(sessionID: sessionID, path: base) else { return nil }
+            journalMonths[year] = listed
+            names = listed
+        }
+        guard let folder = names.first(where: { $0.hasPrefix(String(format: "%02d-", month)) }) else { return nil }
         return "\(base)/\(folder)"
     }
 
