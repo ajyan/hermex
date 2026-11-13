@@ -142,6 +142,7 @@ struct HermesMobileApp: App {
         NetworkPathMonitor.shared.start()
         GoalsWidgetSync.install()
         MealsWidgetSync.install()
+        AppIntentRouter.installWidgetLaunch()
     }
 
     var body: some Scene {

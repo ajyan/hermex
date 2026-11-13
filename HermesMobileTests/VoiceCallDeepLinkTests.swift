@@ -54,4 +54,18 @@ final class VoiceCallDeepLinkTests: XCTestCase {
         VoiceCallLaunch.request(waitsForTap: false)
         XCTAssertFalse(VoiceCallLaunch.takeWaitsForTap())
     }
+
+    // MARK: - Ask Atlas widget
+
+    @MainActor
+    func testTheWidgetsCallAndDictateButtonsRouteAsIntents() async throws {
+        AppIntentRouter.installWidgetLaunch()
+        defer { AppIntentRouter.shared.pendingDeepLink = nil }
+
+        _ = try await AtlasWidgetLaunchIntent(.call).perform()
+        XCTAssertEqual(AppIntentRouter.shared.pendingDeepLink, HermesDeepLink.newCallURL)
+
+        _ = try await AtlasWidgetLaunchIntent(.voiceChat).perform()
+        XCTAssertEqual(AppIntentRouter.shared.pendingDeepLink, HermesDeepLink.newChatVoiceURL)
+    }
 }
