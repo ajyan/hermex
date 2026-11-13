@@ -6,40 +6,80 @@ struct TranscriptLinkPreviewView: View {
     let url: URL
 
     @Environment(\.openURL) private var openURL
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.transcriptServerOrigin) private var serverOrigin
 
     @State private var snapshot: TranscriptLinkPreviewSnapshot?
     @State private var previewImage: UIImage?
     @State private var didFail = false
     @State private var isLoading = false
     @State private var admittedURL: URL?
+    /// A link off the server's origin fetches its preview only once tapped.
+    @State private var isFetchApproved = false
 
     var body: some View {
-        Button {
-            openURL(url)
-        } label: {
-            compactCard
+        HStack(spacing: 0) {
+            Button {
+                openURL(url)
+            } label: {
+                compactCard
+            }
+            .buttonStyle(.chatTactile(.card))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityHint("Opens the web page")
+
+            if showsLoadButton {
+                Button {
+                    isFetchApproved = true
+                } label: {
+                    Text("Preview")
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 12)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(loadButtonAccessibilityLabel)
+                .accessibilityHint("Fetches the page's title and image from that site")
+            }
         }
-        .buttonStyle(.chatTactile(.card))
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Opens the web page")
+        .frame(minHeight: 84)
+        .hxCard(cornerRadius: HXRadius.md)
+        .clipShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        .accessibilityElement(children: .contain)
         .loadsOnceVisible(id: url) { admittedURL = $0 }
-        .task(id: admittedURL) {
+        .task(id: LoadKey(admitted: admittedURL == url, mayFetch: mayFetch)) {
             guard admittedURL == url else { return }
-            await loadMetadataIfNeeded()
+            await loadMetadataIfNeeded(mayFetch: mayFetch)
         }
     }
 
+    private struct LoadKey: Hashable {
+        let admitted: Bool
+        let mayFetch: Bool
+    }
+
+    /// The server's own pages load by themselves; any other site waits for the Preview tap.
+    private var mayFetch: Bool {
+        isFetchApproved || TranscriptRemoteFetchPolicy.loadsAutomatically(url, serverOrigin: serverOrigin)
+    }
+
+    private var showsLoadButton: Bool {
+        !mayFetch && snapshot == nil
+    }
+
+    /// Shows a preview already in memory either way; goes to the network only when `mayFetch`.
     @MainActor
-    private func loadMetadataIfNeeded() async {
+    private func loadMetadataIfNeeded(mayFetch: Bool) async {
         guard snapshot == nil, !didFail, !isLoading else { return }
 
         if let cachedSnapshot = await TranscriptLinkPreviewCache.shared.snapshot(for: url) {
             apply(cachedSnapshot)
             return
         }
+        guard mayFetch else { return }
 
         isLoading = true
         let provider = LPMetadataProvider()
@@ -223,30 +263,35 @@ private extension TranscriptLinkPreviewView {
         return String(localized: "Link preview")
     }
 
+    private var loadButtonAccessibilityLabel: String {
+        if let host = url.host, !host.isEmpty {
+            return String(localized: "Load preview from \(host)")
+        }
+
+        return String(localized: "Load preview")
+    }
+
     private var compactCard: some View {
         HStack(spacing: 10) {
             thumbnail
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayTitle)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(2)
 
                 Text(displaySubtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(AppFont.caption())
+                    .foregroundStyle(Color.hxTextSecondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.trailing, 10)
         }
         .frame(minHeight: 84, alignment: .center)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 0.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -278,7 +323,9 @@ private extension TranscriptLinkPreviewView {
         return String(localized: "Link")
     }
 
+    /// The whole address until a preview loads, so an unloaded card shows where a tap goes.
     private var displaySubtitle: String {
+        guard snapshot != nil else { return url.absoluteString }
         if let host = displayURL?.host, !host.isEmpty {
             return host
         }

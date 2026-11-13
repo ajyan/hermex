@@ -4,7 +4,11 @@ import SwiftUI
 
 /// Debug builds append call events to Documents/voice-call.log for on-device diagnosis.
 /// Each line carries the wall time, seconds since the call began, and the audio route.
+/// Lines name events and lengths, never what was heard or said (`size`), and the file keeps
+/// only its newest `maximumBytes`.
 enum VoiceCallDiagnostics {
+    static let maximumBytes = 256 * 1024
+
     #if DEBUG
     private static let queue = DispatchQueue(label: "voice-call.log", qos: .utility)
     nonisolated(unsafe) private static var callStart = ProcessInfo.processInfo.systemUptime
@@ -30,16 +34,61 @@ enum VoiceCallDiagnostics {
                 .joined(separator: ",")
             let stamp = date.formatted(.iso8601.time(includingFractionalSeconds: true))
             let data = Data(String(format: "%@ +%7.3f [%@] %@\n", stamp, elapsed, route, line).utf8)
-            if let handle = try? FileHandle(forWritingTo: url) {
-                handle.seekToEndOfFile()
-                handle.write(data)
-                try? handle.close()
-            } else {
-                try? data.write(to: url)
-            }
+            append(data, to: url)
         }
         #endif
     }
+
+    /// How a log line names speech: its length, not its words.
+    static func size(_ text: (some StringProtocol)?) -> String {
+        "\(text?.count ?? 0) chars"
+    }
+
+    /// Appends `data` to the log at `url`. Once the file would pass `limit`, it keeps only its
+    /// newest half before appending, so a long-running debug build never grows it without bound.
+    static func append(_ data: Data, to url: URL, limit: Int = maximumBytes) {
+        guard let handle = try? FileHandle(forUpdating: url) else {
+            try? data.write(to: url)
+            return
+        }
+        defer { try? handle.close() }
+        let size = Int((try? handle.seekToEnd()) ?? 0)
+        if size + data.count > limit {
+            let keep = min(size, limit / 2)
+            try? handle.seek(toOffset: UInt64(size - keep))
+            let tail = (try? handle.readToEnd()) ?? Data()
+            try? handle.truncate(atOffset: 0)
+            try? handle.write(contentsOf: tail)
+        }
+        try? handle.write(contentsOf: data)
+    }
+}
+
+/// How the next automatic call starts. `ContentView` marks a call that a link from
+/// another app asked for (`hermes-agent://new-call`), which must wait for Start call;
+/// the chat that opens the call takes the mark once.
+@MainActor
+enum VoiceCallLaunch {
+    private static var nextWaitsForTap = false
+
+    static func request(waitsForTap: Bool) {
+        nextWaitsForTap = waitsForTap
+    }
+
+    static func takeWaitsForTap() -> Bool {
+        defer { nextWaitsForTap = false }
+        return nextWaitsForTap
+    }
+}
+
+/// When a call on screen may open the microphone: never while App Lock covers the app,
+/// and for a call another app's link asked for, only after Start call.
+struct VoiceCallStartGate: Equatable {
+    var isAppLocked: Bool
+    var waitsForTap: Bool
+    var tapped: Bool
+
+    var mayStart: Bool { !isAppLocked && (!waitsForTap || tapped) }
 }
 
 /// Holds an iPhone in portrait while a call is on screen: the call is laid out for a phone held
@@ -115,6 +164,53 @@ struct VoiceCallChatSnapshot: Equatable {
     }
 }
 
+/// The parts of the chat's stream the call screen draws, kept apart from the chat so a
+/// streamed token re-renders only the views that show the reply. Each value changes only
+/// when it differs, since an `@Observable` set notifies even when equal.
+@MainActor @Observable
+final class VoiceCallReplyFeed {
+    /// Everything Atlas said after the latest user turn (`VoiceCallChatSnapshot.streamingText`).
+    private(set) var reply: String?
+    private(set) var toolActivity: VoiceCallToolActivity?
+
+    func update(_ snapshot: VoiceCallChatSnapshot) {
+        if reply != snapshot.streamingText { reply = snapshot.streamingText }
+        if toolActivity != snapshot.toolActivity { toolActivity = snapshot.toolActivity }
+    }
+
+    /// The reply as it would be spoken (no markdown).
+    var caption: String? {
+        guard let reply else { return nil }
+        let sentences = SpeechTextShaper.sentences(in: reply, final: true)
+        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
+    }
+}
+
+/// Reads the chat's stream for the call: it re-renders on every streamed token, so the call
+/// screen doesn't. Builds the snapshot once per change and hands it to the controller and the feed.
+private struct VoiceCallChatFeed: View {
+    let chat: ChatViewModel
+    let controller: VoiceCallController?
+    let feed: VoiceCallReplyFeed
+
+    var body: some View {
+        Color.clear
+            .onChange(of: VoiceCallChatSnapshot.of(chat), initial: true) { _, snapshot in
+                feed.update(snapshot)
+                controller?.chatDidUpdate(
+                    streamingText: snapshot.streamingText,
+                    isStreaming: snapshot.isStreaming,
+                    approval: snapshot.approval,
+                    isReconnecting: snapshot.isReconnecting,
+                    currentTool: snapshot.currentTool,
+                    toolLine: snapshot.toolActivity?.spokenLine
+                )
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 /// What a finished call hands back to whoever opened it.
 struct VoiceCallSummary: Equatable {
     /// Milliseconds each turn waited for its first reply text. A turn that never
@@ -130,6 +226,8 @@ struct VoiceCallView: View {
     let server: URL
     let onAPIError: (Error) -> Void
     let openingTurn: String?
+    /// Shows Start call instead of opening the microphone by itself.
+    let waitsForTap: Bool
     /// The turn times so far, each time a turn is timed (a voice mock saves them as it goes).
     let onTurnTimed: (([Int]) -> Void)?
     let onDismiss: (VoiceCallSummary) -> Void
@@ -154,14 +252,20 @@ struct VoiceCallView: View {
     @State private var sourcesSheet: VoiceCallSourcesSheet.Request?
     /// The latest turn and its reply as text, swiped up from the subtitles.
     @State private var showsReply = false
+    /// The reply and running tool, fed by `VoiceCallChatFeed`.
+    @State private var feed = VoiceCallReplyFeed()
+    /// Start call was tapped on a call that waits for it.
+    @State private var isStartApproved = false
     @Environment(\.openURL) private var openURL
 
     init(chat: ChatViewModel, server: URL, onAPIError: @escaping (Error) -> Void, openingTurn: String? = nil,
-         onTurnTimed: (([Int]) -> Void)? = nil, onDismiss: @escaping (VoiceCallSummary) -> Void) {
+         waitsForTap: Bool = false, onTurnTimed: (([Int]) -> Void)? = nil,
+         onDismiss: @escaping (VoiceCallSummary) -> Void) {
         self.chat = chat
         self.server = server
         self.onAPIError = onAPIError
         self.openingTurn = openingTurn
+        self.waitsForTap = waitsForTap
         self.onTurnTimed = onTurnTimed
         self.onDismiss = onDismiss
     }
@@ -193,6 +297,7 @@ struct VoiceCallView: View {
     private var screen: some View {
         ZStack {
             background
+            VoiceCallChatFeed(chat: chat, controller: controller, feed: feed)
 
             VStack(spacing: 0) {
                 header
@@ -228,7 +333,11 @@ struct VoiceCallView: View {
     /// Feeds the controller the chat's state and follows the call's lifetime.
     private func callEvents(_ content: some View) -> some View {
         content
-            .task { await startCall() }
+            // Held while App Lock covers the app, and until Start call when the call waits for it.
+            .task(id: startGate) {
+                guard startGate.mayStart else { return }
+                await startCall()
+            }
             .onAppear { VoiceCallOrientationLock.set(true) }
             .onChange(of: controller?.turnLatenciesMS ?? []) { _, _ in onTurnTimed?(turnMS) }
             // However the screen goes away, its system call goes with it; a call left
@@ -238,16 +347,6 @@ struct VoiceCallView: View {
                 guard let controller, !controller.isFinished else { return }
                 VoiceCallDiagnostics.write("call screen closed without hanging up; ending the call")
                 controller.end()
-            }
-            .onChange(of: snapshot) { _, snapshot in
-                controller?.chatDidUpdate(
-                    streamingText: snapshot.streamingText,
-                    isStreaming: snapshot.isStreaming,
-                    approval: snapshot.approval,
-                    isReconnecting: snapshot.isReconnecting,
-                    currentTool: snapshot.currentTool,
-                    toolLine: snapshot.toolActivity?.spokenLine
-                )
             }
             .onChange(of: chat.liveToolCalls) { _, _ in absorbSources() }
             .onChange(of: chat.liveContextSources) { _, _ in absorbSources() }
@@ -297,9 +396,12 @@ struct VoiceCallView: View {
             }
     }
 
-    private var snapshot: VoiceCallChatSnapshot {
-        VoiceCallChatSnapshot.of(chat)
+    private var startGate: VoiceCallStartGate {
+        VoiceCallStartGate(isAppLocked: AppLock.shared.isLocked, waitsForTap: waitsForTap, tapped: isStartApproved)
     }
+
+    /// Before Start call, on a call another app's link asked for.
+    private var awaitsStartTap: Bool { controller == nil && waitsForTap && !isStartApproved }
 
     /// Adds what the running reply has drawn on to this turn's memories.
     private func absorbSources() {
@@ -443,81 +545,18 @@ struct VoiceCallView: View {
 
     /// What Atlas is running while it works on a reply; otherwise a lookup it sent off and is still waiting on.
     private var toolActivity: VoiceCallToolActivity? {
-        if controller?.currentTool != nil, state == .thinking || state == .speaking, let running = snapshot.toolActivity {
+        if controller?.currentTool != nil, state == .thinking || state == .speaking, let running = feed.toolActivity {
             return running
         }
         return controller?.digPending == true ? .digging : nil
     }
 
-    /// Subtitles under the status. While Atlas speaks they re-read what it has said ten times a
-    /// second, which redraws only this text. A swipe up shows the turn as text.
     private var captions: some View {
-        TimelineView(.animation(minimumInterval: 0.1, paused: state != .speaking)) { _ in
-            VoiceCallCaptions(
-                sent: controller?.lastSentTurn,
-                live: controller?.partialTranscript ?? "",
-                reply: replyCaption,
-                heard: controller?.heardReply ?? "",
-                isSpeaking: state == .speaking,
-                isReplying: [.thinking, .speaking, .reconnecting].contains(state)
-            )
-        }
-        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-        .contentShape(Rectangle())
-        .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
-            if drag.translation.height < -30, hasTurnText { showsReply = true }
-        })
-        .accessibilityAction(named: Text("Show the reply so far")) {
-            if hasTurnText { showsReply = true }
-        }
+        VoiceCallCaptionsPanel(feed: feed, controller: controller, state: state) { showsReply = true }
     }
 
-    private var hasTurnText: Bool { controller?.lastSentTurn != nil || replyCaption != nil }
-
-    /// The latest turn as text: what the user said, and Atlas's reply so far, live as it streams.
     private var replySheet: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let sent = controller?.lastSentTurn {
-                        turnText(String(localized: "You"), sent)
-                    }
-                    if let reply = replyCaption {
-                        turnText(CallSystemBridge.handle, reply)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
-            }
-            .hxNavigationTitle(String(localized: "This turn"))
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { showsReply = false }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-
-    private func turnText(_ speaker: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: speaker)
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(Color.hxTextSecondary)
-            Text(verbatim: text)
-                .font(AppFont.body())
-                .foregroundStyle(Color.hxTextPrimary)
-                .textSelection(.enabled)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    /// Atlas's reply to the latest turn, as it would be spoken (no markdown).
-    private var replyCaption: String? {
-        guard let text = snapshot.streamingText else { return nil }
-        let sentences = SpeechTextShaper.sentences(in: text, final: true)
-        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
+        VoiceCallReplySheet(feed: feed, controller: controller) { showsReply = false }
     }
 
     @ViewBuilder
@@ -526,6 +565,13 @@ struct VoiceCallView: View {
             VoiceCallFailurePanel(
                 reason: Self.reason(for: failure),
                 onReconnect: startOver,
+                onBack: onClose
+            )
+        } else if awaitsStartTap {
+            VoiceCallFailurePanel(
+                reason: String(localized: "Another app opened this call. The microphone stays off until you start it."),
+                primaryTitle: "Start call",
+                onReconnect: { isStartApproved = true },
                 onBack: onClose
             )
         } else {
@@ -579,6 +625,7 @@ struct VoiceCallView: View {
     /// Whose turn it is, in one word under the cloud.
     private var stateWord: String {
         switch state {
+        case .idle where awaitsStartTap: String(localized: "Ready to call")
         case .idle, .connecting: String(localized: "Connecting")
         case .listening: controller?.isMuted == true ? String(localized: "Muted") : String(localized: "Listening")
         case .thinking: String(localized: "Thinking")
@@ -632,5 +679,83 @@ struct VoiceCallView: View {
         }
         .padding(24)
         .presentationDetents([.medium])
+    }
+}
+
+/// Subtitles under the status. While Atlas speaks they re-read what it has said ten times a
+/// second, which redraws only this text. A swipe up shows the turn as text. Its own view so
+/// the reply's every token redraws only the subtitles.
+private struct VoiceCallCaptionsPanel: View {
+    let feed: VoiceCallReplyFeed
+    let controller: VoiceCallController?
+    let state: VoiceCallState
+    let onShowReply: () -> Void
+
+    var body: some View {
+        let reply = feed.caption
+        let hasTurnText = controller?.lastSentTurn != nil || reply != nil
+        TimelineView(.animation(minimumInterval: 0.1, paused: state != .speaking)) { _ in
+            VoiceCallCaptions(
+                sent: controller?.lastSentTurn,
+                live: controller?.partialTranscript ?? "",
+                reply: reply,
+                heard: controller?.heardReply ?? "",
+                isSpeaking: state == .speaking,
+                isReplying: [.thinking, .speaking, .reconnecting].contains(state)
+            )
+        }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
+            if drag.translation.height < -30, hasTurnText { onShowReply() }
+        })
+        .accessibilityAction(named: Text("Show the reply so far")) {
+            if hasTurnText { onShowReply() }
+        }
+    }
+}
+
+/// The latest turn as text: what the user said, and Atlas's reply so far, live as it streams.
+private struct VoiceCallReplySheet: View {
+    let feed: VoiceCallReplyFeed
+    let controller: VoiceCallController?
+    let onDone: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if let sent = controller?.lastSentTurn {
+                        turnText(String(localized: "You"), sent)
+                    }
+                    if let reply = feed.caption {
+                        turnText(CallSystemBridge.handle, reply)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+            }
+            .hxNavigationTitle(String(localized: "This turn"))
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done", action: onDone)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func turnText(_ speaker: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(verbatim: speaker)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(Color.hxTextSecondary)
+            Text(verbatim: text)
+                .font(AppFont.body())
+                .foregroundStyle(Color.hxTextPrimary)
+                .textSelection(.enabled)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import MarkdownUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -25,6 +26,20 @@ extension EnvironmentValues {
 
 private struct ChatWorkspaceRootKey: EnvironmentKey {
     static let defaultValue: String? = nil
+}
+
+/// The active server's URL, whose origin transcript images and link previews may
+/// fetch from without a tap (`TranscriptRemoteFetchPolicy`). Nil, the default,
+/// means every remote fetch waits for one.
+extension EnvironmentValues {
+    var transcriptServerOrigin: URL? {
+        get { self[TranscriptServerOriginKey.self] }
+        set { self[TranscriptServerOriginKey.self] = newValue }
+    }
+}
+
+private struct TranscriptServerOriginKey: EnvironmentKey {
+    static let defaultValue: URL? = nil
 }
 
 struct TranscriptMediaContentView: View {
@@ -84,15 +99,22 @@ private struct TranscriptMediaThumbnailView: View {
     let loadMediaData: ((TranscriptMediaReference) async -> Data?)?
     let onPreviewMedia: ((TranscriptMediaReference) -> Void)?
 
+    @Environment(\.transcriptServerOrigin) private var serverOrigin
+
     @State private var image: UIImage?
     @State private var didAttemptLoad = false
     @State private var admittedImageKey: TranscriptMediaImageCacheKey?
+    /// An image off the server's origin loads only once tapped.
+    @State private var isFetchApproved = false
 
     private let thumbnailWidth: CGFloat = 210
     private let thumbnailHeight: CGFloat = 132
 
     var body: some View {
         switch reference.mediaKind {
+        case .image where waitsForTap:
+            TranscriptRemoteMediaPlaceholder(reference: reference) { isFetchApproved = true }
+
         case .image where reference.isExtensionlessRemoteMediaCandidate && loadMediaData != nil:
             if let loadMediaData {
                 TranscriptMediaResolvedRemoteView(
@@ -163,6 +185,12 @@ private struct TranscriptMediaThumbnailView: View {
         default:
             TranscriptMediaUnavailableChip(reference: reference)
         }
+    }
+
+    /// A remote image (or extensionless remote media) off the server's origin, not yet tapped.
+    private var waitsForTap: Bool {
+        guard !isFetchApproved, case let .remoteURL(url) = reference.source else { return false }
+        return !TranscriptRemoteFetchPolicy.loadsAutomatically(url, serverOrigin: serverOrigin)
     }
 
     private var imageCacheKey: TranscriptMediaImageCacheKey {
@@ -563,6 +591,90 @@ private struct TranscriptMediaVideoTile: View {
             }
             .padding(.horizontal, 14)
         }
+    }
+}
+
+/// MarkdownUI's image loaders held to `TranscriptRemoteFetchPolicy`, for the images the
+/// transcript parser leaves in the text (a reference-style `![x][r]`). A block image off
+/// the server's origin shows the tap-to-load chip; an inline one shows a photo symbol.
+struct TranscriptGatedImageProvider: ImageProvider {
+    let serverOrigin: URL?
+
+    func makeImage(url: URL?) -> some View {
+        TranscriptGatedMarkdownImage(url: url, serverOrigin: serverOrigin)
+    }
+}
+
+struct TranscriptGatedInlineImageProvider: InlineImageProvider {
+    var serverOrigin: URL?
+
+    func image(with url: URL, label: String) async throws -> Image {
+        guard TranscriptRemoteFetchPolicy.loadsAutomatically(url, serverOrigin: serverOrigin) else {
+            return Image(systemName: "photo")
+        }
+        return try await DefaultInlineImageProvider.default.image(with: url, label: label)
+    }
+}
+
+private struct TranscriptGatedMarkdownImage: View {
+    let url: URL?
+    let serverOrigin: URL?
+
+    @State private var isFetchApproved = false
+
+    var body: some View {
+        if let url, !isFetchApproved, !TranscriptRemoteFetchPolicy.loadsAutomatically(url, serverOrigin: serverOrigin) {
+            TranscriptRemoteMediaPlaceholder(reference: TranscriptMediaReference(rawReference: url.absoluteString)) {
+                isFetchApproved = true
+            }
+        } else {
+            DefaultImageProvider.default.makeImage(url: url)
+        }
+    }
+}
+
+/// Stands in for an image on another site until it's tapped, naming the site it would
+/// load from (`TranscriptRemoteFetchPolicy`).
+private struct TranscriptRemoteMediaPlaceholder: View {
+    let reference: TranscriptMediaReference
+    let onLoad: () -> Void
+
+    var body: some View {
+        Button(action: onLoad) {
+            HStack(spacing: 8) {
+                Image(systemName: "photo")
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextSecondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: host)
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text("Tap to load image")
+                        .font(AppFont.caption2())
+                        .foregroundStyle(Color.accentColor)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: 240, alignment: .leading)
+            .hxCard(cornerRadius: HXRadius.sm)
+            .contentShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+        }
+        .buttonStyle(.chatTactile(.thumbnail))
+        .accessibilityLabel(String(localized: "Image from \(host)"))
+        .accessibilityHint("Loads the image from that site")
+    }
+
+    private var host: String {
+        if case let .remoteURL(url) = reference.source, let host = url.host(), !host.isEmpty {
+            return host
+        }
+        return reference.displayName
     }
 }
 

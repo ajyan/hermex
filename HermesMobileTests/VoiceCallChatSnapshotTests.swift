@@ -77,4 +77,59 @@ final class VoiceCallChatSnapshotTests: XCTestCase {
             XCTAssertTrue(make([], recovery: state).isReconnecting)
         }
     }
+
+    // MARK: - Reply feed
+
+    @MainActor
+    func testANewTokenNotifiesOnlyReplyReaders() {
+        let feed = VoiceCallReplyFeed()
+        feed.update(make([message("user", "hi", "u1"), message("assistant", "One.", "a1")]))
+        let toolReaders = ObservationFlag()
+        withObservationTracking { _ = feed.toolActivity } onChange: { toolReaders.fired = true }
+        let replyReaders = ObservationFlag()
+        withObservationTracking { _ = feed.reply } onChange: { replyReaders.fired = true }
+
+        feed.update(make([message("user", "hi", "u1"), message("assistant", "One. Two.", "a1")]))
+
+        XCTAssertTrue(replyReaders.fired)
+        XCTAssertFalse(toolReaders.fired, "An unchanged tool must not re-render the call screen")
+        XCTAssertEqual(feed.caption, "One. Two.")
+    }
+
+    @MainActor
+    func testAnUnchangedSnapshotNotifiesNobody() {
+        let feed = VoiceCallReplyFeed()
+        let snapshot = make([message("user", "hi", "u1"), message("assistant", "One.", "a1")])
+        feed.update(snapshot)
+        let readers = ObservationFlag()
+        withObservationTracking { _ = feed.reply; _ = feed.toolActivity } onChange: { readers.fired = true }
+
+        feed.update(snapshot)
+
+        XCTAssertFalse(readers.fired)
+    }
+
+    // MARK: - Diagnostics log
+
+    func testTheLogNamesSpeechByLengthOnly() {
+        XCTAssertEqual(VoiceCallDiagnostics.size("send the email"), "14 chars")
+        XCTAssertEqual(VoiceCallDiagnostics.size(Optional<String>.none), "0 chars")
+    }
+
+    func testTheLogKeepsItsNewestHalfOncePastTheCap() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("voice-call-\(UUID().uuidString).log")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let line = Data(String(repeating: "x", count: 99).appending("\n").utf8)
+
+        for _ in 0..<25 { VoiceCallDiagnostics.append(line, to: url, limit: 1_000) }
+
+        let size = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
+        XCTAssertLessThanOrEqual(size, 1_000)
+        XCTAssertGreaterThan(size, 0)
+    }
+}
+
+/// Records an observation's onChange, which runs synchronously on the setter's thread.
+private final class ObservationFlag: @unchecked Sendable {
+    var fired = false
 }

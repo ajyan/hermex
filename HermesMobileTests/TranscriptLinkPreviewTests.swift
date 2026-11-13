@@ -177,4 +177,24 @@ final class TranscriptLinkPreviewTests: XCTestCase {
         XCTAssertNil(TranscriptLinkPreviewCache.cacheKey(for: fileURL))
         XCTAssertNil(cachedSnapshot)
     }
+
+    // MARK: - Remote fetch policy
+
+    func testOnlyTheServersOwnOriginLoadsWithoutATap() throws {
+        let server = try XCTUnwrap(URL(string: "https://atlas.example.com"))
+        let own = try XCTUnwrap(URL(string: "https://atlas.example.com:443/api/media?path=a.png"))
+        let other = try XCTUnwrap(URL(string: "https://evil.example.net/?d=secret"))
+        let otherPort = try XCTUnwrap(URL(string: "https://atlas.example.com:8443/a.png"))
+        let plainHTTP = try XCTUnwrap(URL(string: "http://atlas.example.com/a.png"))
+
+        XCTAssertTrue(TranscriptRemoteFetchPolicy.loadsAutomatically(own, serverOrigin: server))
+        XCTAssertFalse(TranscriptRemoteFetchPolicy.loadsAutomatically(other, serverOrigin: server))
+        XCTAssertFalse(TranscriptRemoteFetchPolicy.loadsAutomatically(otherPort, serverOrigin: server))
+        XCTAssertFalse(TranscriptRemoteFetchPolicy.loadsAutomatically(plainHTTP, serverOrigin: server))
+    }
+
+    func testNothingLoadsWithoutATapWhenNoServerIsKnown() throws {
+        let url = try XCTUnwrap(URL(string: "https://atlas.example.com/a.png"))
+        XCTAssertFalse(TranscriptRemoteFetchPolicy.loadsAutomatically(url, serverOrigin: nil))
+    }
 }
