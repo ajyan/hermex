@@ -491,7 +491,8 @@ struct WorkoutSetRow: View, Equatable {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-            TextField(text: text) { Text(verbatim: label) }
+            // No prompt: the label would otherwise show as a placeholder behind the number.
+            TextField(text: text, prompt: Text(verbatim: "")) { Text(verbatim: label) }
                 .keyboardType(field == .weight ? .decimalPad : .numberPad)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.hxTextPrimary)
