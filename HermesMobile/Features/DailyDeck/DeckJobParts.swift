@@ -82,6 +82,8 @@ struct DeckIdea: Equatable {
     /// The source's words, verbatim. Empty on a summary card.
     let quotes: [DeckPiece.Quote]
     let take: String?
+    /// The source's own parts, a bullet each. A long piece's parts live in its map instead.
+    let parts: [DeckPart]
     let linked: DeckThread?
     /// Written from a summary: none of the source's own text was on hand, so there are no quotes.
     let isSummary: Bool
@@ -112,6 +114,13 @@ struct DeckIdea: Equatable {
         lines = lines.map { DeckPiece.Quote(text: Self.unquoted($0.text), at: $0.at) }.filter { !$0.text.isEmpty }
         isSummary = card.isFromSummary ?? lines.isEmpty
         quotes = isSummary ? [] : lines
+        // A part's line shows only on a card with the source's text, and never twice.
+        let shown = Set(quotes.map(\.text)), summary = isSummary
+        parts = card.piece != nil ? [] : card.parts.compactMap { part in
+            guard !part.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            let line = summary ? nil : part.quote.map(DeckIdea.unquoted).flatMap { $0.isEmpty || shown.contains($0) ? nil : $0 }
+            return DeckPart(label: part.label, text: part.text, quote: line)
+        }
         linked = card.linked
         // "Your notes" under "From your notes" says the same thing twice.
         let named = source.flatMap { palette.name.localizedCaseInsensitiveContains($0) ? nil : $0 }
@@ -159,7 +168,7 @@ extension DeckCard {
     }
 }
 
-/// An idea card's source lines, its take, and what he wrote that it links to, in that order.
+/// An idea card's source lines, its take, its parts, and what he wrote that it links to, in that order.
 struct DeckIdeaBody: View {
     let idea: DeckIdea
     let palette: DeckPalette
@@ -183,6 +192,10 @@ struct DeckIdeaBody: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 18)
                     .textSelection(.enabled)
+            }
+            if !idea.parts.isEmpty {
+                DeckPartsList(parts: idea.parts.map { ($0.label, $0.text, $0.quote) }, palette: palette)
+                    .padding(.top, 18)
             }
             if let linked = idea.linked {
                 DeckLinkedBlock(thread: linked, palette: palette).padding(.top, 18)
@@ -247,10 +260,10 @@ struct DeckAnswerBoxLabel: View {
     }
 }
 
-/// "The parts": a bullet per part, its label bold before its text. An idea card's parts, and a Piece
-/// card's steps.
+/// "The parts": a bullet per part, its label bold before its text, and the source's line it stands on under it.
+/// An idea card's parts, and a Piece card's steps.
 struct DeckPartsList: View {
-    let parts: [(label: String?, text: String)]
+    let parts: [(label: String?, text: String, quote: String?)]
     let palette: DeckPalette
 
     var body: some View {
@@ -264,9 +277,14 @@ struct DeckPartsList: View {
                 ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(verbatim: "•").accessibilityHidden(true)
-                        (Text(verbatim: part.label.map { "\($0): " } ?? "").font(AppFont.subheadline(weight: .semibold))
-                            + Text(verbatim: part.text).font(AppFont.subheadline()))
-                            .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 6) {
+                            (Text(verbatim: part.label.map { "\($0): " } ?? "").font(AppFont.subheadline(weight: .semibold))
+                                + Text(verbatim: part.text).font(AppFont.subheadline()))
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let quote = part.quote, !quote.isEmpty {
+                                DeckQuoteRow(text: quote, at: nil, palette: palette)
+                            }
+                        }
                     }
                     .foregroundStyle(Color.hxTextPrimary)
                     .accessibilityElement(children: .combine)

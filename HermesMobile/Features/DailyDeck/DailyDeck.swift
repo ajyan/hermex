@@ -588,6 +588,8 @@ struct DeckFromIdea: Decodable, Equatable {
 struct DeckPart: Decodable, Equatable, Hashable {
     let label: String
     let text: String
+    /// The source's own line the part stands on, when the card doesn't already show it up top.
+    var quote: String? = nil
 }
 
 /// Yesterday's words a check-in or letter picks up from: a small label, the quote, and who said it where.

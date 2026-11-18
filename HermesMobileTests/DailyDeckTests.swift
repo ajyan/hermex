@@ -3034,7 +3034,8 @@ final class DeckIdeaLayoutTests: XCTestCase {
         {"id":"i","type":"reflect","kind":"book","act":"ideas","title":"A habit isn't yours until it runs without exceptions.",
          "source":"William James, Habit","gist":"Old gist.","take":"Willpower installs a habit; it doesn't run it.",
          "quotes":[{"text":"“Never suffer an exception to occur.”.","at":"William James, 1890"},{"text":"Make the nervous system our ally."}],
-         "parts":[{"label":"Ignored","text":"parts are not drawn"}],
+         "parts":[{"label":"Exceptions","text":"One slip undoes many wins.","quote":"“Never suffer an exception.”"},{"label":"Blank","text":" "},
+                  {"label":"Ally","text":"Train the body.","quote":"Make the nervous system our ally."}],
          "linked":{"label":"You wrote, Oct 25","quote":"Sleep is my one thing again.","at":"You, on the weekly review"},
          "question":"Is he right?"}
         """#)
@@ -3045,6 +3046,9 @@ final class DeckIdeaLayoutTests: XCTestCase {
                        "the row draws the quote mark, so the words lose theirs and the stray full stop")
         XCTAssertEqual(idea.take, "Willpower installs a habit; it doesn't run it.", "the take wins over the gist")
         XCTAssertEqual(idea.linked?.quote, "Sleep is my one thing again.")
+        XCTAssertEqual(idea.parts, [DeckPart(label: "Exceptions", text: "One slip undoes many wins.", quote: "Never suffer an exception."),
+                                    DeckPart(label: "Ally", text: "Train the body.", quote: nil)],
+                       "the source's parts are drawn again, an empty one left out, a line already up top not repeated")
         XCTAssertFalse(idea.isSummary)
     }
 
@@ -3053,9 +3057,11 @@ final class DeckIdeaLayoutTests: XCTestCase {
         let derived = try idea(#"""
         {"id":"i","type":"reflect","kind":"insight","act":"ideas","title":"Write down why your work mattered","source":"Your notes",
          "gist":"Your contributions fade unless you document them.","body":"Your contributions fade unless you document them.",
-         "quotes":[],"parts":[{"label":"Memory fades","text":"Work disappears."}],"question":"Q?"}
+         "quotes":[],"parts":[{"label":"Memory fades","text":"Work disappears.","quote":"Not the source's words."}],"question":"Q?"}
         """#)
         XCTAssertTrue(derived.isSummary)
+        XCTAssertEqual(derived.parts, [DeckPart(label: "Memory fades", text: "Work disappears.", quote: nil)],
+                       "a summary card's parts carry the source's substance, never a line in the source's voice")
         XCTAssertEqual(derived.kindLine, "From your notes · summary", "\"Your notes\" isn't said twice")
         XCTAssertEqual(derived.take, "Your contributions fade unless you document them.")
         XCTAssertTrue(derived.quotes.isEmpty)
