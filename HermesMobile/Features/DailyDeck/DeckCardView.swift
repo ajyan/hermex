@@ -1168,7 +1168,7 @@ private struct PieceArgument: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !piece.steps.isEmpty {  // the variant's gist face shows the quotes alone
-                DeckPartsList(parts: piece.steps.map { ($0.name, $0.claim) }, palette: palette)
+                DeckPartsList(parts: piece.steps.map { ($0.name, $0.claim, nil) }, palette: palette)
             }
             if !piece.quotes.isEmpty {
                 Text(verbatim: "In its own words")
