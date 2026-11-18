@@ -127,7 +127,10 @@ struct DeckMandarinCard: View {
             .accessibilityLabel(Text(verbatim: "Play the question"))
         }
         .padding(.leading, 12)
+        .padding(.trailing, 2)
+        .padding(.vertical, 10)
         .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        .padding(.bottom, 8)
     }
 
     // MARK: Warm up
@@ -166,7 +169,7 @@ struct DeckMandarinCard: View {
     private func warmUpStep(_ item: MandarinWarmUp) -> some View {
         let isRevealed = revealed.contains(item.hanzi)
         questionPinned
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(verbatim: "How would you say")
                     .font(AppFont.footnote(weight: .semibold))
@@ -210,6 +213,7 @@ struct DeckMandarinCard: View {
             actions(primary: ("Got it", "checkmark", { Task { await practice.warm(item, got: true) } }),
                     secondary: ("Again", "arrow.counterclockwise", { Task { await practice.warm(item, got: false) } }),
                     busy: practice.isSavingRecall)
+                .padding(.top, 4)
         } else {
             MandarinMic(prompt: "Say it in Mandarin", palette: palette,
                         alternative: ("Show me", { change { _ = revealed.insert(item.hanzi) } }),
