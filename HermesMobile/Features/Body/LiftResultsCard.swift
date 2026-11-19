@@ -42,7 +42,7 @@ struct LiftResultsCard: View {
                             NavigationLink(value: ShellPushDestination.bodyLift(result.id)) {
                                 LiftResultRow(result: result, frame: frame, showsChevron: true)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.chatTactile(.card))
                             .accessibilityHint(Text(verbatim: "Opens this lift's history"))
                         } else {
                             LiftResultRow(result: result, frame: frame, showsChevron: false)

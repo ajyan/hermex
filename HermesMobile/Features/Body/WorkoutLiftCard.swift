@@ -192,11 +192,15 @@ struct WorkoutFoldedRow: View, Equatable {
     }
 
     private var paper: HermexPaper { .training }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let done = WorkoutViewModel.isComplete(lift)
         let detail = done ? WorkoutCopy.doneSummary(lift) : WorkoutCopy.planLine(lift)
-        Button { viewModel.open(exercise: index) } label: {
+        Button {
+            // The open card folds as this one opens, in one move.
+            withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { viewModel.open(exercise: index) }
+        } label: {
             HStack(spacing: 10) {
                 ZStack {
                     if done {
@@ -229,9 +233,9 @@ struct WorkoutFoldedRow: View, Equatable {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
+            .hxCard(cornerRadius: HXRadius.md)
         }
-        .buttonStyle(.plain)
-        .hxCard(cornerRadius: HXRadius.md)
+        .buttonStyle(.chatTactile(.card))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: done
             ? "\(lift.name), done, \(detail)"
@@ -384,6 +388,7 @@ struct WorkoutSetRow: View, Equatable {
     /// What he has typed into the focused box so far.
     @State private var draft = ""
     private var columns = WorkoutColumns()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(lift: BodyExercise, exercise: Int, index: Int, viewModel: WorkoutViewModel, named: Bool = false) {
         self.lift = lift
@@ -475,7 +480,11 @@ struct WorkoutSetRow: View, Equatable {
             // A number still being typed belongs to this set: land it before the tick.
             if let focus { commit(focus) }
             focus = nil
-            viewModel.toggle(exercise: exercise, set: index)
+            // One move: the reps-left row opens under the set, and a finished lift folds as the
+            // next one opens.
+            withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
+                viewModel.toggle(exercise: exercise, set: index)
+            }
         } label: {
             Image(systemName: "checkmark")
                 .font(AppFont.headline(weight: .bold))
@@ -485,6 +494,7 @@ struct WorkoutSetRow: View, Equatable {
                             in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                     .strokeBorder(row.done ? paper.glow : Color.hxTextSecondary.opacity(0.6), lineWidth: 1.5))
+                .animation(HXMotion.pop(reduceMotion: reduceMotion), value: row.done)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
