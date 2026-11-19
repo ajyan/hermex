@@ -182,7 +182,7 @@ struct DailyDeckView: View {
         switch viewModel.state {
         case .idle, .loading:
             // A day this device hasn't kept yet; a kept one opens from its copy (`DailyDeckViewModel.load`).
-            HXModuleHomePlaceholder(name: viewModel.title)
+            DeckLoadingPlaceholder(name: viewModel.title)
         case .needsWorkspace(let paths):
             workspacePicker(paths)
         case .noDeck:
@@ -366,5 +366,33 @@ extension FeedbackContext {
         return FeedbackContext(
             feature: "Daily Deck", screen: title, item: cardTitle,
             state: ["slot": "\(date).\(kind)", "card": page?.id])
+    }
+}
+
+/// The Brief's first frame on a day this device hasn't kept: one card where the stack's top card
+/// will land, with the opener's shape in static lines. Never animates (DESIGN.md § Motion, Loading).
+private struct DeckLoadingPlaceholder: View {
+    let name: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Capsule()
+                .fill(Color(.tertiarySystemFill))
+                .frame(width: 120, height: 12)
+            HXPlaceholderLines(trailingInsets: [0, 40])
+            HXPlaceholderLines(trailingInsets: [0, 0, 28, 120])
+                .padding(.top, 8)
+            Spacer(minLength: 0)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .hxCardSurface(.summary)
+        .padding(.vertical, 12)
+        .padding(.bottom, 16)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Loading \(name)"))
     }
 }

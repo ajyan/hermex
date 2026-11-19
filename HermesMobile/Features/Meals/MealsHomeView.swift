@@ -108,7 +108,8 @@ struct MealsHomeView: View {
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
             .refreshable { await viewModel.load() }
-            .disabled(viewModel.isSaving)
+            // Holds taps during a save without dimming the whole home (pressable rows dim when disabled).
+            .allowsHitTesting(!viewModel.isSaving)
         }
     }
 

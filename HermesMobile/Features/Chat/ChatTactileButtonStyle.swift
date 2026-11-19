@@ -356,8 +356,9 @@ struct ChatDecisionButtonStyle: ButtonStyle {
     }
 
     private var foregroundColor: Color {
+        // Disabled on a paper takes the card's secondary ink, never hxTextSecondary on a card.
         guard isEnabled else {
-            return Color.hxTextSecondary
+            return paper?.secondaryInk ?? Color.hxTextSecondary
         }
 
         switch emphasis {
@@ -373,6 +374,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
     private func backgroundColor(isPressed: Bool) -> Color {
         guard isEnabled else {
+            if let paper { return paper.wash }
             return colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.05)
         }
 
