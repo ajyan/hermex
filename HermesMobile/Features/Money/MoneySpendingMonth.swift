@@ -211,7 +211,7 @@ struct MoneySpendingMonthSections<BeforeLog: View>: View {
                 .background(isOpen ? Color(uiColor: .tertiarySystemFill) : .clear)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isOpen ? .isSelected : [])
             .accessibilityHint(Text(verbatim: isOpen ? "Hides the transactions" : "Shows its slice and the transactions behind it"))
@@ -345,7 +345,7 @@ struct MoneyAskRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .accessibilityElement(children: .combine)
         .accessibilityHint(Text(verbatim: "Asks Atlas about it"))
     }
