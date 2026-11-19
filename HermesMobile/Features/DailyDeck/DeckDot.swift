@@ -20,13 +20,18 @@ struct DeckDot: View {
     var column: CGFloat = DeckDots.column
     /// The dot's diameter; large text grows it (`GoalDotMetrics`).
     var size: CGFloat = DeckDots.dot
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let plus = size * 7 / 16
         ZStack {
             switch state {
             case "done":
+                // Lands when a check-in fills it inside an animated transaction (`HXMotion.pop` on the tappable
+                // mark); static grids and the widget draw it without one, so nothing moves there. A fade under
+                // Reduce Motion, for a transaction that still animates then (`panel`'s crossfade).
                 Circle().fill(ink)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.6).combined(with: .opacity))
             case "skip":
                 Circle().fill(ink.opacity(0.35))
             case "today":
