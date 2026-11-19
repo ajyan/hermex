@@ -29,6 +29,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
     @ViewBuilder let serverMenu: () -> ServerMenu
 
     @ScaledMetric(relativeTo: .title2) private var composeButtonSize: CGFloat = 56
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let sections = DrawerSessionSections(sessions, isSearching: isSearching)
@@ -99,9 +100,15 @@ struct ChatDrawerView<ServerMenu: View>: View {
 
             if let status {
                 AtlasStatusDrawerBar(note: status) { onOpen(.status) }
+                    .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
             }
             settingsBar
+                // Opaque and on top, so the Status bar rises from behind it rather than across it.
+                .background(Color.hxCanvas)
+                .zIndex(1)
         }
+        // The Status bar rises above Settings when Status first answers, even with the drawer open.
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: status != nil)
         .background(Color.hxCanvas.ignoresSafeArea())
     }
 
@@ -190,6 +197,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
+            // Notes land as their reads return, often with the drawer already open.
+            .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: note)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
