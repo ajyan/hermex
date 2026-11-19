@@ -125,7 +125,7 @@ struct BrainLinkCardsRow: View {
                             BrainLinkCard(ref: ref)
                                 .zoomSource(for: .brainRoute(.page(ref.module, ref.id)), cornerRadius: HXRadius.md)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.chatTactile(.card))
                     }
                 }
                 .scrollTargetLayout()
@@ -196,7 +196,7 @@ struct BrainMentionSection: View {
                     NavigationLink(value: ShellPushDestination.brainRoute(.page(ref.module, ref.id))) {
                         BrainMentionRow(ref: ref, paper: paper)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                 }
                 if let showAllTitle {
                     separator

@@ -49,6 +49,7 @@ struct PrepRunView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(screen)
             .onPreferenceChange(PrepMicBusyKey.self) { micBusy = $0 }
             .environment(\.prepUndoOverride, PrepUndoOverrideAction { point in Task { await viewModel.undoOverride(point) } })
             .environment(\.prepDiagramLoader, viewModel.diagramLoader)
@@ -195,11 +196,31 @@ struct PrepRunView: View {
 
     // MARK: Phases
 
+    /// Which screen the run is on, without its payload: rep 3, rep 3's result, done. The swap
+    /// between screens crossfades on it, so the tutor's streamed words or a point re-graded on the
+    /// same result never crossfade the screen.
+    private enum Screen: Hashable {
+        case loading, unavailable, failed, finished
+        case rep(Int)
+        case result(Int, dialogue: Bool)
+    }
+
+    private var screen: Screen {
+        switch viewModel.phase {
+        case .loading: .loading
+        case .unavailable: .unavailable
+        case .failed: .failed
+        case .finished: .finished
+        case .rep(let rep, _): .rep(rep.index)
+        case .result(let rep, _, _): .result(rep.index, dialogue: Self.usesRecall(rep) && viewModel.inDialogue)
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.phase {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            PrepCardPlaceholder(label: "Loading the run")
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
@@ -633,6 +654,33 @@ private struct PrepSegmentBar: View {
         if index < position { return "done" }
         if index == position { return "today" }
         return "ahead"
+    }
+}
+
+/// A run's or a lesson's first frame while it loads: a card in the Prep wash holding static lines
+/// (Prep teaches in cards), at the rep screen's gutter, so the first card lands where it stood.
+/// `title` adds a line above it for a page that heads itself with a title, like a lesson.
+struct PrepCardPlaceholder: View {
+    /// What VoiceOver hears.
+    let label: String
+    var title = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xl) {
+            if title {
+                HXPlaceholderLines(trailingInsets: [96])
+            }
+            PrepRunCard {
+                HXPlaceholderLines(trailingInsets: [120], paper: .prep)
+                HXPlaceholderLines(trailingInsets: [0, 0, 28, 96], paper: .prep)
+            }
+        }
+        .padding(BrainStyle.l)
+        .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: label))
     }
 }
 

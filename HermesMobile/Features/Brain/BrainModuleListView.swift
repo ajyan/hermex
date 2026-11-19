@@ -207,10 +207,12 @@ struct BrainModuleListView: View {
             }
             .hxNavigationTitle(module.defaultTitle)
             .background(Color.hxCanvas.ignoresSafeArea())
+            // The saved copy before the first frame, so the zoom into the list lands on it.
+            .onAppear { viewModel.showSavedCopy() }
             .task {
                 // Load once; a pop back from a page keeps the pages already scrolled.
-                // Re-run a first load that was cancelled before it finished, or it spins forever.
-                guard !didLoad || viewModel.state == .loading else { return }
+                // Re-run a first load that was cancelled before it answered, saved copy or not.
+                guard !didLoad || !viewModel.hasFetched else { return }
                 didLoad = true
                 await reload()
             }
@@ -256,6 +258,7 @@ struct BrainModuleListView: View {
                 }
             }
             .brainListStyle()
+            .hxLoadSwap(viewModel.state.phase)
             .refreshable { await viewModel.load() }
         } else {
             BrainListStateView(viewModel: viewModel) { list in
@@ -528,15 +531,25 @@ struct BrainModuleListView: View {
 
 // MARK: - Shared pieces
 
-/// The load-state switch every module list shares: a spinner, the unavailable and
-/// failed states, an empty state, or the loaded list. `inline` lays the states out
-/// for a slot inside a scroll view (under the chip bar) instead of filling the screen.
+/// The load-state switch every module list shares: a placeholder shaped like the list, the
+/// unavailable and failed states, an empty state, or the loaded list. `inline` lays the states out
+/// for a slot inside a `List` (under the chip bar) instead of filling the screen; that `List`
+/// carries the `.hxLoadSwap`, since a crossfade on its rows wouldn't reach the list's own diff.
 struct BrainListStateView<Loaded: View>: View {
     let viewModel: BrainListViewModel
     var inline = false
     @ViewBuilder let loaded: (BrainList) -> Loaded
 
     var body: some View {
+        if inline {
+            states
+        } else {
+            states.hxLoadSwap(viewModel.state.phase)
+        }
+    }
+
+    @ViewBuilder
+    private var states: some View {
         if case .loaded(let list) = viewModel.state, !list.items.isEmpty {
             loaded(list)
         } else if inline {
@@ -550,9 +563,7 @@ struct BrainListStateView<Loaded: View>: View {
     private var placeholder: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: inline ? nil : .infinity)
-                .padding(.vertical, inline ? BrainStyle.xl : 0)
+            BrainListPlaceholder(module: viewModel.module, inline: inline)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Brain on this server") } icon: { Image(systemName: "brain") }

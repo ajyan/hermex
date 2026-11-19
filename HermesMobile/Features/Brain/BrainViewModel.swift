@@ -51,6 +51,19 @@ enum BrainLoadState<Value: Equatable>: Equatable {
     /// The server has no Brain API (a stock `hermes-webui`, or another server).
     case unavailable
     case failed(String)
+
+    /// Which state this is, without its payload: what `.hxLoadSwap` keys on, so a refresh that
+    /// brings new data doesn't crossfade the screen.
+    enum Phase: Hashable { case loading, loaded, unavailable, failed }
+
+    var phase: Phase {
+        switch self {
+        case .loading: .loading
+        case .loaded: .loaded
+        case .unavailable: .unavailable
+        case .failed: .failed
+        }
+    }
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol.

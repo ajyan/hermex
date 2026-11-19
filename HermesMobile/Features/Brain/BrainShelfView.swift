@@ -26,8 +26,11 @@ struct BrainShelfView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(kind.title, subtitle: viewModel.cards.isEmpty ? nil : kind.countLabel(viewModel.cards.count))
             .background(Color.hxCanvas.ignoresSafeArea())
+            // The saved copy before the first frame, so the zoom into the page lands on it.
+            .onAppear { viewModel.showSavedCopy() }
             .task { await viewModel.load() }
     }
 
@@ -35,7 +38,7 @@ struct BrainShelfView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            BrainShelfPlaceholder(kind: kind)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Brain on this server") } icon: { Image(systemName: "brain") }
@@ -50,6 +53,32 @@ struct BrainShelfView: View {
             BrainShelfPage(kind: kind, cards: viewModel.cards, isShowingCachedCopy: viewModel.isShowingCachedCopy)
                 .refreshable { await viewModel.load() }
         }
+    }
+}
+
+/// A shelf page's first frame while it loads with no saved copy: two of its cards in its paper,
+/// holding static lines where the words will be, at the page's gutter. Paired with `.hxLoadSwap`.
+private struct BrainShelfPlaceholder: View {
+    let kind: BrainShelfKind
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.l) {
+            ForEach(0..<2, id: \.self) { _ in
+                HXCard(.glow(kind.paper), spacing: BrainStyle.s) {
+                    HXPlaceholderLines(trailingInsets: [140], paper: kind.paper)
+                } content: {
+                    HXPlaceholderLines(trailingInsets: [0, 0, 28, 120], paper: kind.paper)
+                } footer: {
+                    EmptyView()
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, BrainStyle.m)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Loading \(kind.title)"))
     }
 }
 
@@ -124,7 +153,7 @@ struct BrainShelfCard: View {
                         .frame(minHeight: BrainStyle.minTapTarget)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.chatTactile(.capsule))
                 .accessibilityHint(Text(verbatim: "Opens the idea this answers"))
             }
         }
@@ -154,7 +183,7 @@ struct BrainShelfHomeSection: View {
                         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
                         .zoomSource(for: destination, cornerRadius: HXRadius.sm)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                 }
             }
         }

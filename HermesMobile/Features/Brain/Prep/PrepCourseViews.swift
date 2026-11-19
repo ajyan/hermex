@@ -69,7 +69,7 @@ struct PrepReadinessRow: View {
                                     NavigationLink(value: ShellPushDestination.brainRoute(.prep(destination))) {
                                         PrepReadinessPip(check: check, opens: true)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.chatTactile(.card))
                                 } else {
                                     PrepReadinessPip(check: check)
                                 }
@@ -338,7 +338,7 @@ private struct PrepLockedUnitRow: View {
                 HXChip(paper: .prep, label: "Test out") { EmptyView() }
                     .frame(minHeight: BrainStyle.minTapTarget)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .accessibilityLabel(Text(verbatim: "Test out of \(unit.title)"))
         }
     }
@@ -372,7 +372,7 @@ private struct PrepCurrentUnit: View {
                         HXChip(paper: .prep, label: "Test out") { EmptyView() }
                             .frame(minHeight: BrainStyle.minTapTarget)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.capsule))
                     .accessibilityLabel(Text(verbatim: "Test out of \(unit.title)"))
                 }
             }
@@ -480,7 +480,7 @@ private struct PrepLessonNodeLink: View {
         switch lesson.state {
         case .learned, .ready, .shaky:
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lesson(lesson.id)))) { row }
-                .buttonStyle(.plain)
+                .buttonStyle(.chatTactile(.card))
                 .accessibilityLabel(Text(verbatim: "\(lesson.title), \(PrepCopy.lessonStateWord(lesson.state))"))
                 .accessibilityHint(Text(verbatim: "Opens the lesson"))
         case .next:

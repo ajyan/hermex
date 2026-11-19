@@ -359,6 +359,7 @@ struct PrepLessonView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .environment(\.prepDiagramLoader, viewModel.diagramLoader)
             .hxNavigationTitle(title)
             .background(Color.hxCanvas.ignoresSafeArea())
@@ -376,7 +377,7 @@ struct PrepLessonView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            PrepCardPlaceholder(label: "Loading lesson", title: true)
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):

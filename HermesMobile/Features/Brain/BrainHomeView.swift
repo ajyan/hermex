@@ -94,6 +94,13 @@ struct BrainHomeView: View {
         content
             .hxNavigationTitle("Brain")
             .background(Color.hxCanvas.ignoresSafeArea())
+            // The saved copies before the first frame, so the home opens laid out instead of
+            // growing section by section as each read answers.
+            .onAppear {
+                viewModel.showSavedCopy()
+                peopleHome.showSavedCopy()
+                shelf.showSavedCopy()
+            }
             .task {
                 // An appear refreshes only once the last load is a few minutes old (pull to refresh
                 // always does); the review row catches up with swipes made on the Review screen either way.
@@ -128,6 +135,7 @@ struct BrainHomeView: View {
             }
         } else {
             searchableBody
+                .hxLoadSwap(viewModel.state.phase)
                 .searchable(
                     text: $searchViewModel.query,
                     placement: .navigationBarDrawer(displayMode: .always),
@@ -161,7 +169,7 @@ struct BrainHomeView: View {
         } else {
             switch viewModel.state {
             case .loading, .unavailable:
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                HXModuleHomePlaceholder(name: "Brain")
             case .failed(let message):
                 HXFailedView(title: "Couldn't load the Brain", message: message) {
                     Task { await viewModel.load() }
@@ -188,6 +196,12 @@ struct BrainHomeView: View {
         BrainHomeLayout.dueCatchUps(peopleHome.sections)
     }
 
+    /// The home's shape: the review row, due catch-ups, writing rows, Browse rows and the offline note.
+    private var sectionLayout: [Int] {
+        [viewModel.home.bites.isEmpty ? 0 : 1, dueCatchUps.count, shelf.rows.count,
+         viewModel.modules.count, isShowingPrep ? 1 : 0, viewModel.isShowingCachedCopy ? 1 : 0]
+    }
+
     private var home: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.l) {
@@ -210,6 +224,9 @@ struct BrainHomeView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, BrainStyle.m)
+            // The sections land from separate reads; each arrival crossfades and the rest slide,
+            // instead of the screen jumping. Keyed on how many rows each holds, not on their data.
+            .hxLoadSwap(sectionLayout)
         }
         .refreshable {
             async let prep: Void = prepViewModel.load()
@@ -237,7 +254,7 @@ struct BrainHomeView: View {
                                 .frame(minHeight: BrainStyle.minTapTarget)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.chatTactile(.capsule))
                         .accessibilityHint(Text(verbatim: "Starts a chat with Atlas"))
                     }
                 }
@@ -332,7 +349,7 @@ struct BrainHomeView: View {
                 .padding(.horizontal, BrainStyle.cardHorizontalPadding)
                 .zoomSource(for: .brainRoute(route), cornerRadius: HXRadius.sm)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
     }
 }
 
