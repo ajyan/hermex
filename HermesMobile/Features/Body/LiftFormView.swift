@@ -17,6 +17,7 @@ struct LiftFormView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.loadSwapPhase)
             .hxNavigationTitle(title, subtitle: "Form")
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
@@ -31,7 +32,7 @@ struct LiftFormView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Form")
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "Lift not found") } icon: { Image(systemName: "figure.strengthtraining.traditional") }
@@ -144,7 +145,7 @@ struct LiftFormView: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: LiftFormCopy.cueLabel(cue, index: index)))
         .accessibilityHint(Text(verbatim: picked ? "The cue Baki uses" : "Uses this cue"))

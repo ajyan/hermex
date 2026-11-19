@@ -205,14 +205,7 @@ struct WorkoutFinishView: View {
                 }
                 .font(AppFont.display(style: .title3, weight: .semibold))
                 .foregroundStyle(paper.glow)
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach([0, 28, 120] as [CGFloat], id: \.self) { short in
-                        Capsule().fill(paper.wash)
-                            .frame(height: 10)
-                            .padding(.trailing, short)
-                    }
-                }
-                .accessibilityHidden(true)
+                HXPlaceholderLines(paper: paper)
             }
         } footer: {
             EmptyView()
