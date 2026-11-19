@@ -16,6 +16,7 @@ struct LiftProgressView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(title, subtitle: viewModel.subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -40,7 +41,7 @@ struct LiftProgressView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Lift", paper: .training)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "Lift not found") } icon: { Image(systemName: "figure.strengthtraining.traditional") }
@@ -142,9 +143,9 @@ struct LiftProgressView: View {
             .padding(.vertical, 11)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
+            .hxCard()
         }
-        .buttonStyle(.plain)
-        .hxCard()
+        .buttonStyle(.chatTactile(.card))
         .accessibilityHint(Text(verbatim: "Opens this lift's form page"))
     }
 

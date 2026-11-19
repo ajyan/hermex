@@ -95,6 +95,12 @@ enum HXMotion {
         reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
     }
 
+    /// One piece of content replacing another in place (a card's front and back, a question and
+    /// its answer): a blur crossfade, a plain fade under Reduce Motion.
+    static func replaceTransition(reduceMotion: Bool) -> AnyTransition {
+        reduceMotion ? .opacity : AnyTransition(.blurReplace)
+    }
+
     /// Entrance for a transcript row born moments ago: user rows fade up,
     /// assistant rows fade. The animation rides on the transition itself, so
     /// the row animates without wrapping the message append in `withAnimation`
@@ -106,5 +112,24 @@ enum HXMotion {
         let insertion: AnyTransition = isUserRow ? .opacity.combined(with: .offset(y: 8)) : .opacity
         return .asymmetric(insertion: insertion, removal: .identity)
             .animation(.smooth(duration: 0.22, extraBounce: 0))
+    }
+}
+
+extension View {
+    /// Crossfades once on `HXMotion.swap` when `phase` changes: a placeholder giving way to
+    /// content, content giving way to a failure, a section arriving. Key it on a cheap
+    /// discriminator (loading, loaded, failed), never on the payload, so a refresh that brings
+    /// new data doesn't animate the whole screen. Reduce Motion snaps.
+    func hxLoadSwap(_ phase: some Hashable) -> some View {
+        modifier(HXLoadSwap(phase: AnyHashable(phase)))
+    }
+}
+
+private struct HXLoadSwap: ViewModifier {
+    let phase: AnyHashable
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.animation(HXMotion.swap(reduceMotion: reduceMotion), value: phase)
     }
 }

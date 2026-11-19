@@ -5,7 +5,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class SleepViewModel {
-    enum State: Equatable {
+    enum State: Hashable {
         case loading
         /// The vault hasn't written `data/sleep/history.json` yet.
         case empty
@@ -93,6 +93,7 @@ struct SleepView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         content(proxy: proxy)
                     }
+                    .hxLoadSwap(viewModel.state)  // a refresh keeps `.ready`, so only the first load crossfades
                     .padding(16)
                 }
             }
@@ -112,7 +113,7 @@ struct SleepView: View {
     private func content(proxy: ScrollViewProxy) -> some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
+            SleepLoadingPlaceholder()
         case .empty:
             ContentUnavailableView("No sleep history yet", systemImage: "moon.zzz",
                                    description: Text(verbatim: "It appears after the morning Garmin pull runs."))
@@ -137,6 +138,33 @@ struct SleepView: View {
                 withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) { proxy.scrollTo("night", anchor: .top) }
             }
         }
+    }
+}
+
+/// Sleep's first frame while its history loads: the night card in Sleep's paper, then the Trends card, with
+/// static lines where the numbers go. Drawn once; never animates.
+private struct SleepLoadingPlaceholder: View {
+    private let paper = HermexPaper.training
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HXCard(.glow(paper), spacing: 14) {
+                HXPlaceholderLines(trailingInsets: [160], paper: paper)
+            } content: {
+                HXPlaceholderLines(trailingInsets: [120, 0, 28, 0, 60], paper: paper)
+            } footer: {
+                EmptyView()
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                HXSectionHeader(title: "Trends")
+                HXPlaceholderLines(trailingInsets: [0, 0, 0, 0, 0, 80])
+                    .padding(HXCard<EmptyView, EmptyView, EmptyView>.padding)
+                    .hxCard()
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Loading sleep"))
     }
 }
 

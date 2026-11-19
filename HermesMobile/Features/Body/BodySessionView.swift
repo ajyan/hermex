@@ -17,6 +17,7 @@ struct BodySessionView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(BodySessionCopy.title(id: viewModel.id), subtitle: BodySessionCopy.date(id: viewModel.id))
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
@@ -26,7 +27,7 @@ struct BodySessionView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Workout")
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "Workout not found") } icon: { Image(systemName: "figure.strengthtraining.traditional") }

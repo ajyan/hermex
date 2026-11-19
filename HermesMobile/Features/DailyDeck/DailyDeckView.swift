@@ -52,7 +52,8 @@ struct DailyDeckView: View {
     }
 
     var body: some View {
-        content
+        ZStack { content }
+            .hxLoadSwap(loadPhase)
             .environment(showsLabels ? labels : nil)
             .environment(showsLabels && viewModel.date == viewModel.today && !viewModel.isReview ? labelQueue : nil)
             .environment(goals)
@@ -162,11 +163,26 @@ struct DailyDeckView: View {
         .dailyDeck(title: viewModel.title, date: viewModel.date, kind: viewModel.kind, page: viewModel.currentPage)
     }
 
+    /// Which of `content`'s branches shows, without its payload: the load swap crossfades once per branch
+    /// change, never when a read in place brings new cards.
+    private enum LoadPhase { case loading, workspace, noDeck, failed, ready }
+
+    private var loadPhase: LoadPhase {
+        switch viewModel.state {
+        case .idle, .loading: .loading
+        case .needsWorkspace: .workspace
+        case .noDeck: .noDeck
+        case .failed: .failed
+        case .ready: .ready
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .idle, .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A day this device hasn't kept yet; a kept one opens from its copy (`DailyDeckViewModel.load`).
+            DeckLoadingPlaceholder(name: viewModel.title)
         case .needsWorkspace(let paths):
             workspacePicker(paths)
         case .noDeck:
@@ -350,5 +366,33 @@ extension FeedbackContext {
         return FeedbackContext(
             feature: "Daily Deck", screen: title, item: cardTitle,
             state: ["slot": "\(date).\(kind)", "card": page?.id])
+    }
+}
+
+/// The Brief's first frame on a day this device hasn't kept: one card where the stack's top card
+/// will land, with the opener's shape in static lines. Never animates (DESIGN.md § Motion, Loading).
+private struct DeckLoadingPlaceholder: View {
+    let name: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Capsule()
+                .fill(Color(.tertiarySystemFill))
+                .frame(width: 120, height: 12)
+            HXPlaceholderLines(trailingInsets: [0, 40])
+            HXPlaceholderLines(trailingInsets: [0, 0, 28, 120])
+                .padding(.top, 8)
+            Spacer(minLength: 0)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .hxCardSurface(.summary)
+        .padding(.vertical, 12)
+        .padding(.bottom, 16)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Loading \(name)"))
     }
 }

@@ -198,6 +198,37 @@ final class BrainShelfTests: XCTestCase {
         XCTAssertEqual(offline.cards.count, 1)
     }
 
+    func testAPageShowsItsSavedCopyFirstAndSaysOfflineOnlyAfterAFailedFetch() async throws {
+        let cache = BrainCacheHandle(server: serverA, context: try makeContext())
+        let client = FakeBrainClient()
+        client.shelfResults[.letters] = .success(letters)
+        await BrainShelfViewModel(kind: .letters, client: client, cache: cache).load()
+
+        client.shelfResults[.letters] = .failure(URLError(.notConnectedToInternet))
+        let gate = Gate()
+        client.shelfGate = gate
+        let viewModel = BrainShelfViewModel(kind: .letters, client: client, cache: cache)
+        let load = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertEqual(viewModel.state, .loaded(letters))
+        XCTAssertFalse(viewModel.isShowingCachedCopy, "not offline: the fetch hasn't failed")
+        gate.open()
+        await load.value
+        XCTAssertEqual(viewModel.state, .loaded(letters))
+        XCTAssertTrue(viewModel.isShowingCachedCopy)
+    }
+
+    func testHomeRowsShowFromTheSavedCopiesBeforeThePagesAnswer() async throws {
+        let context = try makeContext()
+        let client = FakeBrainClient()
+        client.shelfResults[.letters] = .success(letters)
+        await BrainShelfHomeViewModel(client: client, cache: BrainCacheHandle(server: serverA, context: context)).load()
+
+        let home = BrainShelfHomeViewModel(client: client, cache: BrainCacheHandle(server: serverA, context: context))
+        home.showSavedCopy()
+        XCTAssertEqual(home.rows.first, BrainShelfLayout.HomeRow(kind: .letters, count: 2))
+    }
+
     func testAFailedRefreshKeepsThePageShown() async {
         let client = FakeBrainClient()
         client.shelfResults[.letters] = .success(letters)

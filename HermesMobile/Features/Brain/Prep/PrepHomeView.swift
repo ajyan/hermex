@@ -31,6 +31,7 @@ struct PrepHomeView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle("Interview prep", subtitle: searchModel.pipeline?.pack.map(JobCopy.packSubtitle))
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Home"))
@@ -59,7 +60,7 @@ struct PrepHomeView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Interview prep", paper: .prep)
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
@@ -148,7 +149,7 @@ struct PrepRunButton: View {
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.run))) {
                 label(title, enabled: true)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .accessibilityLabel(Text(verbatim: fullWidth ? title : "\(title) today's run"))
         }
     }
@@ -268,13 +269,13 @@ struct PrepWeakSpotsSection: View {
                 BrainRow(leading: { PrepGapStatusDot(status: gap.status) }, title: gap.label,
                          trailing: PrepCopy.gapRowDetail(gap))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
         case .lesson(let lesson):
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lessonRun(lesson.id)))) {
                 BrainRow(leading: { PrepMissedLessonMark() }, title: lesson.title, subtitle: "In reviews",
                          trailing: "Try it now", trailingTint: Color.accentColor)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityHint(Text(verbatim: "Asks one question on this lesson now"))
         }
     }
@@ -321,6 +322,7 @@ struct PrepGapView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(title)
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Gap"))
             .background(Color.hxCanvas.ignoresSafeArea())
@@ -336,7 +338,7 @@ struct PrepGapView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            BrainPagePlaceholder(label: "Loading gap")
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
@@ -470,7 +472,7 @@ struct PrepPracticeLink: View {
                     .background(Color.accentColor, in: Capsule())
                     .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             if let detail {
                 Text(verbatim: detail)
                     .font(BrainStyle.meta)

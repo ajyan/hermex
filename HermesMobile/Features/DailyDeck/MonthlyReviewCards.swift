@@ -147,7 +147,7 @@ struct MonthCoverCard: View {
             }
         }
         .monthReveal(card, viewModel, $revealed)
-        .sensoryFeedback(.impact(weight: .light), trigger: revealed) { _, now in now }
+        .hxSensoryFeedback(.impact(weight: .light), trigger: revealed) { _, now in now }
         .sheet(isPresented: $isEditingTitle) {
             WeekEditorSheet(title: "The month's title", placeholder: card.title ?? "A few words for the month",
                             palette: palette, initial: title) { viewModel.setText($0, for: card) }

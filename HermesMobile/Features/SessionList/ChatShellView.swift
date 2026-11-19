@@ -671,7 +671,8 @@ struct ChatShellView: View {
                           onOpen: { navigation.push($0) })
             .adaptiveSecondaryNavigationTitle()
         case .goal(let slug):
-            GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
+            GoalDetailView(slug: slug, server: server, seed: GoalDetailSeed.summary(slug: slug, server: server),
+                           onAPIError: authManager.handleAPIError)
                 .id(slug)
         case .finishedGoal(let slug):
             GoalRecordView(slug: slug, server: server, onAPIError: authManager.handleAPIError) { _ in

@@ -298,7 +298,7 @@ struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 28)
                 .id(question)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
         }
         if let traits = card.selfRatings {
             selfRatings(traits).padding(.top, 18)
@@ -317,7 +317,7 @@ struct DeckCardView: View {
                 viewModel.opened(diagram.isMap ? "map" : "diagram", on: card.id)
                 openDiagram = diagram
             } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .padding(.top, index == 0 ? 18 : 10)
             .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))
             .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
@@ -351,13 +351,13 @@ struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 24)
                 .id(question)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
         }
         let written = viewModel.answer(for: card)?.text
         Button { isWriting = true } label: {
             DeckAnswerBoxLabel(text: written, prompt: "Your take", palette: palette)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .padding(.top, 12)
         .accessibilityLabel(Text(verbatim: written.flatMap { $0.isEmpty ? nil : "Your take: \($0). Edit" } ?? "Write your take"))
         if !isOpen, viewModel.currentCardID == card.id, viewModel.index < viewModel.visiblePages.count - 1 {
@@ -370,7 +370,7 @@ struct DeckCardView: View {
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(palette.ink, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .padding(.top, 16)
             .accessibilityHint(Text(verbatim: "Shows the next card"))
         }
@@ -409,7 +409,7 @@ struct DeckCardView: View {
                 .padding(.top, 14)
                 .textSelection(.enabled)
                 .id(title)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
                 .accessibilityAddTraits(.isHeader)
         }
         jobBody(text, isYearAgo: isYearAgo)
@@ -431,7 +431,7 @@ struct DeckCardView: View {
                     .font(AppFont.display(style: .headline, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
                     .id(question)
-                    .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                    .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
             }
             if let traits = card.selfRatings {
                 selfRatings(traits)
@@ -545,7 +545,7 @@ struct DeckCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityLabel(Text(verbatim: "Your reflection: \(text). Edit"))
         } else {
             Button { isWriting = true } label: {
@@ -555,7 +555,7 @@ struct DeckCardView: View {
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(palette.ink, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
         }
     }
 
@@ -897,7 +897,7 @@ struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
                 .id(shownQuestion)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel(question: shownQuestion)))
@@ -977,7 +977,7 @@ struct DeckCardView: View {
                 .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 0.5))
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.capsule))
         .padding(.top, 18)
         .accessibilityLabel(Text(verbatim: "New question"))
         .accessibilityHint(Text(verbatim: "Shows another question for this week"))
@@ -1026,7 +1026,7 @@ struct DeckCardView: View {
                 .accessibilityAddTraits(.isHeader)
             DeckWeekGrid(rows: card.weekRows, deckDate: viewModel.date)
                 .padding(.top, 12)
-                .sensoryFeedback(.success, trigger: goalCheckIns?.landedCheckIns ?? 0)
+                .hxSensoryFeedback(.success, trigger: goalCheckIns?.landedCheckIns ?? 0)
             Text(verbatim: "What Atlas learned")
                 .font(AppFont.display(style: .subheadline, weight: .semibold))
                 .foregroundStyle(Color.hxTextPrimary)
@@ -1131,24 +1131,26 @@ struct DeckCardView: View {
     /// File It (Seal the week on a weekly review), then Rate earlier cards on today's morning deck.
     @ViewBuilder
     private func fileButton() -> some View {
-        let filed = viewModel.isFiled && !viewModel.hasChanges
-        // The card's one filled button wears its glow (Seal the week on the dusk review included); only on a
-        // neutral card (the habit tracker, the opener's paper) is it Nous blue.
-        let nous = palette.isNeutralCard
+        // The card's one filled button wears its glow (Seal the week on the dusk review included) through the
+        // card's `\.hxPaper`; only on a neutral card (the habit tracker, the opener's paper) is it Nous blue.
+        // Disabled until the server's deck is read (a device copy shows first) and while nothing changed.
         let sealsWeek = viewModel.isSealedWeekly
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(nous ? Color.hxOnAccent : palette.onInk) }
+                if viewModel.filing == .filing {
+                    ProgressView()
+                        .tint(ChatDecisionButtonStyle.primaryColors(on: palette.isNeutralCard ? nil : palette.colors).text)
+                }
                 Text(verbatim: sealsWeek ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
                      : viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(nous ? Color.hxOnAccent : palette.onInk)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(nous ? Color.accentColor.opacity(filed ? 0.35 : 1) : palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
+            .frame(minHeight: 32)
         }
-        .buttonStyle(.plain)
-        .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+        .disabled(!viewModel.canFile || !viewModel.hasChanges)
+        // Filing landed: the morning's last act.
+        .hxSensoryFeedback(.success, trigger: viewModel.filing) { old, new in old == .filing && new == .idle }
         .padding(.top, 28)
         if let labelQueue {
             RateRecentCardsLink(queue: labelQueue, palette: palette)
@@ -1910,7 +1912,7 @@ private struct SwipeUpForFeedback: ViewModifier {
                 if isDragging { isArmed = pull >= Self.threshold }
             }
             .overlay(alignment: .bottom) { cue }
-            .sensoryFeedback(.impact(weight: .light), trigger: isArmed) { _, armed in armed }
+            .hxSensoryFeedback(.impact(weight: .light), trigger: isArmed) { _, armed in armed }
             .accessibilityActions {
                 if let action {
                     Button(action: action) { Text(verbatim: "Send Feedback") }

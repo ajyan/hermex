@@ -103,7 +103,7 @@ private extension PrepStorySection {
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.storyPage(story.id)))) {
                 PrepStoryRow(story: story)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
         }
     }
 }
@@ -384,7 +384,7 @@ struct PrepStoryPageView: View {
                         actionRow(symbol: "timer", title: "Drill it",
                                   subtitle: "Tell it against the clock, then answer two follow-ups")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                     if openMockCall.isAvailable {
                         PrepRowDivider()
                         Button {
@@ -404,7 +404,7 @@ struct PrepStoryPageView: View {
                         actionRow(symbol: "bubble.left.and.text.bubble.right", title: "Work on it with Atlas",
                                   subtitle: "Talk it through, sharpen it, and update the story")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                 }
             }
             if let message = viewModel.mock.errorMessage {

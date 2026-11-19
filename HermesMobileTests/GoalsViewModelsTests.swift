@@ -140,6 +140,25 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.navigationTitle, "Finish the NYC Marathon, uninjured")
     }
 
+    func testGoalsHomeSeedsOnlyThatGoalOnThatServer() throws {
+        let goal = try detail().summary
+        let server = URL(string: "https://a.example")!
+        GoalDetailSeed.offer(goal, server: server)
+        XCTAssertEqual(GoalDetailSeed.summary(slug: goal.slug, server: server)?.title, goal.title)
+        XCTAssertNil(GoalDetailSeed.summary(slug: goal.slug, server: URL(string: "https://b.example")!),
+                     "another server's goal never wears this one's paper")
+        XCTAssertNil(GoalDetailSeed.summary(slug: "other-goal", server: server))
+    }
+
+    func testLoadSwapPhaseIgnoresThePayload() throws {
+        let one = BrainLoadState<GoalDetail>.loaded(try detail())
+        XCTAssertEqual(one.phase, BrainLoadState<GoalDetail>.loaded(try detail()).phase)
+        XCTAssertEqual(BrainLoadState<GoalDetail>.failed("a").phase, BrainLoadState<GoalDetail>.failed("b").phase)
+        XCTAssertEqual(Set([BrainLoadState<GoalDetail>.loading.phase, one.phase,
+                            BrainLoadState<GoalDetail>.unavailable.phase,
+                            BrainLoadState<GoalDetail>.failed("a").phase]).count, 4)
+    }
+
     func testYesterdayIsOfferedOnceTheGoalHadBegun() throws {
         let started = try detail()  // first day Oct 10, yesterday Oct 12
         XCTAssertTrue(GoalDetailViewModel.canCheckInYesterday(started))

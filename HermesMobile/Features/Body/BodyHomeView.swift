@@ -8,6 +8,7 @@ struct BodyHomeView: View {
     @State private var viewModel: BodyHomeViewModel
     @State private var showsSleep = false
     @Environment(\.openDraftChat) private var openDraftChat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let client: BodyDataClient
     /// Pushes a screen on the shell's stack (the Other day menu's buttons).
     private let onOpen: (ShellPushDestination) -> Void
@@ -23,6 +24,7 @@ struct BodyHomeView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle("Body", subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -52,7 +54,7 @@ struct BodyHomeView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Body", paper: paper)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Body on this server") } icon: {
@@ -76,6 +78,11 @@ struct BodyHomeView: View {
                     if !home.sessions.isEmpty { sessions(home.sessions) }
                     if let sleep = home.sleep { sleepRow(sleep) }
                 }
+                // A proposal decided leaves its place, and one the server refused comes back to it;
+                // Baki's note replaces its placeholder. The cards below move with them.
+                .animation(HXMotion.swap(reduceMotion: reduceMotion), value: home.proposals.count)
+                .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.noteLoaded)
+                .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.latestNote?.session.id)
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
@@ -108,11 +115,14 @@ struct BodyHomeView: View {
             } content: {
                 if let latest = viewModel.latestNote {
                     BakiNoteText(note: latest.note)
-                } else {
+                } else if viewModel.noteLoaded {
                     Text(verbatim: "Ask about a lift, your plan, or how you feel. His note on each workout lands here.")
                         .font(AppFont.subheadline())
                         .foregroundStyle(paper.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    // The note's shape while its workout is read.
+                    HXPlaceholderLines(paper: paper)
                 }
                 if !watching.isEmpty {
                     BakiRule()
@@ -301,9 +311,9 @@ struct BodyHomeView: View {
                 .padding(.vertical, 11)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
+                .hxCard()
             }
-            .buttonStyle(.plain)
-            .hxCard()
+            .buttonStyle(.chatTactile(.card))
             .accessibilityHint(Text(verbatim: "Opens your sleep history"))
         }
     }
@@ -328,7 +338,7 @@ struct BodyHomeView: View {
                         NavigationLink(value: ShellPushDestination.bodyLift(lift.id)) {
                             liftRow(lift)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.chatTactile(.card))
                     }
                 }
             }
@@ -415,7 +425,7 @@ struct BodyHomeView: View {
                     .contentShape(Rectangle())
                     .accessibilityElement(children: .combine)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                     .accessibilityHint(Text(verbatim: "Opens this workout and Baki's note"))
                 }
             }

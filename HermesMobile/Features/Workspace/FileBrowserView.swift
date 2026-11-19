@@ -12,6 +12,7 @@ struct FileBrowserView: View {
     @State private var openedFile: FileTreeNode?
     /// The warm fetch handed over when `openedFile` was tapped; consumed by that preview only.
     @State private var openedFilePrefetch: Task<FileResponse, Error>?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(session: SessionSummary, server: URL, onAPIError: @escaping (Error) -> Void) {
         self.session = session
@@ -89,6 +90,13 @@ struct FileBrowserView: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
                 .listRowSeparator(.hidden)
             }
+            // A folder opening or closing, or its listing arriving after the tap, slides
+            // its rows in place. Keyed on the row count, not the rows, so a big tree pays
+            // nothing extra per update; search filters snap so typing stays immediate.
+            .animation(
+                searchText.isEmpty ? HXMotion.disclosure(reduceMotion: reduceMotion) : nil,
+                value: visibleNodes.count
+            )
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .refreshable {

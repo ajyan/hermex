@@ -724,6 +724,166 @@ extension BrainViewModelTests {
         XCTAssertFalse(viewModel.needsNewDay)
     }
 
+    // MARK: Saved copy first
+
+    /// A page opens on its saved copy (no offline note) while the fetch runs; the live page replaces it.
+    func testAPageShowsItsSavedCopyUntilTheLivePageLands() async throws {
+        let cache = try makeCache()
+        try BrainCache.store(samplePage, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context))
+        let live = BrainPage(item: BrainItem(module: .wiki, id: "p1", title: "Page One"), content: "Newer body")
+        let client = FakeBrainClient()
+        client.pageResult = .success(live)
+        let gate = Gate()
+        client.pageGate = gate
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        let load = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+        XCTAssertFalse(viewModel.isShowingCachedCopy, "not offline: the fetch hasn't failed")
+        XCTAssertFalse(viewModel.hasFetched)
+        gate.open()
+        await load.value
+        XCTAssertEqual(viewModel.page, live)
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        XCTAssertTrue(viewModel.hasFetched)
+    }
+
+    /// "Offline, showing saved copy" appears only once the fetch behind the saved copy fails.
+    func testAPagesOfflineNoteWaitsForTheFailedFetch() async throws {
+        let cache = try makeCache()
+        try BrainCache.store(samplePage, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.pageResult = .failure(URLError(.notConnectedToInternet))
+        let gate = Gate()
+        client.pageGate = gate
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        viewModel.showSavedCopy()
+        XCTAssertEqual(viewModel.page, samplePage, "shown before the load starts, for the zoom's first frame")
+        let load = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        gate.open()
+        await load.value
+        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+        XCTAssertTrue(viewModel.isShowingCachedCopy)
+        XCTAssertTrue(viewModel.hasFetched)
+    }
+
+    /// A load cancelled with the saved copy showing hasn't fetched, so the reader loads again on its next appear.
+    func testACancelledPageLoadOverTheSavedCopyStillNeedsAFetch() async throws {
+        let cache = try makeCache()
+        try BrainCache.store(samplePage, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.pageResult = .failure(CancellationError())
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertEqual(viewModel.page, samplePage)
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        XCTAssertFalse(viewModel.hasFetched)
+    }
+
+    func testAListShowsItsSavedCopyUntilTheLiveListLandsAndPagesOnlyFromTheLiveOne() async throws {
+        let cache = try makeCache()
+        let saved = BrainList(items: [BrainItem(module: .wiki, id: "w1", date: "")], nextCursor: 1)
+        try BrainCache.store(saved, server: cache.server, kind: "list:wiki", id: "", in: try XCTUnwrap(cache.context))
+        let live = BrainList(items: [BrainItem(module: .wiki, id: "w1", date: ""), BrainItem(module: .wiki, id: "w2", date: "")],
+                             nextCursor: 2)
+        let client = FakeBrainClient()
+        client.listResults = [.success(live), .success(BrainList(items: [BrainItem(module: .wiki, id: "w3", date: "")]))]
+        let gate = Gate()
+        client.firstListGate = gate
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: cache)
+        let load = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertEqual(viewModel.list, saved)
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        await viewModel.loadMore()
+        XCTAssertEqual(client.listCalls.map(\.cursor), [nil], "the saved copy's cursor is never paged")
+        gate.open()
+        await load.value
+        XCTAssertEqual(viewModel.list, live)
+        XCTAssertTrue(viewModel.hasFetched)
+        await viewModel.loadMore()
+        XCTAssertEqual(client.listCalls.map(\.cursor), [nil, 2])
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["w1", "w2", "w3"])
+    }
+
+    func testAListsOfflineNoteWaitsForTheFailedFetch() async throws {
+        let cache = try makeCache()
+        let saved = BrainList(items: [BrainItem(module: .wiki, id: "w1", date: "")], nextCursor: 1)
+        try BrainCache.store(saved, server: cache.server, kind: "list:wiki", id: "", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.listResults = [.failure(URLError(.notConnectedToInternet))]
+        let gate = Gate()
+        client.firstListGate = gate
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: cache)
+        let load = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        gate.open()
+        await load.value
+        XCTAssertEqual(viewModel.state, .loaded(saved))
+        XCTAssertTrue(viewModel.isShowingCachedCopy)
+        await viewModel.loadMore()
+        XCTAssertEqual(client.listCalls.count, 1, "a saved copy doesn't page")
+    }
+
+    func testTheHomeShowsItsSavedModulesUntilTheLiveOnesLand() async throws {
+        let cache = try makeCache()
+        let saved = [BrainModule(id: .wiki, title: "Wiki", count: 1)]
+        let live = [BrainModule(id: .wiki, title: "Wiki", count: 2)]
+        try BrainCache.store(saved, server: cache.server, kind: "modules", id: "", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.modulesResult = .success(live)
+        let gate = Gate()
+        client.modulesGate = gate
+        let viewModel = BrainHomeViewModel(client: client, cache: cache, onAPIError: { _ in })
+        viewModel.showSavedCopy()
+        XCTAssertEqual(viewModel.state, .loaded(saved))
+        let load = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        gate.open()
+        await load.value
+        XCTAssertEqual(viewModel.state, .loaded(live))
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+
+        client.modulesGate = nil
+        client.modulesResult = .failure(URLError(.notConnectedToInternet))
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .loaded(live), "a failed refresh keeps what's shown")
+        XCTAssertTrue(viewModel.isShowingCachedCopy)
+    }
+
+    func testTheHomesOfflineNoteWaitsForTheFailedFetch() async throws {
+        let cache = try makeCache()
+        let saved = [BrainModule(id: .wiki, title: "Wiki", count: 1)]
+        try BrainCache.store(saved, server: cache.server, kind: "modules", id: "", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.modulesResult = .failure(URLError(.notConnectedToInternet))
+        let gate = Gate()
+        client.modulesGate = gate
+        let viewModel = BrainHomeViewModel(client: client, cache: cache, onAPIError: { _ in })
+        let load = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertEqual(viewModel.state, .loaded(saved))
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        gate.open()
+        await load.value
+        XCTAssertEqual(viewModel.state, .loaded(saved))
+        XCTAssertTrue(viewModel.isShowingCachedCopy)
+    }
+
+    func testThePeopleHomeShowsItsSavedCopyFirst() async throws {
+        let cache = try makeCache()
+        let saved = BrainPeopleHome(due: [BrainPersonRow(id: "crm/contacts/Dara.md", title: "Dara", lastSeen: "2026-06-14")])
+        try BrainCache.store(saved, server: cache.server, kind: "people-home", id: "", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        let viewModel = BrainPeopleHomeViewModel(client: client, cache: cache)
+        viewModel.showSavedCopy()
+        XCTAssertFalse(viewModel.sections.isEmpty)
+    }
+
     func testReviewStoreIsPerServer() {
         let store = makeReviewStore()
         let a = URL(string: "https://a.example")!
@@ -793,6 +953,8 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     var pagedListGate: Gate?
     var modulesGate: Gate?
     var firstListGate: Gate?
+    var pageGate: Gate?
+    var shelfGate: Gate?
 
     var searchQueries: [String] { lock.withLock { _searchQueries } }
     var listCalls: [(tag: String?, cursor: Int?)] { lock.withLock { _listCalls } }
@@ -812,8 +974,12 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
         return try (next ?? .success(BrainList())).get()
     }
     func page(module: BrainModuleID, id: String, hub: String?) async throws -> BrainPage {
-        lock.withLock { _pageCalls.append((id, hub)) }
-        return try pageResult.get()
+        let result = lock.withLock {
+            _pageCalls.append((id, hub))
+            return pageResult
+        }
+        if let gate = pageGate { await gate.pass() }
+        return try result.get()
     }
     func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult {
         lock.withLock { _searchQueries.append(query) }
@@ -839,6 +1005,7 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
             _shelfCalls.append(kind)
             return shelfResults[kind]
         }
+        if let gate = shelfGate { await gate.pass() }
         return try (result ?? .success(BrainShelf(kind: kind.rawValue))).get()
     }
     var logResult: Result<BrainPersonLogResult, Error> = .success(BrainPersonLogResult())

@@ -52,32 +52,37 @@ struct InsightsView: View {
             }
     }
 
-    @ViewBuilder
-    private var content: some View {
-        if viewModel.isLoading && !viewModel.hasLoadedAnalytics {
-            ProgressView("Loading usage...")
-        } else if let errorMessage = viewModel.errorMessage, !viewModel.hasLoadedAnalytics {
-            ContentUnavailableView {
-                Label("Could Not Load Usage", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(errorMessage)
-            } actions: {
-                Button("Try Again") {
-                    Task { await loadInsights() }
-                }
-            }
-        } else if !viewModel.hasLoadedAnalytics {
-            ContentUnavailableView {
-                Label("No Data", systemImage: "chart.bar")
-            } description: {
-                Text("Session usage data will appear here once you have conversations.")
-            }
-        } else {
-            loadedContent
-        }
+    /// Which of the screen's states is up. `.hxLoadSwap` crossfades on this,
+    /// never on the figures, so a refresh with new numbers doesn't fade the page.
+    private enum Phase: Hashable {
+        case loading, failed, loaded
     }
 
-    private var loadedContent: some View {
+    /// Nothing loaded and nothing failed reads as loading: the first frame lands
+    /// before `.task` starts the load, and it must not flash an empty state.
+    private var phase: Phase {
+        if viewModel.hasLoadedAnalytics { return .loaded }
+        if viewModel.errorMessage != nil, !viewModel.isLoading { return .failed }
+        return .loading
+    }
+
+    private var content: some View {
+        Group {
+            switch phase {
+            case .failed:
+                HXFailedView(title: String(localized: "Couldn't load usage"), message: viewModel.errorMessage) {
+                    Task { await loadInsights() }
+                }
+            case .loading, .loaded:
+                scrollContent
+            }
+        }
+        .hxLoadSwap(phase)
+    }
+
+    /// The limits and the window picker hold their place from the first frame;
+    /// only the analytics under them swap from placeholder to figures.
+    private var scrollContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if viewModel.showsLimits {
@@ -94,45 +99,11 @@ struct InsightsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                if viewModel.dataSource != .server {
-                    SectionCard {
-                        Label {
-                            Text(viewModel.sourceDescription)
-                                .font(AppFont.caption())
-                                .fixedSize(horizontal: false, vertical: true)
-                        } icon: {
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundStyle(.hxWarning)
-                        }
-                    }
+                if viewModel.hasLoadedAnalytics {
+                    loadedAnalytics
+                } else {
+                    UsageAnalyticsPlaceholder()
                 }
-
-                UsageChartCard(
-                    buckets: viewModel.chartBuckets,
-                    metric: $viewModel.metric,
-                    showsMetricToggle: viewModel.showsMetricToggle,
-                    windowTotal: viewModel.heroFigure,
-                    hourlyNote: viewModel.hourlyChartNote,
-                    chartAccessibilityLabel: viewModel.chartAccessibilityLabel
-                )
-
-                UsageTotalsGrid(cells: viewModel.totalsCells)
-
-                if !viewModel.modelBreakdowns.isEmpty {
-                    UsageModelsCard(
-                        models: viewModel.modelBreakdowns,
-                        hasCost: viewModel.estimatedCost > 0
-                    )
-                }
-
-                if !viewModel.topSessions.isEmpty {
-                    UsageTopSessionsCard(sessions: viewModel.topSessions)
-                }
-
-                Text(viewModel.sourceDescription)
-                    .font(AppFont.caption())
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -140,6 +111,49 @@ struct InsightsView: View {
         .refreshable {
             await refresh()
         }
+    }
+
+    @ViewBuilder
+    private var loadedAnalytics: some View {
+        if viewModel.dataSource != .server {
+            SectionCard {
+                Label {
+                    Text(viewModel.sourceDescription)
+                        .font(AppFont.caption())
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.hxWarning)
+                }
+            }
+        }
+
+        UsageChartCard(
+            buckets: viewModel.chartBuckets,
+            metric: $viewModel.metric,
+            showsMetricToggle: viewModel.showsMetricToggle,
+            windowTotal: viewModel.heroFigure,
+            hourlyNote: viewModel.hourlyChartNote,
+            chartAccessibilityLabel: viewModel.chartAccessibilityLabel
+        )
+
+        UsageTotalsGrid(cells: viewModel.totalsCells)
+
+        if !viewModel.modelBreakdowns.isEmpty {
+            UsageModelsCard(
+                models: viewModel.modelBreakdowns,
+                hasCost: viewModel.estimatedCost > 0
+            )
+        }
+
+        if !viewModel.topSessions.isEmpty {
+            UsageTopSessionsCard(sessions: viewModel.topSessions)
+        }
+
+        Text(viewModel.sourceDescription)
+            .font(AppFont.caption())
+            .foregroundStyle(.hxSecondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// An explicit refresh gesture: the toolbar button and pull-to-refresh. Only
@@ -157,5 +171,35 @@ struct InsightsView: View {
         if let lastError = viewModel.lastError {
             onAPIError(lastError)
         }
+    }
+}
+
+/// The chart and totals cards with sample figures, redacted, while the first
+/// window loads, so the real cards land where these stood. Static: nothing here
+/// animates or repaints, and VoiceOver hears one "Loading usage".
+private struct UsageAnalyticsPlaceholder: View {
+    private static let cells = [
+        UsageTotalsCell(id: "sessions", label: "Sessions", value: "128", detail: nil),
+        UsageTotalsCell(id: "messages", label: "Messages", value: "2,400", detail: nil),
+        UsageTotalsCell(id: "input", label: "Input tokens", value: "1.2M", detail: nil),
+        UsageTotalsCell(id: "output", label: "Output tokens", value: "340K", detail: nil),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            UsageChartCard(
+                buckets: [],
+                metric: .constant(.tokens),
+                showsMetricToggle: false,
+                windowTotal: UsageHeroFigure(label: "Tokens", value: "1,234,567", caption: "Last 30 days"),
+                hourlyNote: nil,
+                chartAccessibilityLabel: ""
+            )
+            UsageTotalsGrid(cells: Self.cells)
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Loading usage"))
     }
 }

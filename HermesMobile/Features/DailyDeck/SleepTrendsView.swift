@@ -166,7 +166,7 @@ private struct SleepTrendChart: View {
                 }
             }
         }
-        .sensoryFeedback(.selection, trigger: selected?.date)
+        .hxSensoryFeedback(.selection, trigger: selected?.date)
         .accessibilityElement()
         .accessibilityLabel(Text(verbatim: "\(metric.title) chart"))
         .accessibilityValue(Text(verbatim: average.map { "Average \(metric.format($0)), \(points.count) bars" } ?? ""))

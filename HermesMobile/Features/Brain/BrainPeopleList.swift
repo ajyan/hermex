@@ -181,10 +181,18 @@ final class BrainPeopleHomeViewModel {
         self.now = now
     }
 
+    /// Shows the saved copy, with today's day math, while nothing is on screen, so the Brain home's
+    /// Today and the People list don't shift when the server answers.
+    func showSavedCopy() {
+        guard sections.isEmpty, let saved = cache.load(BrainPeopleHome.self, kind: Self.cacheKind, id: "") else { return }
+        show(saved)
+    }
+
     /// Offline, the saved copy is shown again with today's day math, so its "6d" and birthdays move on too.
     func load() async {
         generation += 1
         let token = generation
+        showSavedCopy()
         do {
             let home = try await client.peopleHome()
             guard !Task.isCancelled, token == generation else { return }
@@ -201,7 +209,8 @@ final class BrainPeopleHomeViewModel {
     }
 
     private func show(_ home: BrainPeopleHome) {
-        sections = BrainPeopleLayout.sections(home, today: now())
+        let next = BrainPeopleLayout.sections(home, today: now())
+        if next != sections { sections = next }
     }
 }
 

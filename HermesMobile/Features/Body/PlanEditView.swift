@@ -272,7 +272,7 @@ private struct PlanExerciseRow: View {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityHint(Text(verbatim: isOpen ? "Closes the editor" : "Edits this exercise"))
             if isOpen { editor }
         }
@@ -297,8 +297,9 @@ private struct PlanExerciseRow: View {
                 Text(verbatim: "Remove from \(PlanEditCopy.dayTitle(day))")
                     .font(AppFont.body())
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .foregroundStyle(Color.hxDanger)
         }
         .padding(.leading, 4)

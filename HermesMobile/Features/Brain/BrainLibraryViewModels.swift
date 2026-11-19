@@ -129,10 +129,22 @@ final class BrainHomeViewModel {
         reviewIndex = min(max(saved.index, 0), max(reviewPages.count - 1, 0))
     }
 
+    /// Shows the device's copy of the module list while none is on screen, so the home opens on it
+    /// instead of a placeholder. The fetch that follows replaces it; only a failed one says it's a saved copy.
+    func showSavedCopy() {
+        guard modules.isEmpty, let cached = cache.load([BrainModule].self, kind: "modules", id: ""), !cached.isEmpty
+        else { return }
+        modules = cached
+        state = .loaded(cached)
+    }
+
     func load() async {
         generation += 1
         let token = generation
-        if modules.isEmpty { state = .loading }
+        if modules.isEmpty {
+            showSavedCopy()
+            if modules.isEmpty { state = .loading }
+        }
         let day = today()
         // The batch to ask for: today's saved one, or, when the last deck came from a server whose
         // day differs from the phone's, the one saved under that day.
@@ -148,8 +160,13 @@ final class BrainHomeViewModel {
         do {
             let fetched = try await client.modules()
             guard !Task.isCancelled, token == generation else { return }
-            modules = fetched
-            state = .loaded(fetched)
+            // The saved copy usually matches; leave the screen alone when it does.
+            if fetched != modules {
+                modules = fetched
+                state = .loaded(fetched)
+            } else if state.phase != .loaded {
+                state = .loaded(fetched)
+            }
             isShowingCachedCopy = false
             modulesLanded = true
             cache.store(fetched, kind: "modules", id: "")
@@ -159,9 +176,8 @@ final class BrainHomeViewModel {
             guard !Task.isCancelled, token == generation else { return }
             if brainIsNotFound(error) {
                 state = .unavailable
-            } else if let cached = cache.load([BrainModule].self, kind: "modules", id: "") {
-                modules = cached
-                state = .loaded(cached)
+            } else if !modules.isEmpty {
+                // The saved copy shown while it loaded, or the last list: either way no longer current.
                 isShowingCachedCopy = true
             } else {
                 state = .failed(error.localizedDescription)
@@ -232,6 +248,12 @@ final class BrainListViewModel {
     /// Journal only: the calendar's days, grown as each older page lands.
     private(set) var journal = BrainJournalIndex()
     private(set) var isShowingCachedCopy = false
+    /// True while `list` is the device's saved copy rather than a page the server sent: shown while the
+    /// first fetch runs, and kept when it fails. Paging waits for a live list.
+    private var listIsSaved = false
+    /// True once a first-page fetch has answered (live or failed). A load cancelled before then leaves
+    /// it false, so the screen loads again on its next appear even with the saved copy showing.
+    private(set) var hasFetched = false
     private(set) var isLoadingMore = false
     /// True while a first-page load is in flight; `loadMore` waits it out.
     private(set) var isLoading = false
@@ -250,6 +272,8 @@ final class BrainListViewModel {
             list = nil
             state = .loading
             isShowingCachedCopy = false
+            listIsSaved = false
+            hasFetched = false
             isLoadingMore = false
             loadMoreFailed = false
             isLoading = true
@@ -279,6 +303,13 @@ final class BrainListViewModel {
 
     private var cacheKind: String { "list:\(module.rawValue)" }
 
+    /// Shows the device's copy of the first page while nothing is on screen, so the list opens on it
+    /// instead of a placeholder. The fetch that follows replaces it; only a failed one says it's a saved copy.
+    func showSavedCopy() {
+        guard list == nil, let cached = cache.load(BrainList.self, kind: cacheKind, id: selectedTag ?? "") else { return }
+        apply(cached, saved: true)
+    }
+
     func load() async {
         generation += 1
         let token = generation
@@ -287,25 +318,32 @@ final class BrainListViewModel {
         isLoading = true
         defer { if token == generation { isLoading = false } }
         let tag = selectedTag
-        if list == nil { state = .loading }
+        if list == nil {
+            showSavedCopy()
+            if list == nil { state = .loading }
+        }
         do {
             let fetched = try await client.list(module: module, tag: tag, cursor: nil)
             guard !Task.isCancelled, token == generation else { return }
             isLoading = false
-            apply(fetched, cached: false)
+            hasFetched = true
+            apply(fetched, saved: false)
             cache.store(fetched, kind: cacheKind, id: tag ?? "")
         } catch is CancellationError {
             // The screen went away; nothing to update.
         } catch {
             guard !Task.isCancelled, token == generation else { return }
             isLoading = false
-            if list != nil, !isShowingCachedCopy, !brainIsNotFound(error) {
+            hasFetched = true
+            if list != nil, !listIsSaved, !brainIsNotFound(error) {
                 // A failed refresh keeps the pages already shown rather than dropping to the cache.
                 loads += 1
             } else if brainIsNotFound(error) {
                 state = .unavailable
-            } else if let cached = cache.load(BrainList.self, kind: cacheKind, id: tag ?? "") {
-                apply(cached, cached: true)
+            } else if list != nil {
+                // The saved copy shown while it loaded stays, now marked as one.
+                isShowingCachedCopy = true
+                loads += 1
             } else {
                 state = .failed(error.localizedDescription)
             }
@@ -316,7 +354,7 @@ final class BrainListViewModel {
     /// Appends the next page; a no-op without a cursor, while a page is in flight,
     /// or while a first-page load is running.
     func loadMore() async {
-        guard !isLoading, !isLoadingMore, !isShowingCachedCopy,
+        guard !isLoading, !isLoadingMore, !listIsSaved,
               let cursor = list?.nextCursor else { return }
         let token = generation
         isLoadingMore = true
@@ -336,11 +374,16 @@ final class BrainListViewModel {
         }
     }
 
-    private func apply(_ value: BrainList, cached: Bool) {
-        if module == .journal { journal = BrainJournalIndex(items: value.items) }
-        list = value
-        state = .loaded(value)
-        isShowingCachedCopy = cached
+    /// Shows `value`, a live first page or the saved copy. A live page matching the saved copy
+    /// leaves the screen alone; `loads` still moves so paging starts from the live cursor.
+    private func apply(_ value: BrainList, saved: Bool) {
+        if value != list || state.phase != .loaded {
+            if module == .journal { journal = BrainJournalIndex(items: value.items) }
+            list = value
+            state = .loaded(value)
+        }
+        listIsSaved = saved
+        isShowingCachedCopy = false
         loads += 1
     }
 
@@ -456,6 +499,9 @@ final class BrainPageViewModel {
     private(set) var readerLayout: BrainReaderPageLayout?
     private(set) var isShowingCachedCopy = false
     private(set) var isMissing = false
+    /// True once a fetch has answered (live or failed). A load cancelled before then leaves it false, so
+    /// the reader loads again on its next appear even with the saved copy showing.
+    private(set) var hasFetched = false
 
     private let client: any BrainDataClient
     private let cache: BrainCacheHandle
@@ -526,17 +572,39 @@ final class BrainPageViewModel {
     /// pager, which must not show when the same page is opened from search.
     private var cacheID: String { hub.map { "\(id)#hub=\($0)" } ?? id }
 
+    /// Shows the device's copy of the page while none is on screen, so the reader (and the zoom into it)
+    /// opens on the page instead of a placeholder. In a hub, its own copy first, then the page's plain
+    /// copy; outside one, never a hub's. The fetch that follows replaces it; only a failed one says it's
+    /// a saved copy.
+    func showSavedCopy() {
+        guard page == nil,
+              let cached = cache.load(BrainPage.self, kind: "page", id: cacheID)
+                ?? (hub == nil ? nil : cache.load(BrainPage.self, kind: "page", id: id))
+        else { return }
+        page = cached
+        state = .loaded(cached)
+    }
+
     func load() async {
         generation += 1
         let token = generation
-        if page == nil { state = .loading }
+        if page == nil {
+            showSavedCopy()
+            if page == nil { state = .loading }
+        }
         do {
             let fetched = try await client.page(module: module, id: id, hub: hub)
             guard !Task.isCancelled, token == generation else { return }
-            page = fetched
-            state = .loaded(fetched)
+            // The saved copy usually matches; leave the page and its layout alone when it does.
+            if fetched != page {
+                page = fetched
+                state = .loaded(fetched)
+            } else if state.phase != .loaded {
+                state = .loaded(fetched)
+            }
             isShowingCachedCopy = false
             isMissing = false
+            hasFetched = true
             cache.store(fetched, kind: "page", id: cacheID)
         } catch is CancellationError {
             // The screen went away; nothing to update.
@@ -544,11 +612,9 @@ final class BrainPageViewModel {
             guard !Task.isCancelled, token == generation else { return }
             let notFound = brainIsNotFound(error)
             isMissing = notFound
-            // In a hub, its own copy first, then the page's plain copy; outside one, never a hub's.
-            if let cached = cache.load(BrainPage.self, kind: "page", id: cacheID)
-                ?? (hub == nil ? nil : cache.load(BrainPage.self, kind: "page", id: id)) {
-                page = cached
-                state = .loaded(cached)
+            hasFetched = true
+            if page != nil {
+                // The saved copy shown while it loaded, or the last page: either way no longer current.
                 isShowingCachedCopy = true
             } else if notFound {
                 state = .failed(String(localized: "This page moved or was removed"))

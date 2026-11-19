@@ -218,6 +218,7 @@ struct GoalCommitmentWeek: View {
     var isLastWeek = false
     var metrics: GoalDotMetrics = .standard
     var stacked = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let name = GoalsCopy.shortName(row.action)
@@ -288,6 +289,8 @@ struct GoalCommitmentWeek: View {
                 .foregroundStyle(paper.glow)
                 .monospacedDigit()
                 .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.numericText())
+                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: pips.count)
         }
     }
 

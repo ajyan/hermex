@@ -58,9 +58,9 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
             .accessibilityAction(named: Text(verbatim: "Next Card")) { advance(width: width) }
             .accessibilityAction(named: Text(verbatim: "Previous Card")) { retreat(width: width) }
         }
-        .sensoryFeedback(.impact(weight: .light), trigger: currentID)
-        .sensoryFeedback(.selection, trigger: fanPick) { old, new in old != nil && new != nil }
-        .sensoryFeedback(.impact(weight: .medium), trigger: fanPick == nil) { _, stacked in !stacked }
+        .hxSensoryFeedback(.impact(weight: .light), trigger: currentID)
+        .hxSensoryFeedback(.selection, trigger: fanPick) { old, new in old != nil && new != nil }
+        .hxSensoryFeedback(.impact(weight: .medium), trigger: fanPick == nil) { _, stacked in !stacked }
     }
 
     private var currentID: Page.ID? {

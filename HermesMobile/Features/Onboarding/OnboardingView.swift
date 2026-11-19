@@ -69,7 +69,7 @@ struct OnboardingView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if isEditingConnectionField {
                 keyboardActionBar
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
             }
         }
         .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: isEditingConnectionField)

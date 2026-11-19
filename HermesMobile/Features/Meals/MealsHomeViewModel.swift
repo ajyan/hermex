@@ -42,6 +42,9 @@ final class MealsHomeViewModel {
     private(set) var saveError: String?
     /// Set once Eating it has logged tonight, for the rating sheet.
     var logDraft: MealsLogDraft?
+    /// Counts nights Eating it has logged (not ratings or Not eaten), so the screen plays the
+    /// success haptic as each one lands.
+    private(set) var landedLogs = 0
     /// The dish library for the picker, loaded on first use.
     private(set) var library: [MealsDish]?
 
@@ -85,6 +88,7 @@ final class MealsHomeViewModel {
         let request = MealsLogRequest(day: home.day, today: home.day, servings: tonight.servings,
                                       dishes: tonight.dishes.map { MealsLogDish(dish: $0.slug) })
         if await write({ try await self.client.log(request) }) {
+            landedLogs += 1
             logDraft = MealsLogDraft(day: home.day, servings: tonight.servings,
                                      dishes: tonight.dishes.map { MealsLogDraft.Item(dish: $0) })
         }

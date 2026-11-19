@@ -663,3 +663,72 @@ private struct HXFullCard<Content: View>: View {
         }
     }
 }
+
+// MARK: Placeholders
+
+/// Static lines standing in for text that hasn't loaded (DESIGN.md § Motion, Loading). Drawn once,
+/// never animated: a shimmer would repaint every frame and imply progress it can't measure. On a
+/// glow or wash card the lines wear the paper's wash; on neutral ground they use a system fill.
+struct HXPlaceholderLines: View {
+    /// How far each line stops short of the trailing edge, top to bottom.
+    var trailingInsets: [CGFloat] = [0, 28, 120]
+    var paper: HermexPaper?
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 10
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(trailingInsets.enumerated()), id: \.offset) { _, inset in
+                Capsule()
+                    .fill(paper?.wash ?? Color(.tertiarySystemFill))
+                    .frame(height: height)
+                    .padding(.trailing, inset)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// A module home's first frame while it loads (DESIGN.md § Module home): the Now card, a section
+/// header, and a neutral card of rows, at the homes' 16 pt gutter and spacing, so the real home
+/// lands where its placeholder stood. Pair it with `.hxLoadSwap` on the screen's state switch.
+/// `paper` is nil when the home has no single paper (Goals, Brain, Status).
+struct HXModuleHomePlaceholder: View {
+    let name: String
+    var paper: HermexPaper?
+    @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 44
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HXCard(paper.map(HXCardRole.glow) ?? .neutral, spacing: 12) {
+                    Capsule()
+                        .fill(paper?.wash ?? Color(.tertiarySystemFill))
+                        .frame(width: 96, height: 10)
+                } content: {
+                    HXPlaceholderLines(paper: paper)
+                } footer: {
+                    EmptyView()
+                }
+                Capsule()
+                    .fill(Color(.tertiarySystemFill))
+                    .frame(width: 120, height: 12)
+                    .padding(.top, 4)
+                VStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { index in
+                        if index > 0 { Divider() }
+                        HXPlaceholderLines(trailingInsets: [CGFloat(40 + index * 36)])
+                            .frame(minHeight: rowHeight)
+                            .padding(.horizontal, 16)
+                    }
+                }
+                .hxCard()
+            }
+            .padding(16)
+            .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+        .scrollDisabled(true)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Loading \(name)"))
+    }
+}

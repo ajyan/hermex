@@ -526,6 +526,145 @@ struct BrainSectionHeader: View {
     }
 }
 
+// MARK: - Loading placeholders
+
+/// A module list's first frame while it loads with no saved copy: redacted rows, cover cards or the
+/// month's grid, in the shape of what's coming (DESIGN.md § Motion), never a spinner. Static: drawn
+/// once, nothing animates. Pair it with `.hxLoadSwap` on the state switch so the list crossfades in
+/// where its placeholder stood.
+struct BrainListPlaceholder: View {
+    let module: BrainModuleID
+    /// Laid out as a row inside a `List` (under the chip bar) instead of filling the screen.
+    var inline = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private static let titles = ["A page you saved", "Something you wrote down", "A longer note from last month",
+                                 "Notes", "One more page in the list", "A short one", "Another page", "The last one"]
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: inline ? nil : .infinity, alignment: .top)
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: "Loading \(module.defaultTitle)"))
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch module {
+        case .articles, .highlights: cards
+        case .journal: month
+        case .people, .wiki, .letters: rows
+        }
+    }
+
+    /// `BrainRow`s with stand-in words, redacted, on the list's row surface, leading as the module's
+    /// rows do: a monogram for People, the module tile for Letters, nothing for the wiki.
+    private var rows: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(Self.titles.enumerated()), id: \.offset) { index, title in
+                if index > 0 { BrainHomeDivider() }
+                BrainRow(
+                    leading: { leadingMark },
+                    title: title,
+                    subtitle: "Its first line, as the list shows it",
+                    subtitleLineLimit: 1
+                )
+                .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                .padding(.vertical, BrainStyle.s)
+            }
+        }
+        .redacted(reason: .placeholder)
+        .background(inline ? Color.clear : Color.hxSurface)
+    }
+
+    @ViewBuilder
+    private var leadingMark: some View {
+        switch module {
+        case .people:
+            Circle()
+                .fill(Color(.tertiarySystemFill))
+                .frame(width: BrainStyle.thumbnailSize, height: BrainStyle.thumbnailSize)
+        case .letters:
+            BrainModuleIcon(systemName: module.symbolName)
+        default:
+            EmptyView()
+        }
+    }
+
+    /// Two rows of cover cards at the grid's columns.
+    private var cards: some View {
+        let columns = BrainListLayout.columnCount(2, dynamicType: dynamicTypeSize)
+        return VStack(spacing: BrainStyle.m) {
+            ForEach(0..<2, id: \.self) { _ in
+                HStack(alignment: .top, spacing: BrainStyle.m) {
+                    ForEach(0..<columns, id: \.self) { _ in card }
+                }
+            }
+        }
+        .padding(.horizontal, inline ? 0 : BrainStyle.l)
+        .padding(.vertical, BrainStyle.m / 2)
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Color(.tertiarySystemFill)
+                .aspectRatio(BrainStyle.coverAspectRatio, contentMode: .fit)
+            HXPlaceholderLines(trailingInsets: [0, 48])
+                .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                .padding(.vertical, BrainStyle.cardVerticalPadding)
+        }
+        .frame(maxWidth: .infinity)
+        .brainCardSurface()
+    }
+
+    /// This month's grid with no entries yet, redacted.
+    private var month: some View {
+        let today = BrainJournalCalendarLayout.todayKey(.now)
+        return VStack(alignment: .leading, spacing: BrainStyle.xl) {
+            ForEach(BrainJournalCalendarLayout.months(oldest: today, newest: today)) { month in
+                BrainJournalMonthView(month: month, entries: [:], todayKey: today, entryCount: nil)
+            }
+        }
+        .redacted(reason: .placeholder)
+        .padding(BrainStyle.l)
+        .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+    }
+}
+
+/// A page's first frame while it loads with no saved copy: a title, a meta line and two paragraphs,
+/// at the reader's gutter and width. Brain pages, highlight books and Prep gaps use it. Static, like
+/// `HXPlaceholderLines`; pair it with `.hxLoadSwap`.
+struct BrainPagePlaceholder: View {
+    /// What VoiceOver hears: "Loading page", "Loading lesson".
+    var label = "Loading page"
+    @ScaledMetric(relativeTo: .title) private var titleHeight: CGFloat = 22
+    @ScaledMetric(relativeTo: .caption) private var metaHeight: CGFloat = 10
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.l) {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                Capsule()
+                    .fill(Color(.tertiarySystemFill))
+                    .frame(height: titleHeight)
+                    .padding(.trailing, 72)
+                Capsule()
+                    .fill(Color(.tertiarySystemFill))
+                    .frame(width: 140, height: metaHeight)
+            }
+            HXPlaceholderLines(trailingInsets: [0, 0, 24, 0, 120])
+                .padding(.top, BrainStyle.s)
+            HXPlaceholderLines(trailingInsets: [0, 16, 0, 88])
+        }
+        .padding(BrainStyle.l)
+        .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: label))
+    }
+}
+
 #if DEBUG
 #Preview("Rows, cards, chips") {
     let items = [

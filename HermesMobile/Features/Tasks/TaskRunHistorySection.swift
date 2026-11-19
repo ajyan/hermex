@@ -42,7 +42,7 @@ struct TaskRunHistorySection: View {
                         } label: {
                             TaskRunHistoryRow(run: run, hasFailed: isFailedRun(run))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.chatTactile(.card))
                     }
 
                     if canLoadMore {

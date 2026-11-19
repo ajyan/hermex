@@ -34,7 +34,7 @@ struct PrepMockSection: View {
                                         : PrepMockCopy.ladderLine(row.ladder),
                                     trailing: row.ladder.lastScore.map { "Last \(PrepMockCopy.score($0))" })
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.chatTactile(.card))
                         }
                     }
                 }
@@ -175,7 +175,7 @@ struct PrepMockBriefView: View {
                                     subtitle: result.ts.map { BrainStyle.displayDate($0) },
                                     trailing: result.score.map(PrepMockCopy.score))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.chatTactile(.card))
                         }
                     }
                 }

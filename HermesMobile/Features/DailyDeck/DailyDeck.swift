@@ -1346,6 +1346,8 @@ struct DailyDeckStore {
     func workspace(for server: URL) -> String? { defaults.string(forKey: key("workspace", server)) }
 
     func setWorkspace(_ path: String?, for server: URL) {
+        // Another workspace's deck copy would open as this one's brief (DailyDeckViewModel.load).
+        if path != workspace(for: server) { defaults.removeObject(forKey: key("deckCopy", server)) }
         defaults.set(path, forKey: key("workspace", server))
         defaults.removeObject(forKey: key("session", server))
     }

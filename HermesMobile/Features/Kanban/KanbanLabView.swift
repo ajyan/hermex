@@ -136,6 +136,7 @@ struct KanbanFiltersDraft {
 
 struct KanbanStatusFocusView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: KanbanFeatureState
     @State private var showsFilters = false
     @State private var showsBoardManagement = false
@@ -1093,8 +1094,15 @@ struct KanbanStatusFocusView: View {
     }
 
     private var cardList: some View {
-        List {
-            if model.showsBoardLoadingRow {
+        let visibleCards = model.visibleCards
+        var ids = Hasher()
+        for card in visibleCards { ids.combine(card.cardID) }
+        let cardIDs = ids.finalize()
+        return List {
+            // Only with no Card on screen. Over stale Cards (a filter change) the Board
+            // picker shows the spinner instead, so the rows don't shift down and back; with
+            // none matching, this row stands in for an empty state that isn't final yet.
+            if model.showsBoardLoadingRow, model.snapshot == nil || visibleCards.isEmpty {
                 HStack {
                     Spacer()
                     ProgressView("Refreshing Board")
@@ -1103,8 +1111,7 @@ struct KanbanStatusFocusView: View {
                 .listRowSeparator(.hidden)
             }
 
-            let visibleCards = model.visibleCards
-            if model.isRefreshing, model.snapshot == nil {
+            if model.showsBoardLoadingRow, model.snapshot == nil || visibleCards.isEmpty {
                 EmptyView()
             } else if visibleCards.isEmpty {
                 emptyContent
@@ -1126,6 +1133,13 @@ struct KanbanStatusFocusView: View {
                 }
             }
         }
+        // Cards leaving or joining the list (a Status or filter change, a live update)
+        // slide on `swap`. Keyed on a hash of the IDs alone, so a Card whose fields change in
+        // place doesn't animate the list; search results snap so typing stays immediate.
+        .animation(
+            model.searchText.isEmpty ? HXMotion.swap(reduceMotion: reduceMotion) : nil,
+            value: cardIDs
+        )
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .refreshable { await model.refresh() }
@@ -1407,10 +1421,19 @@ struct KanbanStatusFocusView: View {
                         .foregroundStyle(Color.hxTextPrimary)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    Image(systemName: "chevron.down")
-                        .font(AppFont.caption2())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .layoutPriority(1)
+                    // A refetch under new filters keeps the stale Cards on screen, so the
+                    // picker carries the spinner in the chevron's place (no width change).
+                    if model.showsBoardLoadingRow, model.snapshot != nil {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .layoutPriority(1)
+                            .accessibilityLabel(Text("Refreshing Board"))
+                    } else {
+                        Image(systemName: "chevron.down")
+                            .font(AppFont.caption2())
+                            .foregroundStyle(.hxSecondary)
+                            .layoutPriority(1)
+                    }
                 }
                 .frame(maxWidth: boardPickerMaxWidth, minHeight: 44)
             }

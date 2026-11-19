@@ -195,6 +195,33 @@ enum AppHaptics {
     static let streamingPulseIsEnabledKey = "appHaptics.streamingPulse.isEnabled"
 }
 
+extension View {
+    /// `.sensoryFeedback` behind Settings' Haptic Feedback switch. Use it instead of calling
+    /// `.sensoryFeedback` directly, which plays whatever the setting says.
+    func hxSensoryFeedback<T: Equatable>(_ feedback: SensoryFeedback, trigger: T,
+                                         condition: @escaping (T, T) -> Bool = { _, _ in true }) -> some View {
+        modifier(HXSensoryFeedback(trigger: trigger) { old, new in condition(old, new) ? feedback : nil })
+    }
+
+    /// The form that picks the feedback from the change, or none.
+    func hxSensoryFeedback<T: Equatable>(trigger: T,
+                                         _ feedback: @escaping (T, T) -> SensoryFeedback?) -> some View {
+        modifier(HXSensoryFeedback(trigger: trigger, feedback: feedback))
+    }
+}
+
+private struct HXSensoryFeedback<T: Equatable>: ViewModifier {
+    let trigger: T
+    let feedback: (T, T) -> SensoryFeedback?
+    @AppStorage(AppHaptics.isEnabledKey) private var isEnabled = true
+
+    func body(content: Content) -> some View {
+        content.sensoryFeedback(trigger: trigger) { old, new in
+            isEnabled ? feedback(old, new) : nil
+        }
+    }
+}
+
 enum ResponseCompletionNotifications {
     static let isEnabledKey = "responseCompletionNotifications.isEnabled"
     static let hasRequestedPermissionKey = "responseCompletionNotifications.hasRequestedPermission"

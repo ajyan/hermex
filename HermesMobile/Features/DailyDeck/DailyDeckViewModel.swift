@@ -76,6 +76,8 @@ final class DailyDeckViewModel {
     private(set) var sessionID: String?
     /// The deck on screen is this device's saved copy, shown because the server couldn't be reached.
     private(set) var isOfflineCopy = false
+    /// The deck on screen is this device's copy, shown while the server's is read: filing waits for that read.
+    private(set) var isAwaitingLiveRead = false
     private(set) var workspace: String?
     /// What was last filed for the deck on screen; nil until it is filed.
     private(set) var filedAnswers: [String: DeckAnswer]?
@@ -383,9 +385,14 @@ final class DailyDeckViewModel {
         await read(inPlace: true)
     }
 
-    /// Finds the brief's folder, then opens the deck for `date` (today on first load).
+    /// Finds the brief's folder, then opens the deck for `date` (today on first load). A deck this device
+    /// kept (today's brief, once read) shows at once and is read again in place; any other shows the placeholder.
     func load() async {
-        await read(inPlace: false)
+        if openDeviceCopy(offline: false) {
+            await read(inPlace: true)
+        } else {
+            await read(inPlace: false)
+        }
     }
 
     /// Reload from the menu: reads everything again, the journal, sleep and spending too.
@@ -394,17 +401,22 @@ final class DailyDeckViewModel {
         await load()
     }
 
-    /// Reads the deck for `date`. A load shows the spinner and falls back to the offline copy; `inPlace`
-    /// keeps what's on screen while it reads, and on any failure.
+    /// Reads the deck for `date`. A load shows the placeholder and falls back to the offline copy; `inPlace`
+    /// keeps what's on screen while it reads, and on any failure (a device copy still waiting on this read
+    /// becomes the offline copy).
     private func read(inPlace: Bool) async {
         saveDraft()
         if !inPlace {
             state = .loading
             isOfflineCopy = false
+            isAwaitingLiveRead = false
         }
         let (date, kind) = (date, kind)
         do {
-            guard let workspace = try await resolveWorkspace() else { return }
+            guard let workspace = try await resolveWorkspace() else {
+                isAwaitingLiveRead = false
+                return
+            }
             self.workspace = workspace
             let (sessionID, names) = try await sessionAndBriefs(workspace: workspace)
             self.sessionID = sessionID
@@ -424,15 +436,33 @@ final class DailyDeckViewModel {
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
-            if inPlace { return }
-            if !openOfflineCopy() { state = .failed(error.localizedDescription) }
+            if inPlace {
+                if isAwaitingLiveRead, date == self.date, kind == self.kind {
+                    isAwaitingLiveRead = false
+                    // "Offline copy" only when the server couldn't be reached; any other failure leaves the
+                    // copy up unlabelled, as a failed revalidation does.
+                    isOfflineCopy = Self.isUnreachable(error)
+                }
+                return
+            }
+            if !openDeviceCopy(offline: true) { state = .failed(error.localizedDescription) }
         }
     }
 
+    /// Whether a read failed because the server couldn't be reached, not because it answered with an error.
+    static func isUnreachable(_ error: Error) -> Bool {
+        guard let code = (error as? URLError)?.code else { return false }
+        return [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost,
+                .dnsLookupFailed, .internationalRoamingOff, .dataNotAllowed, .secureConnectionFailed].contains(code)
+    }
+
     /// Shows this device's copy of the deck asked for, when it has one (today's morning brief, once it has been
-    /// read): the cards, the filed answers and any unsent ones. Filing still needs the server.
-    private func openOfflineCopy() -> Bool {
-        guard let copy = store.deckCopy(for: server, date: date, kind: kind),
+    /// read): the cards, the filed answers and any unsent ones. `offline` when the server couldn't be reached;
+    /// otherwise it stands in while the server's deck is read, and File It waits for that read. It stands in
+    /// only once a workspace is chosen, so changing the workspace never opens the last one's brief first.
+    private func openDeviceCopy(offline: Bool) -> Bool {
+        guard offline || store.workspace(for: server) != nil,
+              let copy = store.deckCopy(for: server, date: date, kind: kind),
               let decoded = try? DailyDeck.decode(copy.deck)
         else { return false }
         filedAnswers = copy.answers.map(DeckAnswersFile.decodeAnswers)
@@ -442,7 +472,8 @@ final class DailyDeckViewModel {
         shownFiles = nil
         lastRead = nil
         show(decoded, inPlace: false)
-        isOfflineCopy = true
+        isOfflineCopy = offline
+        isAwaitingLiveRead = !offline
         return true
     }
 
@@ -542,6 +573,7 @@ final class DailyDeckViewModel {
     /// this device win over the filed copy, so leaving mid-edit loses nothing.
     private func open(_ read: ReadDeck?, inPlace: Bool) {
         isOfflineCopy = false
+        isAwaitingLiveRead = false
         lastRead = now()
         guard let read else {
             deck = nil
@@ -1339,12 +1371,16 @@ final class DailyDeckViewModel {
 
     // MARK: Filing
 
+    /// Whether File It can run: the server's deck has been read (a device copy shown first waits for it,
+    /// since filing needs the workspace) and no filing is in flight.
+    var canFile: Bool { deck != nil && workspace != nil && !isAwaitingLiveRead && filing != .filing }
+
     /// Files the answers. The server's filer does it without the model; when it leaves
     /// follow-ups for the agent, they go to a fresh session the caller opens. A server without
     /// the filer gets the whole filing as one message in a fresh session, as before. Filing
     /// again sends every answer; the server updates only what changed. Returns nil on failure.
     func file() async -> DailyDeckFilingResult? {
-        guard let deck, let workspace, filing != .filing else { return nil }
+        guard canFile, let deck, let workspace else { return nil }
         filing = .filing
         saveDraft()
         // What is sent: the user can type or open another day while it's in flight.

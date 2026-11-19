@@ -18,6 +18,9 @@ final class BodyHomeViewModel {
     /// Baki's note on the newest finished workout, for his card. Nil until it loads, and when he
     /// hasn't written one.
     private(set) var latestNote: BodyLatestNote?
+    /// The first read for Baki's note has answered (with a note, without one, or failed), so his card
+    /// can say what's there instead of standing in for it.
+    private(set) var noteLoaded = false
 
     @ObservationIgnored private let client: BodyDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
@@ -48,12 +51,18 @@ final class BodyHomeViewModel {
 
     /// Reads the newest session for Baki's note. Home doesn't carry it, and a note is written a
     /// little after its workout, so a session with none yet is read again on the next load. A
-    /// failed read leaves the card as it was.
+    /// failed read leaves the note as it was.
     private func loadLatestNote(_ newest: BodySessionSummary?, token: Int) async {
-        guard let newest else { latestNote = nil; return }
+        guard let newest else {
+            latestNote = nil
+            noteLoaded = true
+            return
+        }
         if latestNote?.session.id == newest.id { return }
-        guard let session = try? await client.session(id: newest.id), token == generation, !Task.isCancelled else { return }
-        latestNote = session.coachNote.map { BodyLatestNote(session: newest, note: $0) }
+        let session = try? await client.session(id: newest.id)
+        guard token == generation, !Task.isCancelled else { return }
+        if let session { latestNote = session.coachNote.map { BodyLatestNote(session: newest, note: $0) } }
+        noteLoaded = true
     }
 
     /// Accepts or skips a proposal. It leaves the list at once and comes back where it was if the
