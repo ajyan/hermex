@@ -9,6 +9,7 @@ struct MealsHomeView: View {
     /// The day the dish picker adds to.
     @State private var pickingFor: PickerTarget?
     @State private var planning = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let server: URL
     private let onAPIError: (Error) -> Void
     private let onOpen: (ShellPushDestination) -> Void
@@ -30,6 +31,8 @@ struct MealsHomeView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(phase)
+            .hxSensoryFeedback(.success, trigger: viewModel.landedLogs)
             .hxNavigationTitle("Meals", subtitle: MealsCopy.short(viewModel.today))
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -55,11 +58,21 @@ struct MealsHomeView: View {
             }
     }
 
+    /// Which branch shows, for `.hxLoadSwap`; never the week itself, so a refresh doesn't fade.
+    private var phase: Int {
+        switch viewModel.state {
+        case .loading: 0
+        case .loaded: 1
+        case .unavailable: 2
+        case .failed: 3
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Meals", paper: paper)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Meals on this server") } icon: { Image(systemName: "fork.knife") }
@@ -124,7 +137,7 @@ struct MealsHomeView: View {
                                 .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.chatTactile(.card))
                         .accessibilityHint(Text(verbatim: "Opens the recipe"))
                     }
                 }
@@ -145,6 +158,8 @@ struct MealsHomeView: View {
             tonightButtons(home)
                 .padding(.top, 4)
         }
+        // Eating it swaps the buttons for Logged as the server answers.
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: home.tonightLogged)
     }
 
     private func tomorrowPrep(_ lines: [String]) -> some View {
@@ -286,7 +301,7 @@ struct MealsHomeView: View {
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.capsule))
                 }
             }
         }
@@ -398,6 +413,7 @@ private struct MealsDayRow: View {
     let today: String
     let paper: HermexPaper
     let onAdd: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isToday: Bool { day.day == today }
 
@@ -463,6 +479,8 @@ private struct MealsDayRow: View {
         }
         let dot = MealsCopy.dayDot(day, today: today)
         DeckDot(state: dot, ink: paper.glow, column: 22, size: 22)
+            // A night logged lands its dot on `pop`; DeckDot's done case animates inside this transaction.
+            .animation(HXMotion.pop(reduceMotion: reduceMotion), value: dot)
             .accessibilityElement()
             .accessibilityLabel(Text(verbatim: MealsCopy.dayDotLabel(day, today: today)))
             // "Nothing planned" is already the row's words.

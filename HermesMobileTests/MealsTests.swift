@@ -162,6 +162,24 @@ final class MealsHomeViewModelTests: XCTestCase {
         XCTAssertEqual(vm.logDraft?.dishes.map(\.dish.slug), ["fish-collar", "tomato-egg"])
     }
 
+    func testOnlyALoggedNightCountsAsLanded() async throws {
+        let home = try MealsModelsTests.home()
+        let client = FakeMealsClient()
+        client.homeResults = [.success(home)]
+        client.writeResults = [.failure(URLError(.notConnectedToInternet)), .success(home)]
+        let vm = viewModel(client)
+        await vm.load()
+        await vm.eatTonight()
+        XCTAssertEqual(vm.landedLogs, 0, "a failed log lands nothing")
+        await vm.eatTonight()
+        XCTAssertEqual(vm.landedLogs, 1)
+        var draft = try XCTUnwrap(vm.logDraft)
+        draft.dishes[0].rating = 3
+        await vm.finishLog(draft)
+        await vm.unlog("2026-11-02")
+        XCTAssertEqual(vm.landedLogs, 1, "ratings and Not eaten play nothing")
+    }
+
     func testTheSheetOnlyLogsAgainWithRatingsOrNotes() async throws {
         let home = try MealsModelsTests.home()
         let client = FakeMealsClient()

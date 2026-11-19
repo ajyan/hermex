@@ -8,6 +8,7 @@ struct MealsDishView: View {
     @State private var editing = false
     @State private var linking = false
     @ScaledMetric(relativeTo: .subheadline) private var amountWidth: CGFloat = 76
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let client: MealsRecipeClient
     private let onAPIError: (Error) -> Void
@@ -28,6 +29,7 @@ struct MealsDishView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(phase)
             .hxNavigationTitle("Recipe")
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -54,11 +56,21 @@ struct MealsDishView: View {
             }
     }
 
+    /// Which branch shows, for `.hxLoadSwap`; never the recipe itself.
+    private var phase: Int {
+        switch viewModel.state {
+        case .loading: 0
+        case .loaded: 1
+        case .unavailable: 2
+        case .failed: 3
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "the recipe", paper: paper)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No recipe here") } icon: { Image(systemName: "fork.knife") }
@@ -129,10 +141,10 @@ struct MealsDishView: View {
             }
             Spacer(minLength: 8)
             stepButton("minus", label: "Fewer servings", disabled: viewModel.servings <= 1) {
-                viewModel.setServings(viewModel.servings - 1)
+                setServings(viewModel.servings - 1)
             }
             stepButton("plus", label: "More servings", disabled: viewModel.servings >= 48) {
-                viewModel.setServings(viewModel.servings + 1)
+                setServings(viewModel.servings + 1)
             }
         }
         .padding(.leading, 12)
@@ -141,6 +153,11 @@ struct MealsDishView: View {
         .glowSurface(paper, cornerRadius: HXRadius.md)
         .padding(.top, 4)
         .accessibilityElement(children: .contain)
+    }
+
+    /// The count rolls and every amount on the page rescales in the same transaction.
+    private func setServings(_ value: Int) {
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.setServings(value) }
     }
 
     private func stepButton(_ symbol: String, label: String, disabled: Bool, action: @escaping () -> Void) -> some View {
@@ -227,7 +244,7 @@ struct MealsDishView: View {
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.capsule))
                     .accessibilityLabel(Text(verbatim: "\(pairing.name), eaten together \(pairing.count) times"))
                 }
             }
@@ -324,7 +341,7 @@ struct MealsDishView: View {
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .foregroundStyle(Color.accentColor)
     }
 
