@@ -97,11 +97,7 @@ final class WorkoutFinishViewModel {
 
     /// Moves the pain score one step. The first tap from no score starts at 5.
     func stepPain(_ delta: Int) {
-        guard let score = painScore else {
-            painScore = 5
-            return
-        }
-        painScore = min(max(score + delta, 0), 10)
+        painScore = BodyPainScore.stepped(painScore, by: delta)
     }
 
     /// Finishes the workout. A failure returns to the form with the reason and everything he entered.

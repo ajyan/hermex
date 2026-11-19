@@ -1,7 +1,7 @@
 import SwiftUI
 
 // The pieces of a lift on the workout screen (board 2C). The open lift is a `training` glow card
-// drawn as several List rows (header, one row per set, the effort question, the footer) so each
+// drawn as several List rows (header, one row per set, what it asks after a set, the footer) so each
 // set can swipe to delete; `WorkoutCardPiece` (WorkoutView.swift) draws its slice of the card behind each row. Rows
 // are `Equatable` on their data and act through the view model, so a tap redraws only its row.
 
@@ -251,10 +251,18 @@ struct WorkoutColumns: DynamicProperty {
     @ScaledMetric(relativeTo: .body) var check = WorkoutLayout.checkSize
 }
 
-/// The open card's top: the name, the target and last time, why it went up, and the column labels.
+/// The open card's top: the name, the target and last time, why it went up, Baki's cue with the
+/// link to the lift's Form page, and the column labels.
 struct WorkoutCardHeader: View, Equatable {
     let lift: BodyExercise
+    /// Opens a lift's Form page, by lift id.
+    let openForm: (String) -> Void
     private var columns = WorkoutColumns()
+
+    init(lift: BodyExercise, openForm: @escaping (String) -> Void) {
+        self.lift = lift
+        self.openForm = openForm
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool { lhs.lift == rhs.lift }
 
@@ -282,6 +290,7 @@ struct WorkoutCardHeader: View, Equatable {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            WorkoutCueBlock(lift: lift) { openForm(lift.id) }
             HStack(spacing: WorkoutLayout.columnSpacing) {
                 Text(verbatim: "Set").frame(width: columns.tag, alignment: .leading)
                 Text(verbatim: "Last time").frame(maxWidth: .infinity, alignment: .leading)
@@ -298,12 +307,18 @@ struct WorkoutCardHeader: View, Equatable {
     }
 }
 
-/// An open superset's top: the lifts' names, each one's target and last time, and the column labels.
+/// An open superset's top: the lifts' names, each one's target and last time, each lift's cue on
+/// one line with its Form link, and the column labels.
 struct WorkoutPairHeader: View, Equatable {
     let lifts: [BodyExercise]
+    /// Opens a lift's Form page, by lift id.
+    let openForm: (String) -> Void
     private var columns = WorkoutColumns()
 
-    init(lifts: [BodyExercise]) { self.lifts = lifts }
+    init(lifts: [BodyExercise], openForm: @escaping (String) -> Void) {
+        self.lifts = lifts
+        self.openForm = openForm
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool { lhs.lifts == rhs.lifts }
 
@@ -326,6 +341,7 @@ struct WorkoutPairHeader: View, Equatable {
                     .foregroundStyle(paper.secondaryInk)
             }
             .fixedSize(horizontal: false, vertical: true)
+            WorkoutPairCues(lifts: lifts, openForm: openForm)
             HStack(spacing: WorkoutLayout.columnSpacing) {
                 Text(verbatim: "Set").frame(width: columns.tag, alignment: .leading)
                 Text(verbatim: "Lift · last time").frame(maxWidth: .infinity, alignment: .leading)

@@ -50,6 +50,7 @@ private final class FakeWorkoutClient: BodyDataClient, @unchecked Sendable {
     func savePlan(_ plan: BodyPlan) async throws -> BodyPlan { throw URLError(.unsupportedURL) }
     func decide(proposalID: String, accept: Bool) async throws -> BodyProposal { throw URLError(.unsupportedURL) }
     func sleepHistory() async throws -> SleepHistory? { throw URLError(.unsupportedURL) }
+    func pickCue(lift: String, index: Int) async throws -> BodyForm { throw URLError(.unsupportedURL) }
 }
 
 @MainActor
@@ -168,13 +169,17 @@ final class WorkoutViewModelTests: XCTestCase {
         vm.toggle(exercise: dbBench, set: 1)
         XCTAssertEqual(vm.current, dbBench, "a set short of the last keeps the lift open")
         vm.toggle(exercise: dbBench, set: 2)
-        XCTAssertEqual(vm.current, dips, "the last set opens the next lift")
+        XCTAssertEqual(vm.current, dbBench, "the last set stays up to ask how many more it had")
         XCTAssertTrue(exercise(vm, dbBench).sets.allSatisfy(\.done))
+        vm.setRepsLeft(2)
+        XCTAssertEqual(vm.current, dips, "the answer opens the next lift")
 
         // Unticking and reticking a set of a finished lift opens the next unfinished one, wrapping to the start.
         vm.toggle(exercise: dbBench, set: 2)
         XCTAssertFalse(exercise(vm, dbBench).sets[2].done)
+        XCTAssertNil(exercise(vm, dbBench).sets[2].left, "an unticked set forgets its reps left")
         vm.toggle(exercise: dbBench, set: 2)
+        vm.setRepsLeft(2)
         XCTAssertEqual(vm.current, dips)
         for i in dips...carry { tickAllWork(vm, i) }
         XCTAssertEqual(vm.current, curlUp, "past the last lift, the first unfinished one opens")
@@ -206,13 +211,27 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(vm.current, press)
     }
 
-    func testAccessoryNeverAsksRepsLeft() async throws {
+    func testHoldsCarriesAndTheWarmupNeverAskRepsLeft() async throws {
         let (vm, _) = try await pushVM()
-        for i in [curlUp, dbBench, dips, carry] {
+        for i in [curlUp, 3, carry] { // a hold, the warm-up's band pull-apart (reps), a carry
             vm.open(exercise: i)
             tickAllWork(vm, i)
-            XCTAssertNil(vm.effortPrompt, "\(exercise(vm, i).id) is not a big lift")
-            XCTAssertNil(exercise(vm, i).repsLeft)
+            XCTAssertNil(vm.effortPrompt, "\(exercise(vm, i).id) asks nothing")
+            XCTAssertNil(vm.askedSet)
+            XCTAssertTrue(exercise(vm, i).sets.allSatisfy { $0.left == nil })
+        }
+    }
+
+    func testAnAccessoryAsksPerSetButNeverWritesTheLiftsRepsLeft() async throws {
+        let (vm, _) = try await pushVM()
+        for i in [dbBench, dips] {
+            vm.open(exercise: i)
+            tickAllWork(vm, i)
+            XCTAssertEqual(vm.effortPrompt, i, "\(exercise(vm, i).id) asks about its last set")
+            vm.setRepsLeft(1)
+            XCTAssertEqual(exercise(vm, i).sets.last?.left, 1)
+            XCTAssertNil(exercise(vm, i).repsLeft, "only a big lift's last set feeds progression")
+            XCTAssertNil(vm.effortPrompt)
         }
     }
 
@@ -285,11 +304,14 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(exercise(vm, incline).repsLeft, 2)
         XCTAssertEqual(vm.current, press)
 
-        // An accessory finished by a swipe-delete opens the next lift.
+        // An accessory finished by a swipe-delete asks about its last set, then opens the next lift.
         vm.open(exercise: dbBench)
         vm.toggle(exercise: dbBench, set: 0)
         vm.toggle(exercise: dbBench, set: 1)
         vm.deleteSet(exercise: dbBench, set: 2)
+        XCTAssertEqual(vm.effortPrompt, dbBench, "the set he ticked last is still waiting on its answer")
+        vm.setRepsLeft(1)
+        XCTAssertEqual(exercise(vm, dbBench).sets[1].left, 1)
         XCTAssertNil(vm.effortPrompt)
         XCTAssertEqual(vm.current, dips)
     }
@@ -318,8 +340,10 @@ final class WorkoutViewModelTests: XCTestCase {
         // Finishing the second lift first opens its partner, not the lift after the superset.
         vm.open(exercise: dips + 1)
         tickAllWork(vm, dips + 1)
+        vm.setRepsLeft(2)
         XCTAssertEqual(vm.current, dips)
         tickAllWork(vm, dips)
+        vm.setRepsLeft(2)
         XCTAssertEqual(vm.current, dips + 2)
 
         vm.addRound(dips...(dips + 1))
@@ -449,7 +473,7 @@ final class WorkoutViewModelTests: XCTestCase {
         // Taps while a save is out wait for it, then go as one save of the newest state.
         vm.toggle(exercise: incline, set: 2)
         vm.setReps(6, exercise: incline, set: 2)
-        vm.setRepsLeft(2) // no question waiting: ignored
+        vm.setRepsLeft(2) // the set he just ticked
         release.yield()
         await vm.idle()
 
@@ -458,6 +482,7 @@ final class WorkoutViewModelTests: XCTestCase {
         let newest = client.saved[1].exercises[incline].sets[2]
         XCTAssertTrue(newest.done)
         XCTAssertEqual(newest.reps, 6)
+        XCTAssertEqual(newest.left, 2, "reps left saves with the set, like the tick")
         XCTAssertEqual(client.saved[1], session(vm))
         XCTAssertEqual(vm.saveStatus, .saved)
     }

@@ -238,7 +238,8 @@ enum Endpoint {
     /// `tools/gym.py`): GET home, GET `prescription?day=`, GET `session?id=` or POST a session
     /// document to save it, POST `session/finish {id, check}`, GET `sessions?before=` (a bare
     /// array), GET `lift?id=`, GET or POST `plan`, POST `proposal {id, decision}` with decision
-    /// `accept` or `skip`, and GET `sleep` (404 when there is no history).
+    /// `accept` or `skip`, GET `sleep` (404 when there is no history), and POST `cue {lift, cue}` to
+    /// pick which of a lift's cues Baki uses (it answers with the lift's form card).
     case bodyHome
     case bodyPrescription(day: String?)
     case bodySession(id: String?)
@@ -248,6 +249,7 @@ enum Endpoint {
     case bodyPlan
     case bodyProposal
     case bodySleep
+    case bodyCue
     /// The Meals screen (same fork module): GET the week around the phone's local `day`, GET the
     /// dish library, POST a week's nights, POST a logged night, POST a new dish without a recipe.
     case mealsHome(day: String)
@@ -674,6 +676,8 @@ enum Endpoint {
             return "/api/body/proposal"
         case .bodySleep:
             return "/api/body/sleep"
+        case .bodyCue:
+            return "/api/body/cue"
         case .mealsHome:
             return "/api/meals/home"
         case .mealsDishes:

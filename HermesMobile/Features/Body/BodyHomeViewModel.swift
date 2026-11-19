@@ -97,7 +97,7 @@ final class BodyHomeViewModel {
 extension BodyHome {
     init(phase: String, phaseLabel: String, starts: String?, next: BodyNext?, week: BodyWeek, sleep: BodyHomeSleep?,
          lifts: [BodyHomeLift], sessions: [BodySessionSummary], proposals: [BodyProposal], changes: [BodyChange] = [],
-         gaps: [String]) {
+         gaps: [String], watching: [BodyWatching] = []) {
         self.phase = phase
         self.phaseLabel = phaseLabel
         self.starts = starts
@@ -109,12 +109,14 @@ extension BodyHome {
         self.proposals = proposals
         self.changes = changes
         self.gaps = gaps
+        self.watching = watching
     }
 
     /// This home with `proposals` swapped in.
     func with(proposals: [BodyProposal]) -> BodyHome {
         BodyHome(phase: phase, phaseLabel: phaseLabel, starts: starts, next: next, week: week, sleep: sleep,
-                 lifts: lifts, sessions: sessions, proposals: proposals, changes: changes, gaps: gaps)
+                 lifts: lifts, sessions: sessions, proposals: proposals, changes: changes, gaps: gaps,
+                 watching: watching)
     }
 }
 
