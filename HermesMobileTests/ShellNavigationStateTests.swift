@@ -184,6 +184,16 @@ final class ShellNavigationStateTests: XCTestCase {
         XCTAssertEqual(state.path, [.body], "with no workout open it changes nothing")
     }
 
+    func testCloseWorkoutPopsAReopenedWorkoutBackToItsPage() {
+        var state = ShellNavigationState()
+        state.push(.body)
+        state.push(.bodySession("2026-11-16-push"))
+        state.push(.bodyReopen("2026-11-16-push"))
+        state.closeWorkout()
+        XCTAssertEqual(state.path, [.body, .bodySession("2026-11-16-push")],
+                       "Done on a reopened workout lands on the past workout's page")
+    }
+
     func testShowOnlyReplacesPath() {
         var state = ShellNavigationState()
         state.push(.projects)

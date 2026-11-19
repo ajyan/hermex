@@ -186,14 +186,16 @@ struct BodyTarget: Codable, Hashable, Sendable {
     }
 }
 
-/// One logged set from the lift's last session.
+/// One logged set from the lift's last session. `done` is nil on a workout saved before the
+/// server sent it, which reads as done.
 struct BodyLastSet: Codable, Hashable, Sendable {
     var weight: Double?
     var reps: Int?
     var holdS: Int?
     var distanceYd: Int?
+    var done: Bool?
 
-    private enum CodingKeys: String, CodingKey { case weight, reps, holdS = "hold_s", distanceYd = "distance_yd" }
+    private enum CodingKeys: String, CodingKey { case weight, reps, holdS = "hold_s", distanceYd = "distance_yd", done }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -201,6 +203,7 @@ struct BodyLastSet: Codable, Hashable, Sendable {
         reps = c.optional(Int.self, .reps)
         holdS = c.optional(Int.self, .holdS)
         distanceYd = c.optional(Int.self, .distanceYd)
+        done = c.optional(Bool.self, .done)
     }
 }
 
@@ -351,13 +354,17 @@ struct BodyCoachNote: Codable, Hashable, Sendable {
 }
 
 /// A workout the app saves and reads back whole: `id` is `YYYY-MM-DD-<day>`. The server stamps
-/// `phase` and `started`, and `finished` stays nil until the finish call.
+/// `phase` and `started`, and `finished` stays nil until the finish call, or until the server
+/// closes a workout left open for two hours (`autoFinished`).
 struct BodySession: Codable, Hashable, Sendable, Identifiable {
     var id: String
     var day: String
     var phase: String?
     var started: String?
     var finished: String?
+    /// The server closed it at his last set because he never tapped Finish: it has no check, and
+    /// saving it again reopens it.
+    var autoFinished = false
     var deload: Bool
     var exercises: [BodyExercise]
     /// A rough night dropped a set from each lift.
@@ -371,7 +378,7 @@ struct BodySession: Codable, Hashable, Sendable, Identifiable {
     var hurts: [BodyHurt] = []
 
     private enum CodingKeys: String, CodingKey {
-        case id, day, phase, started, finished, deload, exercises, trimmed,
+        case id, day, phase, started, finished, autoFinished = "auto_finished", deload, exercises, trimmed,
              movedHinge = "moved_hinge", check, coachNote = "coach_note", note, hurts
     }
 
@@ -402,6 +409,7 @@ struct BodySession: Codable, Hashable, Sendable, Identifiable {
         phase = c.optional(String.self, .phase)
         started = c.optional(String.self, .started)
         finished = c.optional(String.self, .finished)
+        autoFinished = c.bool(.autoFinished)
         deload = c.bool(.deload)
         exercises = c.lossy(BodyExercise.self, .exercises)
         trimmed = c.bool(.trimmed)
@@ -572,11 +580,15 @@ struct BodySessionSummary: Decodable, Hashable, Sendable, Identifiable {
     let date: String
     let minutes: Int?
     let trimmed: Bool
+    /// The server closed this workout at his last set; he never tapped Finish.
+    let autoFinished: Bool
     /// "Incline bench up to 150 lb" when a lift went up from its previous session.
     let highlight: String?
     let note: String?
 
-    private enum CodingKeys: String, CodingKey { case id, day, label, date, minutes, trimmed, highlight, note }
+    private enum CodingKeys: String, CodingKey {
+        case id, day, label, date, minutes, trimmed, autoFinished = "auto_finished", highlight, note
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -586,6 +598,7 @@ struct BodySessionSummary: Decodable, Hashable, Sendable, Identifiable {
         date = c.string(.date)
         minutes = c.optional(Int.self, .minutes)
         trimmed = c.bool(.trimmed)
+        autoFinished = c.bool(.autoFinished)
         highlight = c.optional(String.self, .highlight)
         note = c.optional(String.self, .note)
     }

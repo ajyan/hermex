@@ -91,6 +91,10 @@ final class WorkoutFinishViewModel {
         return WorkoutFinishCopy.summary(session, now: Date())
     }
 
+    /// The workout the lift-by-lift results draw once it is saved: the server's closed copy, or the
+    /// phone's own when the finish answer never came back.
+    var resultsSession: BodySession? { finishedSession ?? workout.session }
+
     /// Moves the pain score one step. The first tap from no score starts at 5.
     func stepPain(_ delta: Int) {
         guard let score = painScore else {
@@ -218,7 +222,7 @@ enum WorkoutFinishCopy {
     }
 
     /// The server's naive local timestamp, "2026-11-23T07:52:00".
-    private static func date(_ stamp: String) -> Date? {
+    static func date(_ stamp: String) -> Date? {
         stampFormatter.date(from: String(stamp.prefix(19)))
     }
 
