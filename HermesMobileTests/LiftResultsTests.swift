@@ -233,6 +233,7 @@ private final class FakeReopenClient: BodyDataClient, @unchecked Sendable {
     func savePlan(_ plan: BodyPlan) async throws -> BodyPlan { throw URLError(.unsupportedURL) }
     func decide(proposalID: String, accept: Bool) async throws -> BodyProposal { throw URLError(.unsupportedURL) }
     func sleepHistory() async throws -> SleepHistory? { throw URLError(.unsupportedURL) }
+    func pickCue(lift: String, index: Int) async throws -> BodyForm { throw URLError(.unsupportedURL) }
 }
 
 /// A workout that saved itself: the new fields decode, its page says so, and it reopens by id.

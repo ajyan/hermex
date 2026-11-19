@@ -96,16 +96,7 @@ struct WorkoutFinishView: View {
     private var painDetails: some View {
         VStack(alignment: .leading, spacing: 14) {
             question("How bad? 0 is none, 10 is the worst") {
-                HStack(spacing: 14) {
-                    stepButton(symbol: "minus", label: "Less pain", delta: -1)
-                    Text(verbatim: viewModel.painScore.map(String.init) ?? "—")
-                        .font(AppFont.display(style: .title2, weight: .bold))
-                        .foregroundStyle(paper.glow)
-                        .monospacedDigit()
-                        .frame(minWidth: 44)
-                        .accessibilityLabel(Text(verbatim: viewModel.painScore.map { "Pain \($0) out of 10" } ?? "No score yet"))
-                    stepButton(symbol: "plus", label: "More pain", delta: 1)
-                }
+                BodyPainStepper(score: viewModel.painScore) { viewModel.stepPain($0) }
             }
             question("Which lift?") {
                 Menu {
@@ -129,19 +120,6 @@ struct WorkoutFinishView: View {
                 }
             }
         }
-    }
-
-    private func stepButton(symbol: String, label: String, delta: Int) -> some View {
-        Button { viewModel.stepPain(delta) } label: {
-            Image(systemName: symbol)
-                .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(paper.glow)
-                .frame(width: 44, height: 44)
-                .background(paper.wash, in: Circle())
-                .overlay(Circle().strokeBorder(paper.edge, lineWidth: 0.5))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: label))
     }
 
     private var noteField: some View {

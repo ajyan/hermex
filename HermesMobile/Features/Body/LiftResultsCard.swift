@@ -1,18 +1,22 @@
 import SwiftUI
 
 /// One work set as a 10 pt pip in the training glow: filled when it was done at its goal, a glow
-/// ring when it was done short of it, and a separator ring when it wasn't done. The lift-by-lift
+/// ring when it was done short of it, and an empty ring when it wasn't done (a separator ring on a
+/// neutral card, the paper's edge on a glow or wash card, where a separator would vanish). The lift-by-lift
 /// results draw all three; Body home's lift rows get a yes or no per set from the server, so
-/// theirs are filled or a glow ring.
+/// theirs are filled or a glow ring. Baki's focus and watching pips are the same three marks;
+/// the focus pips beside a cue are 8 pt.
 struct BodySetPip: View {
     let state: LiftPip
+    var size: CGFloat = 10
+    @Environment(\.hxPaper) private var paper
 
     var body: some View {
         let glow = HermexPaper.training.glow
         Circle()
-            .strokeBorder(state == .notDone ? Color.hxSeparator : glow, lineWidth: 1.5)
+            .strokeBorder(state == .notDone ? (paper?.edge ?? Color.hxSeparator) : glow, lineWidth: 1.5)
             .background(Circle().fill(state == .hit ? glow : Color.clear))
-            .frame(width: 10, height: 10)
+            .frame(width: size, height: size)
     }
 }
 

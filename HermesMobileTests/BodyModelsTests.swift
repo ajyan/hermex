@@ -327,6 +327,30 @@ final class BodyModelsTests: APIClientTestCase {
         XCTAssertEqual(decisions, ["p=accept", "p=skip"])
     }
 
+    func testPickCueSendsTheLiftAndCueAndReadsTheFormBareOrWrapped() async throws {
+        var bodies: [[String: Any]] = []
+        var wrapped = false
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/body/cue")
+            if let data = apiTestBodyData(from: request),
+               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                bodies.append(object)
+            }
+            let form = #"{"lift":"reverse-lunge","setup":"s","cues":["a","b"],"picked":1,"faults":[],"feel":[],"sources":[]}"#
+            return apiTestJSONResponse(wrapped ? #"{"form":\#(form)}"# : form, for: request)
+        }
+        let body = APIClientBodyAdapter(apiClient: client)
+        let bare = try await body.pickCue(lift: "reverse-lunge", index: 1)
+        wrapped = true
+        let nested = try await body.pickCue(lift: "pull-ups", index: 0)
+        XCTAssertEqual(bodies.map { $0["lift"] as? String }, ["reverse-lunge", "pull-ups"])
+        XCTAssertEqual(bodies.map { $0["cue"] as? Int }, [1, 0])
+        XCTAssertEqual(bare.picked, 1)
+        XCTAssertEqual(bare.lift, "reverse-lunge")
+        XCTAssertEqual(nested.cues, ["a", "b"])
+    }
+
     func testSleepHistoryIsNilOn404AndDecodesOtherwise() async throws {
         let missing = APIClientBodyAdapter(apiClient: makeClient { request in
             apiTestJSONResponse(#"{"error":"no sleep history"}"#, for: request, status: 404)

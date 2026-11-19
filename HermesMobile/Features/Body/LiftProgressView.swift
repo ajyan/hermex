@@ -2,7 +2,8 @@ import Charts
 import SwiftUI
 
 /// One lift's page (board 3), pushed as `.bodyLift(id)` from a lift row on Body home: its working
-/// weight as a step line, and every session with its weight and reps.
+/// weight as a step line, the way to its Form page when it has a cue card, and every session with
+/// its weight and reps.
 struct LiftProgressView: View {
     @State private var viewModel: LiftProgressViewModel
 
@@ -54,6 +55,7 @@ struct LiftProgressView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
                     workingWeight(lift)
+                    if lift.form != nil { formRow(lift) }
                     sessions(lift)
                 }
                 .padding(BrainStyle.l)
@@ -117,6 +119,33 @@ struct LiftProgressView: View {
         .frame(height: 150)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: LiftProgressCopy.chartSummary(lift.series, unit: lift.unit)))
+    }
+
+    // MARK: Form
+
+    /// Opens the lift's Form page: setup, cues, and what goes wrong.
+    private func formRow(_ lift: BodyLift) -> some View {
+        NavigationLink(value: ShellPushDestination.bodyLiftForm(lift.id)) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: "Form")
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                    Text(verbatim: "Setup, cues, and what goes wrong")
+                        .font(AppFont.caption())
+                        .foregroundStyle(.hxSecondary)
+                }
+                Spacer(minLength: 8)
+                BodyChevron()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .hxCard()
+        .accessibilityHint(Text(verbatim: "Opens this lift's form page"))
     }
 
     // MARK: Sessions

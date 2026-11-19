@@ -31,6 +31,7 @@ private final class FakePlanClient: BodyDataClient, @unchecked Sendable {
     func sessions(before: String?) async throws -> [BodySessionSummary] { throw URLError(.unsupportedURL) }
     func decide(proposalID: String, accept: Bool) async throws -> BodyProposal { throw URLError(.unsupportedURL) }
     func sleepHistory() async throws -> SleepHistory? { throw URLError(.unsupportedURL) }
+    func pickCue(lift: String, index: Int) async throws -> BodyForm { throw URLError(.unsupportedURL) }
 }
 
 @MainActor
