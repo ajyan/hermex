@@ -362,6 +362,7 @@ struct WorkoutEffortRow: View, Equatable {
     ]
 
     private var paper: HermexPaper { .training }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -375,7 +376,7 @@ struct WorkoutEffortRow: View, Equatable {
                 title(question)
                 HStack(spacing: 8) {
                     ForEach(Self.choices, id: \.value) { choice in
-                        Button { viewModel.setRepsLeft(choice.value) } label: {
+                        Button { answer { viewModel.setRepsLeft(choice.value) } } label: {
                             Text(verbatim: choice.label).monospacedDigit().bodyTapHeight()
                         }
                         .buttonStyle(ChatDecisionButtonStyle(emphasis: after.answer == choice.value ? .primary : .secondary))
@@ -407,6 +408,11 @@ struct WorkoutEffortRow: View, Equatable {
         .padding(.vertical, 8)
     }
 
+    /// An answer can finish the lift's card: it folds as the next lift opens, the way a tick does.
+    private func answer(_ save: () -> Void) {
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion), save)
+    }
+
     private func title(_ text: String) -> some View {
         Text(verbatim: text)
             .font(AppFont.subheadline(weight: .semibold))
@@ -417,7 +423,7 @@ struct WorkoutEffortRow: View, Equatable {
     @ViewBuilder
     private var focusChoices: some View {
         ForEach(BodyFocusAnswer.allCases, id: \.self) { answer in
-            Button { viewModel.setFocusCheck(answer, exercise: exercise) } label: {
+            Button { self.answer { viewModel.setFocusCheck(answer, exercise: exercise) } } label: {
                 Text(verbatim: answer.label).bodyTapHeight()
             }
             .buttonStyle(ChatDecisionButtonStyle(emphasis: after.focusAnswer == answer ? .primary : .secondary))

@@ -173,6 +173,7 @@ struct GoalCheckInDot: View {
     var hitHeight: CGFloat = DeckDots.dot
     let isPending: Bool
     let onSelect: (GoalStatus) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -189,6 +190,8 @@ struct GoalCheckInDot: View {
 
     private var label: some View {
         DeckDot(state: state, ink: ink, column: column, size: size)
+            // The check-in lands as a mark on the tap (it shows before the server answers).
+            .animation(HXMotion.pop(reduceMotion: reduceMotion), value: state)
             .frame(height: hitHeight)
             .contentShape(Rectangle())
     }

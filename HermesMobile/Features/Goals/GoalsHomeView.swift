@@ -24,6 +24,7 @@ struct GoalsHomeView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.loadSwapPhase)
             .hxNavigationTitle("Goals")
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -48,7 +49,7 @@ struct GoalsHomeView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Goals")
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No goals on this server") } icon: { Image(systemName: "flag.checkered") }
@@ -135,7 +136,11 @@ struct GoalsHomeView: View {
     /// A goal's card, which opens the goal, with a line under it when the goal asks to be opened.
     private func goalRow(_ goal: GoalSummary, home: GoalsHome) -> some View {
         let checkIn = GoalHeroCheckIn(slug: goal.slug, home: home, model: viewModel)
-        let open = { onOpen(.goal(goal.slug)) }
+        let open = { [server] in
+            // The goal's screen wears its paper while its detail loads.
+            GoalDetailSeed.offer(goal, server: server)
+            onOpen(.goal(goal.slug))
+        }
         // Not a NavigationLink: its label would swallow the dots' taps and hide them from
         // VoiceOver. The card opens on a tap anywhere else; VoiceOver reads it as one button
         // whose actions are the check-ins.
@@ -214,7 +219,7 @@ struct GoalsHomeView: View {
             .frame(minHeight: BrainStyle.minTapTarget)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .accessibilityHint(Text(verbatim: "Lists them"))
     }
 }

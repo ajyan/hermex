@@ -190,7 +190,7 @@ struct BakiAskRow: View {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityHint(Text(verbatim: "Starts a chat with Baki"))
         }
     }

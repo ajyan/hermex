@@ -128,7 +128,7 @@ struct GoalItemRow: View {
                 .frame(minWidth: BrainStyle.minTapTarget, minHeight: BrainStyle.minTapTarget)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.capsule))
         .disabled(isPending)
         .accessibilityLabel(Text(verbatim: "Add \(row.action)"))
         .accessibilityHint(Text(verbatim: "Counts one now. Add a note or undo it right after."))
@@ -216,7 +216,7 @@ private struct GoalItemNoteField: View {
                     .frame(minHeight: BrainStyle.minTapTarget)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .disabled(isPending)
         }
         .onChange(of: focused) { _, isFocused in

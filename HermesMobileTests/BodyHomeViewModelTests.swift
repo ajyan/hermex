@@ -39,9 +39,14 @@ private final class FakeBodyClient: BodyDataClient, @unchecked Sendable {
     /// What `session(id:)` answers, by id; an id with none throws.
     var sessionsByID: [String: BodySession] = [:]
     private(set) var sessionReads = 0
+    /// When set, `session(id:)` signals `sessionStarted` and waits on it before answering.
+    var sessionGate: AsyncStream<Void>?
+    var sessionStarted: AsyncStream<Void>.Continuation?
 
     func session(id: String) async throws -> BodySession {
         lock.withLock { sessionReads += 1 }
+        sessionStarted?.yield()
+        if let sessionGate { for await _ in sessionGate { break } }
         guard let session = sessionsByID[id] else { throw URLError(.unsupportedURL) }
         return session
     }
@@ -102,6 +107,50 @@ final class BodyHomeViewModelTests: XCTestCase {
 
         await vm.load()
         XCTAssertEqual(client.sessionReads, 2, "a note already in hand isn't read again")
+    }
+
+    func testBakisCardWaitsForTheNoteReadBeforeSayingThereIsNone() async throws {
+        let client = FakeBodyClient()
+        let home = try home()
+        let newest = try XCTUnwrap(home.sessions.first)
+        client.homeResults = [.success(home)]
+        let json = #"{"id":"\#(newest.id)","day":"\#(newest.day)","exercises":[],"coach_note":{"headline":"Good work","body":["Keep the weight."]}}"#
+        client.sessionsByID[newest.id] = try PrepDecoding.decode(BodySession.self, from: Data(json.utf8))
+        let (gate, release) = AsyncStream<Void>.makeStream()
+        let (started, signal) = AsyncStream<Void>.makeStream()
+        client.sessionGate = gate
+        client.sessionStarted = signal
+        let vm = BodyHomeViewModel(client: client)
+        XCTAssertFalse(vm.noteLoaded)
+
+        let load = Task { await vm.load() }
+        for await _ in started { break }
+        XCTAssertNotNil(loaded(vm), "home shows before the note's read answers")
+        XCTAssertFalse(vm.noteLoaded, "the card stands in for the note while it is read")
+        XCTAssertNil(vm.latestNote)
+
+        release.yield()
+        await load.value
+        XCTAssertTrue(vm.noteLoaded)
+        XCTAssertEqual(vm.latestNote?.note.headline, "Good work")
+    }
+
+    func testAFailedNoteReadOrNoWorkoutsStillEndsTheWait() async throws {
+        let client = FakeBodyClient()
+        client.homeResults = [.success(try home())]
+        let vm = BodyHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertTrue(vm.noteLoaded, "a failed read says there's no note rather than waiting forever")
+        XCTAssertNil(vm.latestNote)
+
+        let empty = BodyHome(phase: "build", phaseLabel: "", starts: nil, next: nil, week: try home().week, sleep: nil,
+                             lifts: [], sessions: [], proposals: [], gaps: [])
+        let noWorkouts = FakeBodyClient()
+        noWorkouts.homeResults = [.success(empty)]
+        let fresh = BodyHomeViewModel(client: noWorkouts)
+        await fresh.load()
+        XCTAssertTrue(fresh.noteLoaded)
+        XCTAssertEqual(noWorkouts.sessionReads, 0)
     }
 
     func testNotFoundIsUnavailable() async {

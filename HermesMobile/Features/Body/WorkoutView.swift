@@ -43,6 +43,7 @@ struct WorkoutView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.loadSwapPhase)
             .hxNavigationTitle(title, subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
@@ -88,7 +89,7 @@ struct WorkoutView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Workout")
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: viewModel.sessionID == nil ? "No Body on this server" : "Workout not found") } icon: {

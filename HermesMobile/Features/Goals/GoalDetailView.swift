@@ -2,7 +2,8 @@ import SwiftUI
 
 /// One personal goal: its paper hero, one-tap check-ins for today or yesterday, daily checks,
 /// milestones, and a calendar of its days so far.
-/// Pushed as `.goal(slug)`.
+/// Pushed as `.goal(slug)`. `seed` is the goal as Goals home showed it (`GoalDetailSeed`), so the
+/// screen wears the goal's paper while the detail loads; nil from a deep link or the Brief.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
     /// The finished goal's record: the celebration sheet, then this screen, show it.
@@ -14,13 +15,15 @@ struct GoalDetailView: View {
     private let onAPIError: (Error) -> Void
     /// After a check-in, finish or reopen lands: the widget refreshes for this server.
     private let onChange: @MainActor () -> Void
+    private let seed: GoalSummary?
 
-    init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(slug: String, server: URL, seed: GoalSummary? = nil, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientGoalsAdapter(apiClient: APIClient(baseURL: server))
         let onChange: @MainActor () -> Void = { GoalsWidgetSync.refreshAfterChange(server: server) }
         self.client = client
         self.onAPIError = onAPIError
         self.onChange = onChange
+        self.seed = seed
         _viewModel = State(initialValue: GoalDetailViewModel(
             slug: slug, client: client, onAPIError: onAPIError, onChange: onChange))
     }
@@ -33,10 +36,10 @@ struct GoalDetailView: View {
                     viewModel.reopened(detail)
                 }
             } else {
-                content
+                content.hxLoadSwap(viewModel.state.loadSwapPhase)
             }
         }
-        .hxNavigationTitle(record == nil ? viewModel.navigationTitle : "Finished", subtitle: record?.subtitle)
+        .hxNavigationTitle(record == nil ? title : "Finished", subtitle: record?.subtitle)
         .background(Color.hxCanvas.ignoresSafeArea())
         .task { if record == nil { await viewModel.load() } }
         .hxSensoryFeedback(.success, trigger: viewModel.landedCheckIns)
@@ -57,11 +60,19 @@ struct GoalDetailView: View {
         }
     }
 
+    /// The goal's name, from the seed until the detail lands, so the header doesn't change under it.
+    private var title: String {
+        if case .loading = viewModel.state, let seed, !GoalsCopy.shortTitle(seed.title).isEmpty {
+            return GoalsCopy.shortTitle(seed.title)
+        }
+        return viewModel.navigationTitle
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            GoalDetailPlaceholder(seed: seed)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "Goal not found") } icon: { Image(systemName: "flag.checkered") }
@@ -254,6 +265,68 @@ struct GoalDetailView: View {
     }
 }
 
+/// Goals home's summary of the goal it last opened, handed to that goal's screen as its `seed`.
+/// Keyed by server and slug, so it never colors another server's goal; a stale one only tints
+/// the placeholder until the detail lands.
+@MainActor
+enum GoalDetailSeed {
+    private static var last: (server: URL, goal: GoalSummary)?
+
+    static func offer(_ goal: GoalSummary, server: URL) {
+        last = (server, goal)
+    }
+
+    static func summary(slug: String, server: URL) -> GoalSummary? {
+        guard let last, last.server == server, last.goal.slug == slug else { return nil }
+        return last.goal
+    }
+}
+
+/// A goal's screen before its detail lands, drawn once: the hero in the goal's paper with its name
+/// when there is a seed (neutral without one), then the check-in section's shape.
+private struct GoalDetailPlaceholder: View {
+    let seed: GoalSummary?
+    @ScaledMetric(relativeTo: .body) private var rowHeight: CGFloat = 44
+
+    var body: some View {
+        let paper = seed.map { GoalPaper.palette(for: $0).colors }
+        ScrollView {
+            VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                HXCard(paper.map(HXCardRole.glow) ?? .neutral, title: seed?.title, titleStyle: .title,
+                       spacing: BrainStyle.s) {
+                    Capsule()
+                        .fill(paper?.wash ?? Color(.tertiarySystemFill))
+                        .frame(width: 96, height: 10)
+                } content: {
+                    HXPlaceholderLines(paper: paper)
+                } footer: {
+                    EmptyView()
+                }
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    Capsule()
+                        .fill(Color(.tertiarySystemFill))
+                        .frame(width: 120, height: 12)
+                    SectionCard {
+                        VStack(spacing: 0) {
+                            ForEach(0..<2, id: \.self) { index in
+                                if index > 0 { PrepRowDivider() }
+                                HXPlaceholderLines(trailingInsets: [CGFloat(60 + index * 48)])
+                                    .frame(minHeight: rowHeight)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(BrainStyle.l)
+            .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+        .scrollDisabled(true)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Loading \(seed?.title ?? "the goal")"))
+    }
+}
+
 /// A save the server refused, said where it happened. A failed refresh is an `HXFailedView`.
 private struct GoalErrorLine: View {
     let text: String
@@ -297,6 +370,7 @@ struct GoalCheckCircle: View {
     let tint: GoalTint
     let isPending: Bool
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 32
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -318,6 +392,8 @@ struct GoalCheckCircle: View {
             }
             if isPending { ProgressView().controlSize(.small) }
         }
+        // The check-in lands as a mark the moment it's tapped (it shows before the server answers).
+        .animation(HXMotion.pop(reduceMotion: reduceMotion), value: status)
         .frame(width: side, height: side)
         .frame(width: BrainStyle.minTapTarget, height: BrainStyle.minTapTarget)
         .contentShape(Rectangle())
