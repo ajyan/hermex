@@ -41,7 +41,7 @@ struct GoalsFinishedShelf: View {
                 .accessibilityLabel(Text(verbatim: GoalsFinishedCopy.spoken(goal)))
                 .accessibilityHint(Text(verbatim: "Opens the record"))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
     }
 }
 
@@ -179,7 +179,7 @@ struct GoalsFinishedListView: View {
                 trailing: goal.headline.map { "\($0.value) \($0.label)" }
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .accessibilityHint(Text(verbatim: "Opens the record"))
     }
 }
