@@ -155,11 +155,12 @@ enum BodyHomeCopy {
         return "Baki · after \(latest.session.label), \(sessionDate(latest.session.date))"
     }
 
-    /// "Fri, Nov 27 · 52 min · one set dropped".
+    /// "Fri, Nov 27 · 52 min · one set dropped"; a workout the server closed ends "saved itself".
     static func sessionSubtitle(_ session: BodySessionSummary) -> String {
         var parts = [sessionDate(session.date)]
         if let minutes = session.minutes { parts.append("\(minutes) min") }
         if session.trimmed { parts.append("one set dropped") }
+        if session.autoFinished { parts.append("saved itself") }
         return parts.joined(separator: " · ")
     }
 

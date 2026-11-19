@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// The finish check and Baki's note (board 7), pushed from the workout's Finish button. He answers
-/// three questions and saves; the screen then waits for Baki's note, which the server writes a
-/// little later, and shows any proposals the rules raised. Done leaves for Body home.
+/// three questions and saves; the screen then shows every lift against last time, waits for Baki's
+/// note, which the server writes a little later, and shows any proposals the rules raised. Done
+/// leaves for the screen the workout was opened from.
 struct WorkoutFinishView: View {
     @State private var viewModel: WorkoutFinishViewModel
     private let onDone: () -> Void
@@ -177,6 +178,7 @@ struct WorkoutFinishView: View {
 
     @ViewBuilder
     private var saved: some View {
+        if let session = viewModel.resultsSession { LiftResultsCard(session: session) }
         Group {
             if let note = viewModel.coachNote {
                 coachCard(note)

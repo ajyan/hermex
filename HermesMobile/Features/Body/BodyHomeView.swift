@@ -365,10 +365,7 @@ struct BodyHomeView: View {
     private func setDots(_ dots: [Bool]) -> some View {
         HStack(spacing: 5) {
             ForEach(Array(dots.enumerated()), id: \.offset) { _, hit in
-                Circle()
-                    .strokeBorder(paper.glow, lineWidth: 1.5)
-                    .background(Circle().fill(hit ? paper.glow : Color.clear))
-                    .frame(width: 10, height: 10)
+                BodySetPip(state: hit ? .hit : .short)
             }
         }
         .accessibilityHidden(true)

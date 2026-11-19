@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// The live workout (board 2C), pushed as `.bodyWorkout(day)`: the rough-night and morning-hinge
-/// offers, then every lift in order. The open lift is a glow card with its sets; done lifts fold
-/// to their reps and upcoming ones to their prescription. Ticking a lift's last set opens the
-/// next. Changes save as he goes; leaving the screen or the app sends anything still waiting.
+/// The live workout (board 2C), pushed as `.bodyWorkout(day)`, or as `.bodyReopen(id)` for a saved
+/// workout opened again: the rough-night and morning-hinge offers, then every lift in order. The
+/// open lift is a glow card with its sets; done lifts fold to their reps and upcoming ones to
+/// their prescription. Ticking a lift's last set opens the next. Changes save as he goes; leaving
+/// the screen or the app sends anything still waiting.
 struct WorkoutView: View {
     @State private var viewModel: WorkoutViewModel
     @State private var showsFinish = false
@@ -20,6 +21,15 @@ struct WorkoutView: View {
         self.onAPIError = onAPIError
         self.onDone = onDone
         _viewModel = State(initialValue: WorkoutViewModel(client: client, day: day, onAPIError: onAPIError))
+    }
+
+    /// The saved workout `sessionID` opened again, pushed as `.bodyReopen(id)` from its page.
+    init(sessionID: String, server: URL, onAPIError: @escaping (Error) -> Void, onDone: @escaping () -> Void) {
+        let client = APIClientBodyAdapter(apiClient: APIClient(baseURL: server))
+        self.client = client
+        self.onAPIError = onAPIError
+        self.onDone = onDone
+        _viewModel = State(initialValue: WorkoutViewModel(client: client, sessionID: sessionID, onAPIError: onAPIError))
     }
 
     private var paper: HermexPaper { .training }
@@ -74,11 +84,13 @@ struct WorkoutView: View {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         case .unavailable:
             ContentUnavailableView {
-                Label { Text(verbatim: "No Body on this server") } icon: {
+                Label { Text(verbatim: viewModel.sessionID == nil ? "No Body on this server" : "Workout not found") } icon: {
                     Image(systemName: "figure.strengthtraining.traditional")
                 }
             } description: {
-                Text(verbatim: "This server doesn't serve Body. It needs the Body API from your hermes-webui fork.")
+                Text(verbatim: viewModel.sessionID == nil
+                    ? "This server doesn't serve Body. It needs the Body API from your hermes-webui fork."
+                    : "This server doesn't have that workout any more.")
             }
         case .failed(let message):
             HXFailedView(title: "Couldn't load the workout", message: message) {

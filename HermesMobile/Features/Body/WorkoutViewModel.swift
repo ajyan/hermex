@@ -6,8 +6,9 @@ private func workoutIsCancellation(_ error: Error) -> Bool {
 }
 
 /// The live workout (board 2C): today's prescription as a `BodySession` he ticks through at the
-/// gym. Every change saves the whole session, debounced and in order, so a slow response never
-/// lands on top of newer taps and a failed save keeps everything on the phone.
+/// gym, or a saved workout opened again by its id. Every change saves the whole session, debounced
+/// and in order, so a slow response never lands on top of newer taps and a failed save keeps
+/// everything on the phone.
 @MainActor
 @Observable
 final class WorkoutViewModel {
@@ -37,6 +38,8 @@ final class WorkoutViewModel {
 
     /// The day asked for (push, legs, pull), or nil for the next in the rotation.
     let day: String?
+    /// The saved workout this one reopens, instead of loading a prescription.
+    let sessionID: String?
 
     @ObservationIgnored private let client: BodyDataClient
     @ObservationIgnored private let debounce: Duration
@@ -58,6 +61,18 @@ final class WorkoutViewModel {
          onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.client = client
         self.day = day
+        self.sessionID = nil
+        self.debounce = debounce
+        self.onAPIError = onAPIError
+    }
+
+    /// Opens the saved workout `sessionID` again: a workout that saved itself, to add sets or say
+    /// how it went. The server reopens it on the first save.
+    init(client: BodyDataClient, sessionID: String, debounce: Duration = .milliseconds(400),
+         onAPIError: @escaping (Error) -> Void = { _ in }) {
+        self.client = client
+        self.day = nil
+        self.sessionID = sessionID
         self.debounce = debounce
         self.onAPIError = onAPIError
     }
@@ -69,8 +84,8 @@ final class WorkoutViewModel {
 
     // MARK: Load
 
-    /// Loads today's prescription once; a workout already on screen is never replaced. Today's
-    /// saved, unfinished workout comes back resumed, with its ticks.
+    /// Loads today's prescription once, or the saved workout being reopened; a workout already on
+    /// screen is never replaced. Today's saved, unfinished workout comes back resumed, with its ticks.
     func load() async {
         switch state {
         case .loaded, .unavailable: return
@@ -80,14 +95,31 @@ final class WorkoutViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            let prescription = try await client.prescription(day: day)
-            guard !Task.isCancelled else { return }
-            apply(prescription)
+            if let sessionID {
+                let saved = try await client.session(id: sessionID)
+                guard !Task.isCancelled else { return }
+                apply(saved)
+            } else {
+                let prescription = try await client.prescription(day: day)
+                guard !Task.isCancelled else { return }
+                apply(prescription)
+            }
         } catch {
             guard !workoutIsCancellation(error), !Task.isCancelled else { return }
             onAPIError(error)
             state = (error as? APIError)?.isNotFound == true ? .unavailable : .failed(error.localizedDescription)
         }
+    }
+
+    /// A saved workout opened again, with its ticks and numbers and no offers. Saving reopens it on
+    /// the server, so the phone's copy stops calling it saved-by-itself. One he finished by hand
+    /// stays closed: the server would answer every save with 409.
+    private func apply(_ saved: BodySession) {
+        var session = saved
+        if saved.finished != nil, !saved.autoFinished { saveStatus = .finished }
+        session.autoFinished = false
+        current = Self.firstUnfinished(in: session.exercises, after: -1) ?? 0
+        state = .loaded(session)
     }
 
     private func apply(_ prescription: BodyPrescription) {
@@ -447,7 +479,8 @@ final class WorkoutViewModel {
         finishError = nil
         defer { isFinishing = false }
         // An untouched fresh workout has never been saved, and finishing needs the session on the server.
-        if generation == 0, sentGeneration == 0 { generation = 1 }
+        // A reopened one is there already: untouched, it finishes as it stands and keeps its finish time.
+        if sessionID == nil, generation == 0, sentGeneration == 0 { generation = 1 }
         saveNow()
         await idle()
         switch saveStatus {

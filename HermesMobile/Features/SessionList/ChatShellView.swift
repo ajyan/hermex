@@ -698,6 +698,10 @@ struct ChatShellView: View {
             WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError,
                         onDone: { navigation.closeWorkout() })
                 .id(day ?? "next")
+        case .bodyReopen(let id):
+            WorkoutView(sessionID: id, server: server, onAPIError: authManager.handleAPIError,
+                        onDone: { navigation.closeWorkout() })
+                .id(id)
         case .meals:
             MealsHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) },
                           ask: askAtlas)

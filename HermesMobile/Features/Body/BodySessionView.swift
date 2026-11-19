@@ -1,9 +1,10 @@
 import Observation
 import SwiftUI
 
-/// One finished workout, pushed as `.bodySession(id)` from a row in Body home's Sessions: Baki's
-/// note on it, how the finish check went, and every lift with the sets that were done. A lift's
-/// row opens that lift's history.
+/// One finished workout, pushed as `.bodySession(id)` from a row in Body home's Sessions: how the
+/// finish check went, every lift set by set against the time before, and Baki's note on it. A
+/// lift's row opens that lift's history. A workout that saved itself has no check yet: it says so
+/// and offers to reopen it, and every return to this screen reads the workout again.
 struct BodySessionView: View {
     @State private var viewModel: BodySessionViewModel
 
@@ -39,9 +40,9 @@ struct BodySessionView: View {
         case .loaded(let session):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
+                    howItWent(session)
+                    LiftResultsCard(session: session, frame: .past, opensLifts: true)
                     baki(session)
-                    if let check = session.check { howItWent(check, session: session) }
-                    lifts(session)
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
@@ -72,57 +73,68 @@ struct BodySessionView: View {
         }
     }
 
-    private func howItWent(_ check: BodyCheck, session: BodySession) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HXSectionHeader(title: "How it went", trailing: WorkoutFinishCopy.summary(session, finished: session.finished, now: .now))
-            FlowRow(spacing: 8) {
-                ForEach(BodySessionCopy.checkChips(check), id: \.self) { label in
-                    HXChip(paper: paper, label: label)
+    /// The finish check as chips; for a workout that saved itself, that it did and the way back in;
+    /// for one he reopened and left, the way to carry on.
+    @ViewBuilder
+    private func howItWent(_ session: BodySession) -> some View {
+        switch BodySessionCopy.outcome(session) {
+        case .checked(let check):
+            VStack(alignment: .leading, spacing: 8) {
+                HXSectionHeader(title: "How it went", trailing: summary(session))
+                FlowRow(spacing: 8) {
+                    ForEach(BodySessionCopy.checkChips(check), id: \.self) { label in
+                        HXChip(paper: paper, label: label)
+                    }
+                }
+                if !check.note.isEmpty {
+                    // His own words about the workout: the serif is for what he wrote.
+                    Text(verbatim: check.note)
+                        .font(AppFont.serif(style: .body))
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
                 }
             }
-            if !check.note.isEmpty {
-                // His own words about the workout: the serif is for what he wrote.
-                Text(verbatim: check.note)
-                    .font(AppFont.serif(style: .body))
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 4)
+        case .savedItself:
+            VStack(alignment: .leading, spacing: 8) {
+                HXSectionHeader(title: "How it went", trailing: summary(session))
+                FlowRow(spacing: 8) {
+                    HXChip(paper: paper, symbol: "clock", label: "Saved itself")
+                }
+                footnote(BodySessionCopy.savedItselfNote(finished: session.finished))
+                reopenLink("Reopen workout", hint: "Opens the workout to add sets and finish it", id: session.id)
             }
+        case .open:
+            VStack(alignment: .leading, spacing: 8) {
+                HXSectionHeader(title: "How it went")
+                footnote(BodySessionCopy.openNote)
+                reopenLink("Continue workout", hint: "Opens the workout where you left it", id: session.id)
+            }
+        case .unchecked:
+            EmptyView()
         }
     }
 
-    private func lifts(_ session: BodySession) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HXSectionHeader(title: "Lifts")
-            VStack(spacing: 0) {
-                ForEach(Array(session.exercises.enumerated()), id: \.element.id) { offset, lift in
-                    if offset > 0 { PrepRowDivider().padding(.leading, 14) }
-                    NavigationLink(value: ShellPushDestination.bodyLift(lift.id)) {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(verbatim: lift.name)
-                                    .font(AppFont.subheadline(weight: .semibold))
-                                    .foregroundStyle(Color.hxTextPrimary)
-                                Text(verbatim: BodySessionCopy.setsLine(lift))
-                                    .font(AppFont.caption())
-                                    .monospacedDigit()
-                                    .foregroundStyle(Color.hxTextSecondary)
-                            }
-                            Spacer(minLength: 8)
-                            BodyChevron()
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 11)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                        .accessibilityElement(children: .combine)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(Text(verbatim: "Opens this lift's history"))
-                }
-            }
-            .hxCard()
+    private func summary(_ session: BodySession) -> String {
+        WorkoutFinishCopy.summary(session, finished: session.finished, now: .now)
+    }
+
+    private func footnote(_ text: String) -> some View {
+        Text(verbatim: text)
+            .font(AppFont.footnote())
+            .foregroundStyle(.hxSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 4)
+    }
+
+    /// The way back into the live workout: a neutral secondary capsule on the canvas, like the
+    /// workout's own "Finish early".
+    private func reopenLink(_ title: String, hint: String, id: String) -> some View {
+        NavigationLink(value: ShellPushDestination.bodyReopen(id)) {
+            Text(verbatim: title).bodyTapHeight()
         }
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+        .accessibilityHint(Text(verbatim: hint))
     }
 }
 
@@ -173,19 +185,39 @@ enum BodySessionCopy {
     /// "Mon, Nov 9" from the id's date.
     static func date(id: String) -> String { BodyHomeCopy.sessionDate(String(id.prefix(10))) }
 
-    /// The done work sets on one line: "115 × 8 8 7 6", "BW × 5 4 3 3", "3 sets" for holds and
-    /// carries, and "Skipped" when none were ticked.
-    static func setsLine(_ lift: BodyExercise) -> String {
-        let done = lift.workSets.filter(\.done)
-        guard !done.isEmpty else { return "Skipped" }
-        let summary = WorkoutCopy.doneSummary(lift)
-        guard BodyMeasure(lift) == .reps else { return summary }
-        let weights = Set(done.map(\.weight))
-        guard weights.count == 1, let weight = WorkoutCopy.shortWeight(unit: lift.unit, weight: done[0].weight) else {
-            return summary
-        }
-        return "\(weight) × \(summary)"
+    /// What the "How it went" section has to show for a saved workout.
+    enum Outcome: Equatable {
+        /// He finished it and answered the check.
+        case checked(BodyCheck)
+        /// The server closed it at his last set; it can be reopened.
+        case savedItself
+        /// Reopened and not finished again yet.
+        case open
+        /// Finished with no check on file: the section is left out.
+        case unchecked
     }
+
+    static func outcome(_ session: BodySession) -> Outcome {
+        if session.finished == nil { return .open }
+        if session.autoFinished { return .savedItself }
+        return session.check.map(Outcome.checked) ?? .unchecked
+    }
+
+    /// "It saved itself at your last set, 8:24 AM. Reopen it to add sets or say how it went." The
+    /// time is left out when the finish stamp doesn't read.
+    static func savedItselfNote(finished: String?, locale: Locale = .current) -> String {
+        let time = finished.flatMap(WorkoutFinishCopy.date).map { date in
+            let formatter = DateFormatter()
+            formatter.locale = locale
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            return ", \(formatter.string(from: date))"
+        } ?? ""
+        return "It saved itself at your last set\(time). Reopen it to add sets or say how it went."
+    }
+
+    /// Under a workout he reopened and left before finishing.
+    static let openNote = "This workout is open again. Finish it to say how it went, or it saves itself two hours after your last set."
 
     /// The finish check as chips: "Solid", "Lower back fine", "Shoulder blades tight", and
     /// "Pain 4 of 10" when he scored it.

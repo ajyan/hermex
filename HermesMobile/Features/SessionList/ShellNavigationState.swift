@@ -39,6 +39,8 @@ enum ShellPushDestination: Hashable {
     case bodySession(String)
     /// A workout: the given day (push, legs, pull), or the next in the rotation when nil.
     case bodyWorkout(String?)
+    /// A saved workout opened again to add sets or finish it, by session id.
+    case bodyReopen(String)
     /// Meals: tonight and the week, from the drawer or the Tonight widget.
     case meals
     /// The recipe book, from Meals.
@@ -137,9 +139,15 @@ struct ShellNavigationState: Equatable {
         path.append(destination)
     }
 
-    /// Leaves a finished workout: pops it and anything pushed over it, back to the screen it started from.
+    /// Leaves a finished workout: pops it and anything pushed over it, back to the screen it started
+    /// from (Body home, or the past workout's page it was reopened from).
     mutating func closeWorkout() {
-        guard let index = path.lastIndex(where: { if case .bodyWorkout = $0 { true } else { false } }) else { return }
+        guard let index = path.lastIndex(where: { destination in
+            switch destination {
+            case .bodyWorkout, .bodyReopen: true
+            default: false
+            }
+        }) else { return }
         path.removeSubrange(index...)
     }
 
@@ -230,7 +238,7 @@ extension ShellPushDestination {
         case .goals, .goal, .finishedGoal, .finishedGoals: "Goals"
         case .money: "Money"
         case .feedback: "Feedback"
-        case .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout: "Body"
+        case .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen: "Body"
         case .meals, .mealsBook, .mealsDish, .mealsSeason: "Meals"
         case .status, .statusTile: "Status"
         case .settings: "Settings"
@@ -344,8 +352,8 @@ extension ShellPushDestination {
         switch self {
         case .brain, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
-             .feedback, .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason,
-             .status, .statusTile, .settings: false
+             .feedback, .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen, .meals, .mealsBook, .mealsDish,
+             .mealsSeason, .status, .statusTile, .settings: false
         }
     }
 
@@ -361,8 +369,8 @@ extension ShellPushDestination {
              .brainRoute(.prep(.story(_))), .brainRoute(.prep(.gapRun(_))), .brainRoute(.prep(.lessonRun(_))): false
         case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
-             .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason,
-             .status, .statusTile, .settings: false
+             .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen, .meals, .mealsBook, .mealsDish,
+             .mealsSeason, .status, .statusTile, .settings: false
         }
     }
 }
