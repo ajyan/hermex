@@ -298,7 +298,7 @@ struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 28)
                 .id(question)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
         }
         if let traits = card.selfRatings {
             selfRatings(traits).padding(.top, 18)
@@ -351,7 +351,7 @@ struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 24)
                 .id(question)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
         }
         let written = viewModel.answer(for: card)?.text
         Button { isWriting = true } label: {
@@ -409,7 +409,7 @@ struct DeckCardView: View {
                 .padding(.top, 14)
                 .textSelection(.enabled)
                 .id(title)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
                 .accessibilityAddTraits(.isHeader)
         }
         jobBody(text, isYearAgo: isYearAgo)
@@ -431,7 +431,7 @@ struct DeckCardView: View {
                     .font(AppFont.display(style: .headline, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
                     .id(question)
-                    .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                    .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
             }
             if let traits = card.selfRatings {
                 selfRatings(traits)
@@ -897,7 +897,7 @@ struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
                 .id(shownQuestion)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel(question: shownQuestion)))

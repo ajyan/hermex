@@ -74,7 +74,7 @@ struct WeekHeldCard: View {
                     }
                 }
                 .padding(.top, 18)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
             }
             if let tiles = month?.tiles, !tiles.isEmpty {
                 MonthHighlights(tiles: tiles, palette: palette, revealed: revealed).padding(.top, 18)
