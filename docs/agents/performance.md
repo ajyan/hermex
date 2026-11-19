@@ -24,6 +24,7 @@ limit, so read the value there.
 | Live frames held during a Hermes attach are bounded, matching the host's per-session replay ring | `HermesConversation.heldFrameLimit` | `HermesConversationTests` (the flood test past `heldFrameLimit`) |
 | Signposts carry static names and integer metadata only | `PerformanceSignposts.swift` header | Review only |
 | Debug instruments compile out of Release | `HitchMeter` (`#if DEBUG`), `RenderProbe` (Release `hit` is an empty inlined stub) | `HitchMeterTests` covers the hitch math only; the Release compile-out is review only |
+| A cue diagram redraws only while its three reps play, then rests with its timeline paused; the equal frames of a hold aren't drawn again | `CueDiagramPlayback`, `CueDiagramView`, `CueDiagramCanvas.==` | `CueDiagramPlaybackTests` (three reps, then the start pose; Reduce Motion never plays). The paused timeline and the skipped hold frames are review only. |
 | No continuously repainting animation; every animation respects Reduce Motion | `AGENTS.md` § Taste | Review only. `repeatForever` has zero uses in `HermesMobile/` today. |
 
 ## Guards

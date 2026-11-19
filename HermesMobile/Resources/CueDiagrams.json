@@ -1,0 +1,415 @@
+{
+  "version": 1,
+  "viewBox": [-10, -16, 220, 216],
+  "floorY": 190,
+  "aliases": {"machine-chest-fly": "chest-fly"},
+  "lifts": {
+    "curl-up": {
+      "name": "Curl-up",
+      "cue": "Unload your head from a scale",
+      "view": "side",
+      "a": {"hip": [112, 180], "shoulder": [64, 177], "head": [42, 175], "knee": [139, 150], "ankle": [163, 182], "toe": [183, 186], "knee2": [152, 181], "ankle2": [192, 182], "toe2": [195, 162], "elbow": [90, 185], "hand": [116, 186]},
+      "b": {"shoulder": [65, 170], "head": [44, 162], "elbow": [91, 183]},
+      "props": [
+        {"type": "floor", "span": [14, 204]}
+      ],
+      "muscles": ["abs"],
+      "cues": [
+        {"type": "line", "from": [26, 190], "to": [58, 190]},
+        {"type": "arrow", "from": [40, 146], "to": [40, 128], "when": "effort"}
+      ]
+    },
+    "side-plank": {
+      "name": "Side plank",
+      "cue": "Shove the floor away with forearm",
+      "view": "side",
+      "a": {"shoulder": [58, 156], "elbow": [58, 184], "hand": [75, 187], "hip": [100, 180], "knee": [140, 180], "ankle": [180, 182], "toe": [188, 172], "head": [39, 144]},
+      "b": {"hip": [105, 166], "knee": [144, 174], "ankle": [183, 182], "toe": [191, 173], "head": [36, 147]},
+      "props": [
+        {"type": "floor", "span": [14, 204]}
+      ],
+      "muscles": ["core"],
+      "cues": [
+        {"type": "arrow", "from": [42, 166], "to": [42, 185], "when": "effort"}
+      ],
+      "foreshorten": [["elbow", "hand"], ["ankle", "toe"]]
+    },
+    "bird-dog": {
+      "name": "Bird dog",
+      "cue": "Reach your heel to the back wall",
+      "view": "side",
+      "a": {"shoulder": [140, 134], "hip": [93, 142], "head": [161, 126], "elbow": [141, 161], "hand": [140, 186], "elbow2": [141, 161], "hand2": [140, 186], "knee": [93, 182], "ankle": [53, 184], "toe": [34, 187], "knee2": [93, 182], "ankle2": [53, 184], "toe2": [34, 187]},
+      "b": {"elbow2": [168, 130], "hand2": [193, 126], "knee": [53, 142], "ankle": [13, 142], "toe": [11, 162]},
+      "props": [
+        {"type": "floor", "span": [10, 200]}
+      ],
+      "muscles": ["glute"],
+      "spine": true,
+      "cues": [
+        {"type": "line", "from": [1, 118], "to": [1, 166]},
+        {"type": "arrow", "from": [62, 121], "to": [14, 121], "when": "effort"}
+      ],
+      "swing": ["knee", "ankle", "elbow2", "hand2"]
+    },
+    "band-pull-apart": {
+      "name": "Band pull-apart",
+      "cue": "Stretch the band to your chest",
+      "view": "front",
+      "a": {"head": [100, 32], "sl": [82, 56], "pl": [90, 104], "kl": [91, 144], "al": [92, 183], "tl": [86, 187], "sr": [118, 56], "pr": [110, 104], "kr": [109, 144], "ar": [108, 183], "tr": [114, 187], "el": [80, 64], "hl": [86, 60], "er": [120, 64], "hr": [114, 60]},
+      "b": {"el": [54, 61], "hl": [29, 66], "er": [146, 61], "hr": [171, 66]},
+      "props": [
+        {"type": "floor"},
+        {"type": "band", "from": "hl", "to": "hr"}
+      ],
+      "muscles": ["upper-back"],
+      "cues": [
+        {"type": "arrow", "from": [70, 80], "to": [34, 80], "dashed": true},
+        {"type": "arrow", "from": [130, 80], "to": [166, 80], "dashed": true},
+        {"type": "dot", "at": "chest"}
+      ],
+      "foreshorten": [["sl", "el"], ["el", "hl"], ["sr", "er"], ["er", "hr"]]
+    },
+    "incline-bench": {
+      "name": "Incline bench",
+      "cue": "Push yourself away from the weight",
+      "view": "side",
+      "a": {"hip": [112, 138], "shoulder": [70, 114], "head": [51, 103], "knee": [152, 144], "ankle": [154, 183], "toe": [174, 186], "elbow": [82, 139], "hand": [82, 113]},
+      "b": {"elbow": [70, 86], "hand": [70, 60]},
+      "props": [
+        {"type": "floor"},
+        {"type": "bench", "from": [38, 111], "to": [105, 150], "posts": [0.35]},
+        {"type": "bench", "from": [105, 151], "to": [134, 151], "posts": [0.5]},
+        {"type": "dumbbell", "at": "hand"}
+      ],
+      "muscles": ["chest"],
+      "cues": [
+        {"type": "arrow", "from": [93, 108], "to": [81, 62], "dashed": true},
+        {"type": "arrow", "from": [62, 125], "to": [55, 146], "when": "effort"}
+      ]
+    },
+    "strict-press": {
+      "name": "Strict press",
+      "cue": "Aim the bar at your nose",
+      "view": "side",
+      "a": {"toe": [120, 186], "ankle": [100, 182], "knee": [100, 142], "hip": [100, 102], "shoulder": [100, 56], "head": [102, 34], "elbow": [112, 83], "hand": [115, 57]},
+      "b": {"head": [107, 35], "elbow": [101, 28], "hand": [101, 2]},
+      "props": [
+        {"type": "floor"},
+        {"type": "plate", "at": "hand"}
+      ],
+      "muscles": [["shoulder", "elbow"]],
+      "cues": [
+        {"type": "arrow", "from": [124, 52], "to": [110, 4], "dashed": true},
+        {"type": "ring", "at": "belly"}
+      ]
+    },
+    "db-bench": {
+      "name": "DB bench press",
+      "cue": "Push the bench away",
+      "view": "side",
+      "a": {"hip": [116, 128], "shoulder": [68, 128], "head": [46, 127], "knee": [154, 142], "ankle": [155, 182], "toe": [175, 186], "elbow": [78, 154], "hand": [78, 128]},
+      "b": {"elbow": [68, 100], "hand": [68, 74]},
+      "props": [
+        {"type": "floor"},
+        {"type": "bench", "from": [32, 141], "to": [126, 141], "posts": [0.15, 0.85]},
+        {"type": "dumbbell", "at": "hand"}
+      ],
+      "muscles": ["chest"],
+      "cues": [
+        {"type": "arrow", "from": [91, 122], "to": [81, 76], "dashed": true},
+        {"type": "arrow", "from": [62, 146], "to": [62, 168], "when": "effort"}
+      ]
+    },
+    "bench-dips": {
+      "name": "Bench dips",
+      "cue": "Push the bench into the floor",
+      "view": "side",
+      "a": {"hand": [78, 137], "ankle": [129, 182], "toe": [149, 186], "shoulder": [86, 84], "elbow": [81, 110], "hip": [90, 132], "head": [88, 62], "knee": [129, 142]},
+      "b": {"shoulder": [92, 109], "elbow": [65, 115], "hip": [94, 157], "head": [94, 87], "knee": [131, 142]},
+      "props": [
+        {"type": "floor"},
+        {"type": "bench", "from": [18, 143], "to": [82, 143], "posts": [0.15, 0.6]}
+      ],
+      "muscles": [["shoulder", "elbow"]],
+      "cues": [
+        {"type": "arrow", "from": [72, 150], "to": [72, 174], "when": "effort"}
+      ],
+      "solve": ["elbow", "knee"]
+    },
+    "lateral-raise": {
+      "name": "Lateral raise",
+      "cue": "Push the dumbbells out to the walls",
+      "view": "front",
+      "a": {"head": [100, 32], "sl": [82, 56], "pl": [90, 104], "kl": [91, 144], "al": [92, 183], "tl": [86, 187], "sr": [118, 56], "pr": [110, 104], "kr": [109, 144], "ar": [108, 183], "tr": [114, 187], "el": [77, 83], "hl": [74, 109], "er": [123, 83], "hr": [126, 109]},
+      "b": {"el": [54, 59], "hl": [28, 58], "er": [146, 59], "hr": [172, 58]},
+      "props": [
+        {"type": "floor"},
+        {"type": "dumbbell", "at": "hl", "r": 7},
+        {"type": "dumbbell", "at": "hr", "r": 7}
+      ],
+      "muscles": ["delts"],
+      "cues": [
+        {"type": "line", "from": [5, 36], "to": [5, 84]},
+        {"type": "line", "from": [195, 36], "to": [195, 84]},
+        {"type": "arrow", "from": [60, 106], "to": [26, 80], "dashed": true},
+        {"type": "arrow", "from": [140, 106], "to": [174, 80], "dashed": true}
+      ],
+      "swing": ["el", "hl", "er", "hr"]
+    },
+    "chest-fly": {
+      "name": "Machine chest fly",
+      "cue": "Hug a big tree",
+      "view": "front",
+      "a": {"head": [100, 64], "sl": [82, 88], "pl": [90, 136], "kl": [86, 146], "al": [86, 183], "tl": [80, 186], "el": [55, 97], "hl": [30, 90], "sr": [118, 88], "pr": [110, 136], "kr": [114, 146], "ar": [114, 183], "tr": [120, 186], "er": [145, 97], "hr": [170, 90]},
+      "b": {"el": [74, 103], "hl": [95, 102], "er": [126, 103], "hr": [105, 102]},
+      "props": [
+        {"type": "floor"},
+        {"type": "bench", "from": [74, 151], "to": [126, 151], "posts": [0.5]},
+        {"type": "handle", "at": "hl"},
+        {"type": "handle", "at": "hr"}
+      ],
+      "muscles": ["chest"],
+      "cues": [
+        {"type": "ring", "at": [100, 91], "rx": 70, "ry": 12}
+      ],
+      "foreshorten": [["sl", "el"], ["el", "hl"], ["sr", "er"], ["er", "hr"]]
+    },
+    "suitcase-carry": {
+      "name": "Suitcase carry",
+      "cue": "Walk tall between two walls",
+      "view": "front",
+      "a": {"head": [100, 32], "sl": [82, 56], "pl": [90, 104], "kl": [91, 144], "al": [92, 183], "tl": [86, 187], "sr": [118, 56], "pr": [110, 104], "kr": [109, 139], "ar": [108, 171], "tr": [113, 178], "el": [79, 84], "hl": [77, 110], "er": [121, 84], "hr": [123, 110]},
+      "b": {"kl": [91, 139], "al": [92, 171], "tl": [87, 178], "kr": [109, 144], "ar": [108, 183], "tr": [114, 187]},
+      "props": [
+        {"type": "floor"},
+        {"type": "dumbbell", "at": "hl"}
+      ],
+      "muscles": ["obliques-r"],
+      "cues": [
+        {"type": "line", "from": [56, 14], "to": [56, 150]},
+        {"type": "line", "from": [144, 14], "to": [144, 150]}
+      ],
+      "foreshorten": [["pl", "kl"], ["kl", "al"], ["pr", "kr"], ["kr", "ar"], ["al", "tl"], ["ar", "tr"]]
+    },
+    "goblet-squat": {
+      "name": "Goblet squat",
+      "cue": "Spread the floor with your feet",
+      "view": "front",
+      "a": {"head": [100, 32], "sl": [82, 56], "pl": [90, 104], "kl": [85, 144], "al": [80, 183], "tl": [72, 187], "el": [79, 84], "hl": [95, 68], "sr": [118, 56], "pr": [110, 104], "kr": [115, 144], "ar": [120, 183], "tr": [128, 187], "er": [121, 84], "hr": [105, 68]},
+      "b": {"head": [100, 78], "sl": [82, 101], "pl": [90, 146], "kl": [67, 150], "el": [79, 129], "hl": [95, 113], "sr": [118, 101], "pr": [110, 146], "kr": [133, 150], "er": [121, 129], "hr": [105, 113]},
+      "props": [
+        {"type": "floor"},
+        {"type": "dumbbell", "at": "hands", "lie": "upright"}
+      ],
+      "muscles": [["pl", "kl"], ["pr", "kr"]],
+      "cues": [
+        {"type": "arrow", "from": [64, 178], "to": [38, 178]},
+        {"type": "arrow", "from": [136, 178], "to": [162, 178]}
+      ],
+      "foreshorten": [["pl", "kl"], ["pr", "kr"], ["kl", "al"], ["kr", "ar"]]
+    },
+    "db-rdl": {
+      "name": "DB Romanian deadlift",
+      "cue": "Close a car door with your hips",
+      "view": "side",
+      "a": {"toe": [120, 186], "ankle": [100, 182], "knee": [102, 142], "hip": [100, 102], "shoulder": [100, 54], "head": [101, 32], "elbow": [102, 80], "hand": [103, 106]},
+      "b": {"knee": [96, 143], "hip": [78, 106], "shoulder": [120, 82], "head": [137, 72], "elbow": [115, 107], "hand": [108, 132]},
+      "props": [
+        {"type": "floor"},
+        {"type": "dumbbell", "at": "hand"}
+      ],
+      "muscles": [["hip", "knee"]],
+      "spine": true,
+      "cues": [
+        {"type": "line", "from": [42, 82], "to": [42, 130]},
+        {"type": "arrow", "from": [70, 106], "to": [50, 106], "when": "effort"}
+      ]
+    },
+    "split-squat": {
+      "name": "Bulgarian split squat",
+      "cue": "Back knee drops like an elevator",
+      "view": "side",
+      "a": {"ankle": [132, 182], "toe": [152, 186], "ankle2": [56, 139], "toe2": [37, 141], "hip": [106, 108], "shoulder": [113, 60], "head": [117, 39], "elbow": [112, 88], "hand": [113, 114], "knee": [126, 142], "knee2": [95, 147]},
+      "b": {"hip": [102, 138], "shoulder": [112, 91], "head": [117, 70], "elbow": [111, 119], "hand": [112, 145], "knee": [142, 143], "knee2": [80, 171]},
+      "props": [
+        {"type": "floor"},
+        {"type": "bench", "from": [18, 148], "to": [62, 148], "posts": [0.2, 0.8]},
+        {"type": "dumbbell", "at": "hand", "lie": "cross"}
+      ],
+      "muscles": [["hip", "knee"], "glute"],
+      "spine": true,
+      "cues": [
+        {"type": "arrow", "from": [98, 148], "to": [98, 181], "dashed": true},
+        {"type": "dot", "at": "knee2"}
+      ],
+      "solve": ["knee", "knee2"]
+    },
+    "reverse-lunge": {
+      "name": "Reverse lunge",
+      "cue": "Step back, drop knee straight down",
+      "view": "side",
+      "a": {"toe": [138, 186], "ankle": [118, 182], "knee": [118, 142], "hip": [118, 102], "shoulder": [118, 54], "head": [119, 32], "elbow": [118, 82], "hand": [118, 108], "knee2": [118, 142], "ankle2": [118, 182], "toe2": [138, 186]},
+      "b": {"knee": [124, 142], "hip": [84, 138], "shoulder": [92, 91], "head": [97, 69], "elbow": [92, 119], "hand": [93, 145], "knee2": [83, 178], "ankle2": [44, 168], "toe2": [50, 187]},
+      "props": [
+        {"type": "floor"},
+        {"type": "dumbbell", "at": "hand", "lie": "cross"}
+      ],
+      "muscles": [["hip", "knee"], "glute"],
+      "cues": [
+        {"type": "arrow", "from": [104, 196], "to": [52, 196], "dashed": true},
+        {"type": "arrow", "from": [64, 138], "to": [64, 160], "when": "effort"}
+      ],
+      "solve": ["knee", "knee2"]
+    },
+    "sl-glute-bridge": {
+      "name": "Single-leg glute bridge",
+      "cue": "Push the floor away through heel",
+      "view": "side",
+      "a": {"shoulder": [52, 178], "head": [30, 176], "ankle": [136, 182], "toe": [156, 186], "hip": [98, 180], "elbow": [79, 184], "hand": [105, 186], "knee": [119, 146], "knee2": [83, 143], "ankle2": [122, 153], "toe2": [127, 134]},
+      "b": {"hip": [96, 159], "knee": [133, 142], "knee2": [66, 132], "ankle2": [105, 124], "toe2": [101, 105]},
+      "props": [
+        {"type": "floor", "span": [14, 190]}
+      ],
+      "muscles": ["glute"],
+      "cues": [
+        {"type": "arrow", "from": [152, 146], "to": [152, 172], "when": "effort"}
+      ],
+      "solve": ["knee"]
+    },
+    "pallof-press": {
+      "name": "Pallof press",
+      "cue": "Press straight out, don't turn",
+      "view": "side",
+      "a": {"toe": [116, 186], "ankle": [96, 182], "knee": [96, 142], "hip": [96, 102], "shoulder": [96, 54], "head": [97, 32], "elbow": [88, 81], "hand": [113, 73]},
+      "b": {"elbow": [123, 61], "hand": [149, 63]},
+      "props": [
+        {"type": "floor"},
+        {"type": "handle", "at": "hand"}
+      ],
+      "muscles": ["core"],
+      "cues": [
+        {"type": "arrow", "from": [124, 78], "to": [160, 78], "dashed": true},
+        {"type": "ring", "at": "belly", "pulse": true}
+      ],
+      "solve": ["elbow"]
+    },
+    "wall-sit": {
+      "name": "Wall sit",
+      "cue": "Press your whole back into the wall",
+      "view": "side",
+      "a": {"shoulder": [70, 92], "hip": [70, 140], "knee": [110, 141], "ankle": [110, 182], "toe": [130, 186], "head": [71, 70], "elbow": [77, 118], "hand": [86, 100]},
+      "b": {},
+      "props": [
+        {"type": "floor"},
+        {"type": "wall", "x": 58}
+      ],
+      "muscles": [["hip", "knee"]],
+      "cues": [
+        {"type": "arrow", "from": [114, 86], "to": [88, 86], "when": "effort"}
+      ]
+    },
+    "pull-ups": {
+      "name": "Pull-ups",
+      "cue": "Pull the bar to your chest",
+      "view": "front",
+      "a": {"hl": [72, 30], "hr": [128, 30], "el": [76, 58], "er": [124, 58], "sl": [82, 88], "sr": [118, 88], "head": [100, 70], "pl": [90, 140], "pr": [110, 140], "kl": [92, 168], "kr": [108, 168], "al": [93, 194], "ar": [107, 194]},
+      "b": {"el": [59, 57], "er": [141, 57], "sl": [82, 42], "sr": [118, 42], "head": [100, 20], "pl": [90, 94], "pr": [110, 94], "kl": [92, 122], "kr": [108, 122], "al": [93, 148], "ar": [107, 148]},
+      "props": [
+        {"type": "bar", "from": [36, 30], "to": [164, 30]}
+      ],
+      "muscles": ["lats"],
+      "cues": [
+        {"type": "arrow", "from": [100, 96], "to": [100, 40], "dashed": true},
+        {"type": "dot", "at": "chest"}
+      ],
+      "foreshorten": [["sl", "el"], ["sr", "er"]]
+    },
+    "lat-pulldown": {
+      "name": "Lat pulldown",
+      "cue": "Pull the bar to your upper chest",
+      "view": "side",
+      "a": {"hip": [100, 138], "knee": [140, 142], "ankle": [140, 182], "toe": [160, 186], "shoulder": [90, 91], "head": [87, 69], "elbow": [95, 63], "hand": [99, 38]},
+      "b": {"elbow": [90, 118], "hand": [104, 95]},
+      "props": [
+        {"type": "floor"},
+        {"type": "bench", "from": [84, 153], "to": [124, 153], "posts": [0.5]},
+        {"type": "cable", "from": [99, -16], "to": "hand"},
+        {"type": "handle", "at": "hand"}
+      ],
+      "muscles": ["back"],
+      "cues": [
+        {"type": "arrow", "from": [117, 42], "to": [119, 86], "dashed": true},
+        {"type": "dot", "at": "chest"}
+      ]
+    },
+    "db-row": {
+      "name": "Chest-supported DB row",
+      "cue": "Pull dumbbells to your hip pockets",
+      "view": "side",
+      "a": {"shoulder": [128, 98], "hip": [91, 129], "head": [148, 89], "ankle": [31, 179], "toe": [48, 187], "elbow": [128, 126], "hand": [128, 152], "knee": [66, 160]},
+      "b": {"elbow": [101, 105], "hand": [102, 131]},
+      "props": [
+        {"type": "floor"},
+        {"type": "bench", "from": [84, 151], "to": [141, 101], "posts": [0.12, 0.85]},
+        {"type": "dumbbell", "at": "hand"}
+      ],
+      "muscles": ["back"],
+      "cues": [
+        {"type": "arrow", "from": [124, 168], "to": [98, 148], "dashed": true},
+        {"type": "dot", "at": "hip"}
+      ],
+      "swing": ["elbow", "hand"]
+    },
+    "face-pull": {
+      "name": "Face pull",
+      "cue": "Pull the rope apart to your ears",
+      "view": "side",
+      "a": {"hip": [84, 106], "ankle": [102, 182], "toe": [122, 186], "ankle2": [64, 182], "toe2": [84, 186], "shoulder": [84, 58], "head": [86, 36], "knee": [101, 142], "knee2": [81, 146], "elbow": [112, 54], "hand": [137, 50]},
+      "b": {"elbow": [69, 57], "hand": [80, 33]},
+      "props": [
+        {"type": "floor"},
+        {"type": "cable", "from": [206, 34], "to": "hand"},
+        {"type": "handle", "at": "hand"}
+      ],
+      "muscles": ["delt", "back"],
+      "cues": [
+        {"type": "arrow", "from": [132, 38], "to": [102, 31], "dashed": true},
+        {"type": "dot", "at": "head"}
+      ],
+      "foreshorten": [["shoulder", "elbow"]]
+    },
+    "hammer-curl": {
+      "name": "Hammer curl",
+      "cue": "Thumbs lead up to your shoulders",
+      "view": "side",
+      "a": {"toe": [120, 186], "ankle": [100, 182], "knee": [100, 142], "hip": [100, 102], "shoulder": [100, 54], "head": [101, 32], "elbow": [99, 82], "hand": [101, 108]},
+      "b": {"hand": [109, 58]},
+      "props": [
+        {"type": "floor"},
+        {"type": "dumbbell", "at": "hand", "lie": "cross"}
+      ],
+      "muscles": [["shoulder", "elbow"], ["elbow", "hand"]],
+      "cues": [
+        {"type": "arrow", "from": [136, 104], "to": [130, 58], "dashed": true},
+        {"type": "dot", "at": "elbow"}
+      ],
+      "swing": ["hand"]
+    },
+    "farmer-carry": {
+      "name": "Farmer carry",
+      "cue": "Crush the handles",
+      "view": "side",
+      "a": {"hip": [99, 103], "shoulder": [100, 55], "head": [101, 33], "ankle": [112, 182], "toe": [132, 186], "ankle2": [84, 177], "toe2": [101, 187], "elbow": [100, 83], "hand": [100, 109], "knee": [106, 142], "knee2": [104, 143]},
+      "b": {"ankle": [84, 177], "toe": [101, 187], "ankle2": [112, 182], "toe2": [132, 186], "knee": [104, 143], "knee2": [106, 142]},
+      "props": [
+        {"type": "floor"},
+        {"type": "dumbbell", "at": "hand", "lie": "cross"}
+      ],
+      "muscles": [["elbow", "hand"]],
+      "cues": [
+        {"type": "ring", "at": "hand", "rx": 19, "ry": 13, "pulse": true}
+      ],
+      "solve": ["knee", "knee2"]
+    }
+  }
+}
