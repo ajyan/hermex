@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Body's landing screen, in the module home order (DESIGN.md § Module home): the next workout,
-/// Baki's changes waiting on him, the week, then Baki's note, every lift, recent sessions, and
-/// last night's sleep. Pushed from the drawer as `.body`; workouts, lifts, and the plan push from here.
+/// Baki's changes waiting on him, the week, then Baki's note and what he is watching, every lift,
+/// recent sessions, and last night's sleep. Pushed from the drawer as `.body`; workouts, lifts, and
+/// the plan push from here.
 struct BodyHomeView: View {
     @State private var viewModel: BodyHomeViewModel
     @State private var showsSleep = false
@@ -70,7 +71,7 @@ struct BodyHomeView: View {
                     upNext(home)
                     needsYou(home.proposals)
                     thisWeek(home)
-                    bakiCard
+                    bakiCard(watching: home.watching)
                     if !home.lifts.isEmpty { lifts(home.lifts) }
                     if !home.sessions.isEmpty { sessions(home.sessions) }
                     if let sleep = home.sleep { sleepRow(sleep) }
@@ -98,8 +99,8 @@ struct BodyHomeView: View {
         }
     }
 
-    /// Baki's note on the newest workout, and the way to ask him something.
-    private var bakiCard: some View {
+    /// Baki's note on the newest workout, the patterns he is watching, and the way to ask him something.
+    private func bakiCard(watching: [BodyWatching]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HXSectionHeader(title: "Baki")
             HXCard(.wash(paper), spacing: 10) {
@@ -112,6 +113,10 @@ struct BodyHomeView: View {
                         .font(AppFont.subheadline())
                         .foregroundStyle(paper.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                if !watching.isEmpty {
+                    BakiRule()
+                    BodyWatchingList(items: watching)
                 }
             } footer: {
                 if openDraftChat.isAvailable {

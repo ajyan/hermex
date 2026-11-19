@@ -382,6 +382,7 @@ final class ContractReadinessTests: XCTestCase {
             .init(name: "body plan save", method: "POST", endpoint: .bodyPlan, path: "/api/body/plan"),
             .init(name: "body proposal", method: "POST", endpoint: .bodyProposal, path: "/api/body/proposal"),
             .init(name: "body sleep", method: "GET", endpoint: .bodySleep, path: "/api/body/sleep"),
+            .init(name: "body cue", method: "POST", endpoint: .bodyCue, path: "/api/body/cue"),
             .init(name: "meals home", method: "GET", endpoint: .mealsHome(day: "2026-11-03"),
                   path: "/api/meals/home", query: ["day": "2026-11-03"]),
             .init(name: "meals dishes", method: "GET", endpoint: .mealsDishes, path: "/api/meals/dishes"),

@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The live workout (board 2C), pushed as `.bodyWorkout(day)`, or as `.bodyReopen(id)` for a saved
-/// workout opened again: the rough-night and morning-hinge offers, then every lift in order. The
+/// workout opened again: the body check, the rough-night and morning-hinge offers and Baki's
+/// adjustments, then every lift in order. The
 /// open lift is a glow card with its sets; done lifts fold to their reps and upcoming ones to
 /// their prescription. Ticking a lift's last set opens the next. Changes save as he goes; leaving
 /// the screen or the app sends anything still waiting.
@@ -12,23 +13,29 @@ struct WorkoutView: View {
     private let onAPIError: (Error) -> Void
     /// Leaves the finished workout for the screen it started from.
     private let onDone: () -> Void
+    /// Pushes a screen on the shell's stack (a lift's Form page).
+    private let onOpen: (ShellPushDestination) -> Void
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(day: String?, server: URL, onAPIError: @escaping (Error) -> Void, onDone: @escaping () -> Void) {
+    init(day: String?, server: URL, onAPIError: @escaping (Error) -> Void, onDone: @escaping () -> Void,
+         onOpen: @escaping (ShellPushDestination) -> Void) {
         let client = APIClientBodyAdapter(apiClient: APIClient(baseURL: server))
         self.client = client
         self.onAPIError = onAPIError
         self.onDone = onDone
+        self.onOpen = onOpen
         _viewModel = State(initialValue: WorkoutViewModel(client: client, day: day, onAPIError: onAPIError))
     }
 
     /// The saved workout `sessionID` opened again, pushed as `.bodyReopen(id)` from its page.
-    init(sessionID: String, server: URL, onAPIError: @escaping (Error) -> Void, onDone: @escaping () -> Void) {
+    init(sessionID: String, server: URL, onAPIError: @escaping (Error) -> Void, onDone: @escaping () -> Void,
+         onOpen: @escaping (ShellPushDestination) -> Void) {
         let client = APIClientBodyAdapter(apiClient: APIClient(baseURL: server))
         self.client = client
         self.onAPIError = onAPIError
         self.onDone = onDone
+        self.onOpen = onOpen
         _viewModel = State(initialValue: WorkoutViewModel(client: client, sessionID: sessionID, onAPIError: onAPIError))
     }
 
@@ -118,8 +125,16 @@ struct WorkoutView: View {
             List {
                 if viewModel.saveStatus == .failed { notSavedRow.workoutPlainRow() }
                 if viewModel.saveStatus == .finished { finishedRow.workoutPlainRow() }
+                if viewModel.coach.bodyCheckBanner != .hidden {
+                    WorkoutBodyCheckBanner(viewModel: viewModel).workoutPlainRow()
+                }
                 if viewModel.sleepBanner != .hidden { sleepBanner.workoutPlainRow() }
                 if viewModel.hingeBanner != .hidden { hingeBanner.workoutPlainRow() }
+                ForEach(viewModel.adjustmentRows) { row in
+                    WorkoutAdjustmentBanner(row: row, viewModel: viewModel)
+                        .equatable()
+                        .workoutPlainRow()
+                }
                 ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, lift in
                     let startsSection = index == 0 || session.exercises[index - 1].section != lift.section
                     liftRows(lift, index: index, startsSection: startsSection, in: session.exercises)
@@ -166,7 +181,7 @@ struct WorkoutView: View {
             // An open superset is one card, drawn once by its first lift.
             if index == group.lowerBound { pairedCard(group, in: exercises) }
         } else if index == viewModel.current {
-            WorkoutCardHeader(lift: lift)
+            WorkoutCardHeader(lift: lift, openForm: openForm)
                 .equatable()
                 .workoutCardRow(.top)
                 .id(lift.id)
@@ -184,11 +199,7 @@ struct WorkoutView: View {
                         }
                     }
             }
-            if viewModel.effortPrompt == index {
-                WorkoutEffortRow(answer: lift.repsLeft, viewModel: viewModel)
-                    .equatable()
-                    .workoutCardRow(.middle)
-            }
+            afterSetRow(lift, index: index, named: false)
             WorkoutCardFooter(group: index...index, hurts: hurtLines(index...index, in: exercises), viewModel: viewModel)
                 .equatable()
                 .workoutCardRow(.bottom)
@@ -205,7 +216,7 @@ struct WorkoutView: View {
     @ViewBuilder
     private func pairedCard(_ group: ClosedRange<Int>, in exercises: [BodyExercise]) -> some View {
         let lifts = Array(exercises[group])
-        WorkoutPairHeader(lifts: lifts)
+        WorkoutPairHeader(lifts: lifts, openForm: openForm)
             .equatable()
             .workoutCardRow(.top)
             .id(exercises[group.lowerBound].id)
@@ -224,14 +235,28 @@ struct WorkoutView: View {
                     }
                 }
         }
-        if let e = viewModel.effortPrompt, group.contains(e) {
-            WorkoutEffortRow(answer: exercises[e].repsLeft, viewModel: viewModel)
-                .equatable()
-                .workoutCardRow(.middle)
+        ForEach(Array(group), id: \.self) { e in
+            afterSetRow(exercises[e], index: e, named: true)
         }
         WorkoutCardFooter(group: group, hurts: hurtLines(group, in: exercises), viewModel: viewModel)
             .equatable()
             .workoutCardRow(.bottom)
+    }
+
+    /// What the open card asks after a set: reps left on the set he just ticked, and the coach's
+    /// question once the lift is done. No row when there is nothing to ask.
+    @ViewBuilder
+    private func afterSetRow(_ lift: BodyExercise, index: Int, named: Bool) -> some View {
+        let after = WorkoutCoach.afterSet(lift, asked: viewModel.askedSet(in: lift), named: named)
+        if !after.isEmpty {
+            WorkoutEffortRow(after: after, exercise: index, viewModel: viewModel)
+                .equatable()
+                .workoutCardRow(.middle)
+        }
+    }
+
+    private func openForm(_ liftID: String) {
+        onOpen(.bodyLiftForm(liftID))
     }
 
     /// The hurts logged on the open card's lifts, by their place in the session's list, for Undo.
@@ -263,86 +288,30 @@ struct WorkoutView: View {
 
     @ViewBuilder
     private var sleepBanner: some View {
-        let paper = HermexPaper.training
         if viewModel.sleepBanner == .asking {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "moon.fill")
-                        .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(paper.glow)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: viewModel.sleepOffer.map(WorkoutCopy.sleepTitle) ?? "Rough night")
-                            .font(AppFont.display(style: .headline, weight: .semibold))
-                            .foregroundStyle(paper.glow)
-                        Text(verbatim: "Drop one set from each lift? The warm-up and finisher stay.")
-                            .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextPrimary)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 8) {
-                    Button { viewModel.acceptSleepOffer() } label: { Text(verbatim: "Drop a set") }
-                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
-                    Button { viewModel.keepAllSets() } label: { Text(verbatim: "Keep them all") }
-                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                }
+            WorkoutOfferBanner(
+                symbol: "moon.fill", title: viewModel.sleepOffer.map(WorkoutCopy.sleepTitle) ?? "Rough night",
+                question: "Drop one set from each lift? The warm-up and finisher stay.") {
+                WorkoutOfferButtons(primary: "Drop a set", secondary: "Keep them all",
+                                    onPrimary: { viewModel.acceptSleepOffer() }, onSecondary: { viewModel.keepAllSets() })
             }
-            .padding(14)
-            .glowSurface(paper, cornerRadius: HXRadius.lg, opaque: true)
         } else {
-            undoBanner("One set dropped from each lift.", paper: paper) { viewModel.undoSleepOffer() }
+            WorkoutUndoLine(text: "One set dropped from each lift.") { viewModel.undoSleepOffer() }
         }
     }
 
     @ViewBuilder
     private var hingeBanner: some View {
-        let paper = HermexPaper.training
         if viewModel.hingeBanner == .asking {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "sunrise.fill")
-                        .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(paper.glow)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: WorkoutCopy.hingeTitle(minutes: viewModel.hingeMinutes))
-                            .font(AppFont.display(style: .headline, weight: .semibold))
-                            .foregroundStyle(paper.glow)
-                        Text(verbatim: WorkoutCopy.hingeQuestion(viewModel.hingeNames))
-                            .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextPrimary)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 8) {
-                    Button { viewModel.moveHinge() } label: { Text(verbatim: "Move to the end") }
-                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
-                    Button { viewModel.keepHingeOrder() } label: { Text(verbatim: "Keep the order") }
-                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                }
+            WorkoutOfferBanner(
+                symbol: "sunrise.fill", title: WorkoutCopy.hingeTitle(minutes: viewModel.hingeMinutes),
+                question: WorkoutCopy.hingeQuestion(viewModel.hingeNames)) {
+                WorkoutOfferButtons(primary: "Move to the end", secondary: "Keep the order",
+                                    onPrimary: { viewModel.moveHinge() }, onSecondary: { viewModel.keepHingeOrder() })
             }
-            .padding(14)
-            .glowSurface(paper, cornerRadius: HXRadius.lg, opaque: true)
         } else {
-            undoBanner("Moved to the end of the main lifts.", paper: paper) { viewModel.undoMoveHinge() }
+            WorkoutUndoLine(text: "Moved to the end of the main lifts.") { viewModel.undoMoveHinge() }
         }
-    }
-
-    private func undoBanner(_ text: String, paper: HermexPaper, undo: @escaping () -> Void) -> some View {
-        HStack(spacing: 10) {
-            Text(verbatim: text)
-                .font(AppFont.subheadline())
-                .foregroundStyle(paper.glow)
-            Spacer(minLength: 8)
-            Button(action: undo) {
-                Text(verbatim: "Undo").font(AppFont.subheadline(weight: .semibold))
-            }
-            .buttonStyle(.borderless)
-            .frame(minHeight: 44)
-        }
-        .padding(.horizontal, 14)
-        .glowSurface(paper, cornerRadius: HXRadius.md)
     }
 
     // MARK: Finish
@@ -428,38 +397,6 @@ extension View {
 }
 
 // MARK: - Open card rows
-
-/// Board 6: after a big lift's last set, "How many more could you have done?" 0 / 1 / 2 / 3+.
-struct WorkoutEffortRow: View, Equatable {
-    let answer: Int?
-    let viewModel: WorkoutViewModel
-
-    static func == (lhs: Self, rhs: Self) -> Bool { lhs.answer == rhs.answer }
-
-    private static let choices: [(value: Int, label: String, spoken: String)] = [
-        (0, "0", "None left"), (1, "1", "One left"), (2, "2", "Two left"), (3, "3+", "Three or more left"),
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: "How many more could you have done?")
-                .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
-                ForEach(Self.choices, id: \.value) { choice in
-                    Button { viewModel.setRepsLeft(choice.value) } label: {
-                        Text(verbatim: choice.label).monospacedDigit()
-                    }
-                    .buttonStyle(ChatDecisionButtonStyle(emphasis: answer == choice.value ? .primary : .secondary))
-                    .accessibilityLabel(Text(verbatim: choice.spoken))
-                    .accessibilityAddTraits(answer == choice.value ? .isSelected : [])
-                }
-            }
-        }
-        .padding(.vertical, 8)
-    }
-}
 
 /// A hurt logged on the open card, as its foot shows it.
 struct WorkoutHurtLine: Equatable {

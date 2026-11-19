@@ -33,6 +33,8 @@ enum ShellPushDestination: Hashable {
     case body
     /// One lift's history, by lift id.
     case bodyLift(String)
+    /// One lift's Form page (setup, cues, faults), by lift id.
+    case bodyLiftForm(String)
     /// The training plan editor.
     case bodyPlan
     /// A finished workout with Baki's note, by session id.
@@ -238,7 +240,7 @@ extension ShellPushDestination {
         case .goals, .goal, .finishedGoal, .finishedGoals: "Goals"
         case .money: "Money"
         case .feedback: "Feedback"
-        case .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen: "Body"
+        case .body, .bodyLift, .bodyLiftForm, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen: "Body"
         case .meals, .mealsBook, .mealsDish, .mealsSeason: "Meals"
         case .status, .statusTile: "Status"
         case .settings: "Settings"
@@ -352,7 +354,7 @@ extension ShellPushDestination {
         switch self {
         case .brain, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
-             .feedback, .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen, .meals, .mealsBook, .mealsDish,
+             .feedback, .body, .bodyLift, .bodyLiftForm, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen, .meals, .mealsBook, .mealsDish,
              .mealsSeason, .status, .statusTile, .settings: false
         }
     }
@@ -369,7 +371,7 @@ extension ShellPushDestination {
              .brainRoute(.prep(.story(_))), .brainRoute(.prep(.gapRun(_))), .brainRoute(.prep(.lessonRun(_))): false
         case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
-             .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen, .meals, .mealsBook, .mealsDish,
+             .body, .bodyLift, .bodyLiftForm, .bodyPlan, .bodySession, .bodyWorkout, .bodyReopen, .meals, .mealsBook, .mealsDish,
              .mealsSeason, .status, .statusTile, .settings: false
         }
     }

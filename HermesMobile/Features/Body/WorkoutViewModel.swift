@@ -21,8 +21,15 @@ final class WorkoutViewModel {
     private(set) var state: BrainLoadState<BodySession> = .loading
     /// The open lift's index in `exercises`.
     private(set) var current = 0
-    /// A big lift whose last work set was just ticked, waiting for "how many more could you have done?".
+    /// A lift whose last work set was just ticked, held open for what its card still asks: how many
+    /// reps that set had left, and the coach's focus question. Answering them, or opening another
+    /// lift, moves on.
     private(set) var effortPrompt: Int?
+    /// The work set he just ticked, by its `uid`: the one "how many more could you have done?" is about.
+    private(set) var askedSet: UUID?
+    /// The body check, Baki's adjustments, and what their Undo needs. Changed only by the methods in
+    /// WorkoutViewModel+Coach.swift.
+    var coach = WorkoutCoachState()
     private(set) var saveStatus: SaveStatus = .saved
     /// Last night, when it was rough enough to offer dropping a set.
     private(set) var sleepOffer: BodySleepOffer?
@@ -46,6 +53,10 @@ final class WorkoutViewModel {
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var isLoading = false
     @ObservationIgnored private var hingeIDs: Set<String> = []
+    /// The hinge offer was up when the body check took its lifts out; it comes back with them.
+    @ObservationIgnored private var hingeOfferSuspended = false
+    /// A saved workout opened again, by its id or because today's prescription came back closed.
+    @ObservationIgnored private var isReopened = false
     /// The set each lift lost to "Drop a set", by lift id, for Undo.
     @ObservationIgnored private var droppedSets: [String: BodySet] = [:]
     /// The lift order before "Move to the end", for Undo.
@@ -116,6 +127,7 @@ final class WorkoutViewModel {
     /// stays closed: the server would answer every save with 409.
     private func apply(_ saved: BodySession) {
         var session = saved
+        isReopened = true
         if saved.finished != nil, !saved.autoFinished { saveStatus = .finished }
         session.autoFinished = false
         current = Self.firstUnfinished(in: session.exercises, after: -1) ?? 0
@@ -123,9 +135,20 @@ final class WorkoutViewModel {
     }
 
     private func apply(_ prescription: BodyPrescription) {
-        let session = BodySession(
+        // A picked day whose workout closed itself today comes back as that saved workout. It opens
+        // like any reopened one, so the first save reopens it instead of a fresh sheet replacing it.
+        if let saved = prescription.saved, saved.finished != nil {
+            apply(saved)
+            return
+        }
+        // A resumed draft is the saved document itself, so everything logged in it stays.
+        var session = prescription.saved ?? BodySession(
             id: prescription.id, day: prescription.day, phase: prescription.phase, deload: prescription.deload,
             exercises: prescription.exercises, trimmed: prescription.trimmed, movedHinge: prescription.movedHinge)
+        session.adjustments = prescription.adjustments
+        session.adjustmentAnswers = prescription.adjustmentAnswers
+        session.bodyCheck = prescription.bodyCheck
+        startCoach(for: session)
         current = Self.firstUnfinished(in: session.exercises, after: -1) ?? 0
         if !prescription.resumed, !prescription.trimmed, let offer = prescription.offers.sleep {
             sleepOffer = offer
@@ -143,15 +166,23 @@ final class WorkoutViewModel {
 
     // MARK: Sets
 
-    /// Ticks or unticks one set. Ticking a lift's last work set opens the next unfinished lift,
-    /// or first asks how many reps were left when it's a big lift.
+    /// Ticks or unticks one set. A ticked work set of a lift that counts reps asks how many more he
+    /// could have done; an unticked set forgets its answer. Ticking a lift's last work set opens the
+    /// next unfinished lift, once the card has nothing left to ask.
     func toggle(exercise e: Int, set s: Int) {
         guard let lift = lift(e), lift.sets.indices.contains(s) else { return }
         let wasComplete = Self.isComplete(lift)
         var completed = false
         mutate { session in
             session.exercises[e].sets[s].done.toggle()
+            if !session.exercises[e].sets[s].done { session.exercises[e].sets[s].left = nil }
             completed = !wasComplete && Self.isComplete(session.exercises[e])
+        }
+        let uid = lift.sets[s].uid
+        if self.lift(e)?.sets[s].done == true {
+            if lift.sets[s].kind == .work, WorkoutCoach.asksRepsLeft(lift) { askedSet = uid }
+        } else if askedSet == uid {
+            askedSet = nil
         }
         // Once a work set the offer would drop from is ticked, it's too late to drop one; the warm-up
         // lifts come first and never count.
@@ -166,11 +197,42 @@ final class WorkoutViewModel {
         }
     }
 
-    /// A lift just had its last work set ticked or its last open set removed: a big lift asks how
-    /// many reps were left, anything else opens the next lift.
+    /// A lift just had its last work set ticked or its last open set removed. It stays open while its
+    /// card still asks something (reps left on a set, the coach's focus question); with nothing to
+    /// ask, the next lift opens.
     private func didComplete(_ e: Int) {
         guard let lift = lift(e) else { return }
-        if lift.big { effortPrompt = e } else { advance(from: e) }
+        // Finished without a tick (its last open set was removed): the last set is the one to ask about.
+        if WorkoutCoach.asksRepsLeft(lift), askedSet(in: lift) == nil,
+           let last = lift.sets.last(where: { $0.kind == .work }), last.left == nil {
+            askedSet = last.uid
+        }
+        if Self.waitsOnAnswer(lift, asked: askedSet(in: lift)) {
+            effortPrompt = e
+            current = e
+        } else {
+            advance(from: e)
+        }
+    }
+
+    /// The place in `lift.sets` of the set the reps-left question is about, when it is one of this lift's.
+    func askedSet(in lift: BodyExercise) -> Int? {
+        guard let askedSet else { return nil }
+        return lift.sets.firstIndex { $0.uid == askedSet }
+    }
+
+    /// A finished lift's card still has a question he hasn't answered.
+    private static func waitsOnAnswer(_ lift: BodyExercise, asked: Int?) -> Bool {
+        if let asked, lift.sets[asked].left == nil { return true }
+        return WorkoutCoach.asksFocus(lift) && lift.focusCheck == nil
+    }
+
+    /// After an answer on a lift held open past its last set: with nothing left to ask, the next lift opens.
+    private func advanceIfAnswered(_ e: Int) {
+        guard effortPrompt == e, let lift = lift(e), Self.isComplete(lift),
+              !Self.waitsOnAnswer(lift, asked: askedSet(in: lift)) else { return }
+        effortPrompt = nil
+        advance(from: e)
     }
 
     /// Sets one set's weight. Later work sets he hasn't ticked yet that still had the set's old
@@ -261,19 +323,36 @@ final class WorkoutViewModel {
         return lift.sets[s].kind == .warm || lift.workSets.count > 1
     }
 
-    /// Opens a lift. A reps-left question nobody answered goes away.
+    /// Opens a lift. A question nobody answered goes away.
     func open(exercise e: Int) {
         guard lift(e) != nil else { return }
         effortPrompt = nil
+        askedSet = nil
         current = e
     }
 
-    /// Answers the big-lift question (3 means 3 or more) and opens the next lift.
+    /// Answers "how many more could you have done?" for the set he just ticked (3 means 3 or more),
+    /// written on that set as `left`. A big lift's last set also sets the lift's `repsLeft`, which the
+    /// server's progression reads. Never needed: the next set ticks with or without it.
     func setRepsLeft(_ left: Int) {
-        guard let e = effortPrompt, lift(e) != nil else { return }
-        mutate { $0.exercises[e].repsLeft = min(max(left, 0), 3) }
-        effortPrompt = nil
-        advance(from: e)
+        guard let askedSet, let exercises = session?.exercises,
+              let e = exercises.firstIndex(where: { lift in lift.sets.contains { $0.uid == askedSet } }),
+              let s = exercises[e].sets.firstIndex(where: { $0.uid == askedSet }), exercises[e].sets[s].done else { return }
+        let value = min(max(left, 0), 3)
+        let isLast = exercises[e].sets.lastIndex { $0.kind == .work } == s
+        mutate { session in
+            session.exercises[e].sets[s].left = value
+            if isLast, session.exercises[e].big { session.exercises[e].repsLeft = value }
+        }
+        advanceIfAnswered(e)
+    }
+
+    /// Answers the coach's focus question on a finished lift (`focus_check`, saved beside the lift's
+    /// `coach` so history knows which focus it was for).
+    func setFocusCheck(_ answer: BodyFocusAnswer, exercise e: Int) {
+        guard let lift = lift(e), WorkoutCoach.asksFocus(lift), Self.isComplete(lift) else { return }
+        mutate { $0.exercises[e].focusCheck = answer.rawValue }
+        advanceIfAnswered(e)
     }
 
     /// Opens the next lift: an unfinished partner in the same superset first, then the next unfinished
@@ -317,16 +396,25 @@ final class WorkoutViewModel {
         guard sleepBanner == .asking else { return }
         var dropped: [String: BodySet] = [:]
         mutate { session in
-            for i in session.exercises.indices where session.exercises[i].section.isTrimmable {
-                let lift = session.exercises[i]
-                guard lift.workSets.count > 1, let last = lift.sets.lastIndex(where: { $0.kind == .work }),
-                      !lift.sets[last].done else { continue }
-                dropped[lift.id] = session.exercises[i].sets.remove(at: last)
+            for i in session.exercises.indices {
+                if let set = Self.dropLastSet(from: &session.exercises[i]) { dropped[session.exercises[i].id] = set }
             }
             session.trimmed = true
         }
+        // The lifts the body check is holding lose theirs too, so they come back trimmed like the rest.
+        for i in coach.removedLifts.indices {
+            if let set = Self.dropLastSet(from: &coach.removedLifts[i]) { dropped[coach.removedLifts[i].id] = set }
+        }
         droppedSets = dropped
         sleepBanner = .done
+    }
+
+    /// The rough-night trim for one lift: its last work set, when it is a main, superset or optional
+    /// lift with more than one and that set isn't ticked.
+    private static func dropLastSet(from lift: inout BodyExercise) -> BodySet? {
+        guard lift.section.isTrimmable, lift.workSets.count > 1,
+              let last = lift.sets.lastIndex(where: { $0.kind == .work }), !lift.sets[last].done else { return nil }
+        return lift.sets.remove(at: last)
     }
 
     /// Puts the dropped sets back, keeping every tap made since.
@@ -338,6 +426,9 @@ final class WorkoutViewModel {
                 if let set = dropped[session.exercises[i].id] { session.exercises[i].sets.append(set) }
             }
             session.trimmed = false
+        }
+        for i in coach.removedLifts.indices {
+            if let set = dropped[coach.removedLifts[i].id] { coach.removedLifts[i].sets.append(set) }
         }
         droppedSets = [:]
         sleepBanner = .hidden
@@ -370,9 +461,11 @@ final class WorkoutViewModel {
         guard hingeBanner == .done, let before = session?.exercises else { return }
         let openID = before.indices.contains(current) ? before[current].id : nil
         let rank = Dictionary(uniqueKeysWithValues: orderBeforeHinge.enumerated().map { ($1, $0) })
-        let order = before.enumerated()
+        var order = before.enumerated()
             .sorted { (rank[$0.element.id] ?? Int.max, $0.offset) < (rank[$1.element.id] ?? Int.max, $1.offset) }
             .map(\.element)
+        // A lift Baki's adjustment moved up after the hinge move stays moved.
+        if let session { order = WorkoutCoach.reapplyingUsedMoves(order, in: session) }
         mutate { session in
             session.exercises = order
             session.movedHinge = false
@@ -386,8 +479,23 @@ final class WorkoutViewModel {
         if hingeBanner == .asking { hingeBanner = .hidden }
     }
 
+    /// After the body check takes lifts out or puts them back: the hinge offer names only the hinge
+    /// lifts still in the session, hides while there are none, and comes back with them.
+    func refreshHingeOffer() {
+        guard !hingeIDs.isEmpty, let exercises = session?.exercises else { return }
+        let hinged = exercises.filter { hingeIDs.contains($0.id) && $0.section == .main }
+        if hingeBanner == .asking, hinged.isEmpty {
+            hingeBanner = .hidden
+            hingeOfferSuspended = true
+        } else if hingeOfferSuspended, !hinged.isEmpty {
+            hingeBanner = .asking
+            hingeOfferSuspended = false
+        }
+        if !hinged.isEmpty { hingeNames = hinged.map(\.name) }
+    }
+
     /// After a reorder: the lift that was open stays open, unless it moved away to the end.
-    private func reopen(_ id: String?, movedAway: Bool) {
+    func reopen(_ id: String?, movedAway: Bool) {
         guard let exercises = session?.exercises else { return }
         effortPrompt = nil
         if !movedAway, let id, let index = exercises.firstIndex(where: { $0.id == id }) {
@@ -417,7 +525,9 @@ final class WorkoutViewModel {
         }
     }
 
-    private func mutate(_ change: (inout BodySession) -> Void) {
+    /// Every change to the workout goes through here: it lands on screen at once and schedules the
+    /// debounced save of the whole session.
+    func mutate(_ change: (inout BodySession) -> Void) {
         guard case .loaded(var session) = state else { return }
         change(&session)
         state = .loaded(session)
@@ -480,7 +590,7 @@ final class WorkoutViewModel {
         defer { isFinishing = false }
         // An untouched fresh workout has never been saved, and finishing needs the session on the server.
         // A reopened one is there already: untouched, it finishes as it stands and keeps its finish time.
-        if sessionID == nil, generation == 0, sentGeneration == 0 { generation = 1 }
+        if !isReopened, generation == 0, sentGeneration == 0 { generation = 1 }
         saveNow()
         await idle()
         switch saveStatus {
@@ -514,7 +624,7 @@ final class WorkoutViewModel {
 
     // MARK: Helpers
 
-    private func lift(_ e: Int) -> BodyExercise? {
+    func lift(_ e: Int) -> BodyExercise? {
         guard let exercises = session?.exercises, exercises.indices.contains(e) else { return nil }
         return exercises[e]
     }

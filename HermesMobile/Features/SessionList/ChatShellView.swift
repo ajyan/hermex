@@ -689,6 +689,9 @@ struct ChatShellView: View {
         case .bodyLift(let id):
             LiftProgressView(id: id, server: server, onAPIError: authManager.handleAPIError)
                 .id(id)
+        case .bodyLiftForm(let id):
+            LiftFormView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .id(id)
         case .bodyPlan:
             PlanEditView(server: server, onAPIError: authManager.handleAPIError)
         case .bodySession(let id):
@@ -696,11 +699,11 @@ struct ChatShellView: View {
                 .id(id)
         case .bodyWorkout(let day):
             WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError,
-                        onDone: { navigation.closeWorkout() })
+                        onDone: { navigation.closeWorkout() }, onOpen: { navigation.push($0) })
                 .id(day ?? "next")
         case .bodyReopen(let id):
             WorkoutView(sessionID: id, server: server, onAPIError: authManager.handleAPIError,
-                        onDone: { navigation.closeWorkout() })
+                        onDone: { navigation.closeWorkout() }, onOpen: { navigation.push($0) })
                 .id(id)
         case .meals:
             MealsHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) },

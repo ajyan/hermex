@@ -106,7 +106,8 @@ enum BodyCondition: String, Hashable, Sendable, Codable, CaseIterable {
 
 /// One set of one lift. A weight is nil for bodyweight, band and cable lifts, and for a lift
 /// (Lat pulldown) that has no weight yet: the workout lets him type one in. `uid` is the set's
-/// identity on this phone (a row id): it is never sent and doesn't take part in equality.
+/// identity on this phone (a row id): it is never sent and doesn't take part in equality. `left` is
+/// his answer to "how many more could you have done?" after the set: 0 to 3, where 3 means 3 or more.
 struct BodySet: Codable, Hashable, Sendable {
     let uid = UUID()
 
@@ -124,19 +125,21 @@ struct BodySet: Codable, Hashable, Sendable {
     var holdS: Int?
     var distanceYd: Int?
     var done: Bool
+    var left: Int?
 
     private enum CodingKeys: String, CodingKey {
-        case kind, weight, reps, holdS = "hold_s", distanceYd = "distance_yd", done
+        case kind, weight, reps, holdS = "hold_s", distanceYd = "distance_yd", done, left
     }
 
     init(kind: Kind = .work, weight: Double? = nil, reps: Int? = nil, holdS: Int? = nil,
-         distanceYd: Int? = nil, done: Bool = false) {
+         distanceYd: Int? = nil, done: Bool = false, left: Int? = nil) {
         self.kind = kind
         self.weight = weight
         self.reps = reps
         self.holdS = holdS
         self.distanceYd = distanceYd
         self.done = done
+        self.left = left
     }
 
     init(from decoder: Decoder) throws {
@@ -147,11 +150,12 @@ struct BodySet: Codable, Hashable, Sendable {
         holdS = c.optional(Int.self, .holdS)
         distanceYd = c.optional(Int.self, .distanceYd)
         done = c.bool(.done)
+        left = c.optional(Int.self, .left)
     }
 
     static func == (lhs: BodySet, rhs: BodySet) -> Bool {
         lhs.kind == rhs.kind && lhs.weight == rhs.weight && lhs.reps == rhs.reps && lhs.holdS == rhs.holdS
-            && lhs.distanceYd == rhs.distanceYd && lhs.done == rhs.done
+            && lhs.distanceYd == rhs.distanceYd && lhs.done == rhs.done && lhs.left == rhs.left
     }
 
     func hash(into hasher: inout Hasher) {
@@ -161,6 +165,7 @@ struct BodySet: Codable, Hashable, Sendable {
         hasher.combine(holdS)
         hasher.combine(distanceYd)
         hasher.combine(done)
+        hasher.combine(left)
     }
 }
 
@@ -210,6 +215,8 @@ struct BodyLastSet: Codable, Hashable, Sendable {
 /// One lift in a workout. `weightLabel` and `up` come from the server's prescription (a bump
 /// is already applied); `last` is what he did last time; `repsLeft` is his answer to "how many
 /// more could you have done?" on a big lift. `hinge` marks a lift the morning offer can move.
+/// `coach` is Baki's cue for the lift and `focusCheck` his answer to its question (`yes`, `mostly`
+/// or `no`); `loads` names the body areas the lift loads. All three are nil from a server without them.
 struct BodyExercise: Codable, Hashable, Sendable, Identifiable {
     let id: String
     var name: String
@@ -227,10 +234,14 @@ struct BodyExercise: Codable, Hashable, Sendable, Identifiable {
     var sets: [BodySet]
     var repsLeft: Int?
     var note: String?
+    var coach: BodyCoach?
+    var focusCheck: String?
+    var loads: [String]?
 
     private enum CodingKeys: String, CodingKey {
         case id, name, section, big, hinge, unit, perSide = "per_side", target, weightLabel = "weight_label",
-             up, upFrom = "up_from", goalReps = "goal_reps", last, sets, repsLeft = "reps_left", note
+             up, upFrom = "up_from", goalReps = "goal_reps", last, sets, repsLeft = "reps_left", note,
+             coach, focusCheck = "focus_check", loads
     }
 
     init(from decoder: Decoder) throws {
@@ -251,6 +262,9 @@ struct BodyExercise: Codable, Hashable, Sendable, Identifiable {
         sets = c.lossy(BodySet.self, .sets)
         repsLeft = c.optional(Int.self, .repsLeft)
         note = c.optional(String.self, .note)
+        coach = c.optional(BodyCoach.self, .coach)
+        focusCheck = c.optional(String.self, .focusCheck)
+        loads = c.optional([String].self, .loads)
     }
 
     /// The sets that count toward progression; warm-up sets are left out.
@@ -376,10 +390,16 @@ struct BodySession: Codable, Hashable, Sendable, Identifiable {
     var note: String?
     /// Every "Something hurt" tapped during the workout, oldest first.
     var hurts: [BodyHurt] = []
+    /// What Baki offered to change today, and his answer to each by its id (`use` or `keep`).
+    var adjustments: [BodyAdjustment]?
+    var adjustmentAnswers: [String: String]?
+    /// His answer to "How's your body today?" before the first set.
+    var bodyCheck: BodyDayCheck?
 
     private enum CodingKeys: String, CodingKey {
         case id, day, phase, started, finished, autoFinished = "auto_finished", deload, exercises, trimmed,
-             movedHinge = "moved_hinge", check, coachNote = "coach_note", note, hurts
+             movedHinge = "moved_hinge", check, coachNote = "coach_note", note, hurts, adjustments,
+             adjustmentAnswers = "adjustment_answers", bodyCheck = "body_check"
     }
 
     init(id: String, day: String, phase: String? = nil, started: String? = nil, finished: String? = nil,
@@ -418,6 +438,9 @@ struct BodySession: Codable, Hashable, Sendable, Identifiable {
         coachNote = c.optional(BodyCoachNote.self, .coachNote)
         note = c.optional(String.self, .note)
         hurts = c.lossy(BodyHurt.self, .hurts)
+        adjustments = c.contains(.adjustments) ? c.lossy(BodyAdjustment.self, .adjustments) : nil
+        adjustmentAnswers = c.optional([String: String].self, .adjustmentAnswers)
+        bodyCheck = c.optional(BodyDayCheck.self, .bodyCheck)
     }
 
     var isFinished: Bool { finished != nil }
@@ -465,7 +488,8 @@ struct BodyOffers: Decodable, Hashable, Sendable {
 
 /// What to lift today (`GET /api/body/prescription`). `exercises` is empty in `before` and
 /// `recover`. When today's saved, unfinished session exists, the server returns it with
-/// `resumed` true, which is why `trimmed` and `movedHinge` are here too.
+/// `resumed` true, which is why `trimmed`, `movedHinge`, the adjustment answers and the body check
+/// are here too.
 struct BodyPrescription: Decodable, Hashable, Sendable, Identifiable {
     let id: String
     let day: String
@@ -476,9 +500,16 @@ struct BodyPrescription: Decodable, Hashable, Sendable, Identifiable {
     let exercises: [BodyExercise]
     let trimmed: Bool
     let movedHinge: Bool
+    let adjustments: [BodyAdjustment]?
+    let adjustmentAnswers: [String: String]?
+    let bodyCheck: BodyDayCheck?
+    /// The saved workout itself when `resumed`: a draft with everything logged in it, or one that
+    /// closed itself today (`finished` set, `autoFinished` true), which opens like a reopened workout.
+    let saved: BodySession?
 
     private enum CodingKeys: String, CodingKey {
-        case id, day, phase, deload, resumed, offers, exercises, trimmed, movedHinge = "moved_hinge"
+        case id, day, phase, deload, resumed, offers, exercises, trimmed, movedHinge = "moved_hinge",
+             adjustments, adjustmentAnswers = "adjustment_answers", bodyCheck = "body_check"
     }
 
     init(from decoder: Decoder) throws {
@@ -492,6 +523,10 @@ struct BodyPrescription: Decodable, Hashable, Sendable, Identifiable {
         exercises = c.lossy(BodyExercise.self, .exercises)
         trimmed = c.bool(.trimmed)
         movedHinge = c.bool(.movedHinge)
+        adjustments = c.contains(.adjustments) ? c.lossy(BodyAdjustment.self, .adjustments) : nil
+        adjustmentAnswers = c.optional([String: String].self, .adjustmentAnswers)
+        bodyCheck = c.optional(BodyDayCheck.self, .bodyCheck)
+        if resumed { saved = try? BodySession(from: decoder) } else { saved = nil }
     }
 }
 
@@ -730,9 +765,12 @@ struct BodyHome: Decodable, Hashable, Sendable {
     let changes: [BodyChange]
     /// Rotation days with no finished session in 10 or more days.
     let gaps: [String]
+    /// The patterns Baki is watching, for his card.
+    let watching: [BodyWatching]
 
     private enum CodingKeys: String, CodingKey {
-        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, proposals, changes, gaps
+        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, proposals, changes, gaps,
+             watching
     }
 
     init(from decoder: Decoder) throws {
@@ -748,6 +786,7 @@ struct BodyHome: Decodable, Hashable, Sendable {
         proposals = c.lossy(BodyProposal.self, .proposals)
         changes = c.lossy(BodyChange.self, .changes)
         gaps = c.strings(.gaps)
+        watching = c.lossy(BodyWatching.self, .watching)
     }
 }
 
@@ -811,6 +850,7 @@ struct BodyLiftSession: Decodable, Hashable, Sendable {
 
 /// One lift's detail (`GET /api/body/lift?id=`): `series` is weight over time, oldest first, and
 /// `sessions` is each session's reps, newest first. `weightLabel` and `up` are the next prescription.
+/// `form` is the lift's cue card, nil when it has none; `loads` the body areas it loads.
 struct BodyLift: Decodable, Hashable, Sendable, Identifiable {
     let id: String
     let name: String
@@ -819,8 +859,12 @@ struct BodyLift: Decodable, Hashable, Sendable, Identifiable {
     let up: Bool
     let series: [BodyLiftPoint]
     let sessions: [BodyLiftSession]
+    var form: BodyForm?
+    let loads: [String]
 
-    private enum CodingKeys: String, CodingKey { case id, name, unit, weightLabel = "weight_label", up, series, sessions }
+    private enum CodingKeys: String, CodingKey {
+        case id, name, unit, weightLabel = "weight_label", up, series, sessions, form, loads
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -831,6 +875,8 @@ struct BodyLift: Decodable, Hashable, Sendable, Identifiable {
         up = c.bool(.up)
         series = c.lossy(BodyLiftPoint.self, .series)
         sessions = c.lossy(BodyLiftSession.self, .sessions)
+        form = c.optional(BodyForm.self, .form)
+        loads = c.strings(.loads)
     }
 }
 

@@ -2,8 +2,8 @@ import Foundation
 
 /// The Body API on this user's `hermes-webui` fork (`api/vault_body.py`, over the vault's
 /// `tools/gym.py`): home, today's prescription, saving and finishing a workout, history, a lift's
-/// detail, the plan, Baki's proposals, and the sleep history. Stock upstream servers answer 404,
-/// which screens treat as "no Body on this server".
+/// detail, the plan, Baki's proposals, the sleep history, and picking a lift's cue. Stock upstream
+/// servers answer 404, which screens treat as "no Body on this server".
 protocol BodyDataClient: Sendable {
     func home() async throws -> BodyHome
     /// What to lift on `day` (push, legs or pull), or the next day in the rotation when nil. Today's
@@ -22,6 +22,9 @@ protocol BodyDataClient: Sendable {
     func decide(proposalID: String, accept: Bool) async throws -> BodyProposal
     /// The Sleep screen's history, or nil when the server has none (404).
     func sleepHistory() async throws -> SleepHistory?
+    /// Makes cue `index` the one Baki uses on a lift and returns its new form card. `lift` is the
+    /// cue card's key (`form.lift`), which on an alternate week is not the lift's own id.
+    func pickCue(lift: String, index: Int) async throws -> BodyForm
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol, decoding with
@@ -86,6 +89,17 @@ struct APIClientBodyAdapter: BodyDataClient {
         } catch {
             throw APIError.decoding(underlying: error)
         }
+    }
+
+    func pickCue(lift: String, index: Int) async throws -> BodyForm {
+        let result: BodyCuePickResult = try decode(try await apiClient.sendData(
+            endpoint: .bodyCue, method: "POST", body: CueRequest(lift: lift, cue: index)))
+        return result.form
+    }
+
+    private struct CueRequest: Encodable {
+        let lift: String
+        let cue: Int
     }
 
     private struct FinishRequest: Encodable {
