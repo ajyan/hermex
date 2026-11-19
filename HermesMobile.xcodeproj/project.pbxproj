@@ -57,6 +57,13 @@
 		B0D7000000000000000000E2 /* BodySessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D7000000000000000000E1 /* BodySessionView.swift */; };
 		B0D7000000000000000000E4 /* LiftResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D7000000000000000000E3 /* LiftResults.swift */; };
 		B0D7000000000000000000E6 /* LiftResultsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D7000000000000000000E5 /* LiftResultsCard.swift */; };
+		CD1A60000000000000000004 /* CueDiagramModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1A60000000000000000003 /* CueDiagramModel.swift */; };
+		CD1A60000000000000000006 /* CueDiagramGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1A60000000000000000005 /* CueDiagramGeometry.swift */; };
+		CD1A60000000000000000008 /* CueDiagramDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1A60000000000000000007 /* CueDiagramDrawing.swift */; };
+		CD1A6000000000000000000A /* CueDiagramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1A60000000000000000009 /* CueDiagramView.swift */; };
+		CD1A6000000000000000000C /* CueDiagramTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1A6000000000000000000B /* CueDiagramTests.swift */; };
+		CD1A6000000000000000000E /* CueDiagramSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1A6000000000000000000D /* CueDiagramSnapshotTests.swift */; };
+		CD1A60000000000000000002 /* CueDiagrams.json in Resources */ = {isa = PBXBuildFile; fileRef = CD1A60000000000000000001 /* CueDiagrams.json */; };
 		B0D7000000000000000001C1 /* BodyCoachModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D7000000000000000001C0 /* BodyCoachModels.swift */; };
 		B0D7000000000000000001C3 /* BodyCoachViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D7000000000000000001C2 /* BodyCoachViews.swift */; };
 		B0D7000000000000000001C5 /* LiftFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D7000000000000000001C4 /* LiftFormView.swift */; };
@@ -1033,6 +1040,13 @@
 		B0D7000000000000000000E1 /* BodySessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySessionView.swift; sourceTree = "<group>"; };
 		B0D7000000000000000000E3 /* LiftResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiftResults.swift; sourceTree = "<group>"; };
 		B0D7000000000000000000E5 /* LiftResultsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiftResultsCard.swift; sourceTree = "<group>"; };
+		CD1A60000000000000000003 /* CueDiagramModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueDiagramModel.swift; sourceTree = "<group>"; };
+		CD1A60000000000000000005 /* CueDiagramGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueDiagramGeometry.swift; sourceTree = "<group>"; };
+		CD1A60000000000000000007 /* CueDiagramDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueDiagramDrawing.swift; sourceTree = "<group>"; };
+		CD1A60000000000000000009 /* CueDiagramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueDiagramView.swift; sourceTree = "<group>"; };
+		CD1A6000000000000000000B /* CueDiagramTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueDiagramTests.swift; sourceTree = "<group>"; };
+		CD1A6000000000000000000D /* CueDiagramSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueDiagramSnapshotTests.swift; sourceTree = "<group>"; };
+		CD1A60000000000000000001 /* CueDiagrams.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = CueDiagrams.json; sourceTree = "<group>"; };
 		B0D7000000000000000001C0 /* BodyCoachModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyCoachModels.swift; sourceTree = "<group>"; };
 		B0D7000000000000000001C2 /* BodyCoachViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyCoachViews.swift; sourceTree = "<group>"; };
 		B0D7000000000000000001C4 /* LiftFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiftFormView.swift; sourceTree = "<group>"; };
@@ -2019,6 +2033,10 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D7000000000000000000E1 /* BodySessionView.swift */,
 				B0D7000000000000000000E3 /* LiftResults.swift */,
 				B0D7000000000000000000E5 /* LiftResultsCard.swift */,
+				CD1A60000000000000000003 /* CueDiagramModel.swift */,
+				CD1A60000000000000000005 /* CueDiagramGeometry.swift */,
+				CD1A60000000000000000007 /* CueDiagramDrawing.swift */,
+				CD1A60000000000000000009 /* CueDiagramView.swift */,
 				B0D7000000000000000001C0 /* BodyCoachModels.swift */,
 				B0D7000000000000000001C2 /* BodyCoachViews.swift */,
 				B0D7000000000000000001C4 /* LiftFormView.swift */,
@@ -2176,6 +2194,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F700000000013 /* Info.plist */,
 				B5A100000000000000000015 /* HermesMobile.entitlements */,
 				1A2B3C4D5E6F70000000301 /* PrivacyInfo.xcprivacy */,
+				CD1A60000000000000000001 /* CueDiagrams.json */,
 				488791F556304AD2AC59BC5D /* ThirdPartyNotices */,
 			);
 			path = Resources;
@@ -2197,6 +2216,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D7000000000000000001B3 /* WeeklyReviewV4Tests.swift */,
 				B0D700000000000000000026 /* WorkoutFinishTests.swift */,
 				B0D7000000000000000000E7 /* LiftResultsTests.swift */,
+				CD1A6000000000000000000B /* CueDiagramTests.swift */,
+				CD1A6000000000000000000D /* CueDiagramSnapshotTests.swift */,
 				B0D7000000000000000001D0 /* WorkoutCoachTests.swift */,
 				B0D7000000000000000001D2 /* LiftFormViewModelTests.swift */,
 				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
@@ -3423,6 +3444,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				10CA110C0DE000000000B001 /* Localizable.xcstrings in Resources */,
 				10CA110C0DE000000000B004 /* AppShortcuts.xcstrings in Resources */,
 				1A2B3C4D5E6F70000000300 /* PrivacyInfo.xcprivacy in Resources */,
+				CD1A60000000000000000002 /* CueDiagrams.json in Resources */,
 				9E2A653D968A4ACDA19A8142 /* ThirdPartyNotices in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -3587,6 +3609,10 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D7000000000000000000E2 /* BodySessionView.swift in Sources */,
 				B0D7000000000000000000E4 /* LiftResults.swift in Sources */,
 				B0D7000000000000000000E6 /* LiftResultsCard.swift in Sources */,
+				CD1A60000000000000000004 /* CueDiagramModel.swift in Sources */,
+				CD1A60000000000000000006 /* CueDiagramGeometry.swift in Sources */,
+				CD1A60000000000000000008 /* CueDiagramDrawing.swift in Sources */,
+				CD1A6000000000000000000A /* CueDiagramView.swift in Sources */,
 				B0D7000000000000000001C1 /* BodyCoachModels.swift in Sources */,
 				B0D7000000000000000001C3 /* BodyCoachViews.swift in Sources */,
 				B0D7000000000000000001C5 /* LiftFormView.swift in Sources */,
@@ -4089,6 +4115,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D7000000000000000001B2 /* WeeklyReviewV4Tests.swift in Sources */,
 				B0D700000000000000000027 /* WorkoutFinishTests.swift in Sources */,
 				B0D7000000000000000000E8 /* LiftResultsTests.swift in Sources */,
+				CD1A6000000000000000000C /* CueDiagramTests.swift in Sources */,
+				CD1A6000000000000000000E /* CueDiagramSnapshotTests.swift in Sources */,
 				B0D7000000000000000001D1 /* WorkoutCoachTests.swift in Sources */,
 				B0D7000000000000000001D3 /* LiftFormViewModelTests.swift in Sources */,
 				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
