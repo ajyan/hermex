@@ -25,37 +25,57 @@ struct YearOfWeeksView: View {
         WeeksModel.tiles(year: year, today: model.now(), records: model.recordDates, photos: model.photoDates, decks: model.unfiledDecks)
     }
 
+    /// Which branch `body` shows, for the load swap.
+    private enum LoadPhase { case loading, loaded, failed }
+
+    private var loadPhase: LoadPhase {
+        if model.isLoaded { return .loaded }
+        return isLoading || model.loadError == nil ? .loading : .failed
+    }
+
     var body: some View {
-        Group {
-            if model.isLoaded {
-                grid
-            } else if isLoading || model.loadError == nil {
-                // Until every folder has been read once, a tile can't tell a sealed week from a missed one.
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
+        ZStack {
+            switch loadPhase {
+            case .loaded:
+                grid(placeholder: false)
+            case .loading:
+                // Until every folder has been read once, a tile can't tell a sealed week from a missed one: the
+                // calendar alone draws the grid, redacted and still.
+                grid(placeholder: true)
+                    .redacted(reason: .placeholder)
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(verbatim: "Loading your weeks"))
+            case .failed:
                 HXFailedView(title: "Couldn't read your weeks", message: "Check your connection and try again.") {
                     Task { await load() }
                 }
             }
         }
+        .hxLoadSwap(loadPhase)
         .background(Color.hxCanvas.ignoresSafeArea())
         .hxNavigationTitle("Your year in weeks")
         .task { await load() }
     }
 
-    private var grid: some View {
+    /// The year's tiles; a `placeholder` grid (folders not read yet) leaves out a past read's failure.
+    private func grid(placeholder: Bool) -> some View {
         let tiles = tiles
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header(reviewed: tiles.filter { if case .reviewed = $0.state { true } else { false } }.count, total: tiles.count)
-                if let loadError = model.loadError {
+                if !placeholder, let loadError = model.loadError {
                     // The tiles show the last good read; a later one failed.
                     HXFailedView(title: loadError, style: .inline) { Task { await load() } }
                         .padding(.top, 8)
                 }
                 LazyVGrid(columns: columns, spacing: 4) {
                     ForEach(tiles, id: \.weekEnding) { tile in
-                        tileView(tile)
+                        if placeholder {
+                            placeholderTile(tile)
+                        } else {
+                            tileView(tile)
+                        }
                     }
                 }
                 .padding(.top, 16)
@@ -138,6 +158,20 @@ struct YearOfWeeksView: View {
         case .reviewed, .unreviewed(hasDeck: true): true
         case .current: model.unfiledDecks.contains(tile.weekEnding)
         case .unreviewed(hasDeck: false), .future: false
+        }
+    }
+
+    /// A tile before the folders are read: the calendar knows this week and the weeks ahead; a past week,
+    /// sealed or missed, is a plain fill until then.
+    @ViewBuilder
+    private func placeholderTile(_ tile: (weekEnding: String, number: Int, state: WeekTileState)) -> some View {
+        switch tile.state {
+        case .future, .current:
+            tileFace(tile).aspectRatio(1, contentMode: .fit)
+        case .reviewed, .unreviewed:
+            RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
+                .fill(Color(.tertiarySystemFill))
+                .aspectRatio(1, contentMode: .fit)
         }
     }
 
