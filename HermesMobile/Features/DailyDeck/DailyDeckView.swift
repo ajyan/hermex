@@ -52,7 +52,8 @@ struct DailyDeckView: View {
     }
 
     var body: some View {
-        content
+        ZStack { content }
+            .hxLoadSwap(loadPhase)
             .environment(showsLabels ? labels : nil)
             .environment(showsLabels && viewModel.date == viewModel.today && !viewModel.isReview ? labelQueue : nil)
             .environment(goals)
@@ -162,11 +163,26 @@ struct DailyDeckView: View {
         .dailyDeck(title: viewModel.title, date: viewModel.date, kind: viewModel.kind, page: viewModel.currentPage)
     }
 
+    /// Which of `content`'s branches shows, without its payload: the load swap crossfades once per branch
+    /// change, never when a read in place brings new cards.
+    private enum LoadPhase { case loading, workspace, noDeck, failed, ready }
+
+    private var loadPhase: LoadPhase {
+        switch viewModel.state {
+        case .idle, .loading: .loading
+        case .needsWorkspace: .workspace
+        case .noDeck: .noDeck
+        case .failed: .failed
+        case .ready: .ready
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .idle, .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A day this device hasn't kept yet; a kept one opens from its copy (`DailyDeckViewModel.load`).
+            HXModuleHomePlaceholder(name: viewModel.title)
         case .needsWorkspace(let paths):
             workspacePicker(paths)
         case .noDeck:

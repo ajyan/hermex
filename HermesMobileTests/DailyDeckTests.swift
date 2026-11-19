@@ -2435,6 +2435,85 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertNil(store.deckCopy(for: server, date: "2026-10-04", kind: "morning"), "removing a server removes its copy")
     }
 
+    /// Today's kept brief shows at once (no placeholder) while the server's is read, and File It waits for
+    /// that read; the server's deck then replaces the copy in place, on the same card.
+    @MainActor
+    func testTodaysBriefOpensFromItsCopyThenReadsInPlace() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        await makeViewModel(client).load()  // keeps today's copy
+        client.files["briefs/2026-10-04.morning.json"] = Self.deckJSON.replacingOccurrences(of: "Sun, Oct 4", with: "Sunday")
+
+        let viewModel = makeViewModel(client)
+        let seen = StateLog()
+        let midRead = CopyReadLog()
+        client.readGate = {
+            await MainActor.run {
+                seen.states.append(viewModel.state)
+                midRead.title = midRead.title ?? viewModel.cards.first?.title
+                midRead.canFile = midRead.canFile ?? viewModel.canFile
+                midRead.isOfflineCopy = midRead.isOfflineCopy ?? viewModel.isOfflineCopy
+            }
+            if midRead.filed == nil { midRead.filed = .some(await viewModel.file()) }
+        }
+        await viewModel.load()
+
+        XCTAssertEqual(seen.states.first, .ready, "the copy is up before the server answers")
+        XCTAssertEqual(midRead.title, "Sun, Oct 4", "the device's copy")
+        XCTAssertEqual(midRead.canFile, false, "filing waits for the server's deck")
+        XCTAssertEqual(midRead.isOfflineCopy, false, "a copy being read again isn't offline")
+        XCTAssertNotNil(midRead.filed, "File It was tried mid-read")
+        XCTAssertNil(midRead.filed ?? nil, "File It does nothing until the read lands")
+        XCTAssertTrue(client.fileRequests.isEmpty)
+
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(viewModel.cards.first?.title, "Sunday", "the server's deck replaces the copy")
+        XCTAssertFalse(viewModel.isAwaitingLiveRead)
+        XCTAssertFalse(viewModel.isOfflineCopy)
+        XCTAssertTrue(viewModel.canFile)
+    }
+
+    /// A copy shown first whose read then fails stays up, marked as the offline copy.
+    @MainActor
+    func testACopyWhoseReadFailsBecomesTheOfflineCopy() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        await makeViewModel(client).load()
+
+        client.listingErrors[DailyDeckPaths.directory] = URLError(.notConnectedToInternet)
+        let viewModel = makeViewModel(client)
+        let seen = StateLog()
+        client.readGate = { await MainActor.run { seen.states.append(viewModel.state) } }
+        await viewModel.load()
+
+        XCTAssertFalse(seen.states.contains(.loading))
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertTrue(viewModel.isOfflineCopy, "the header says Offline copy")
+        XCTAssertFalse(viewModel.isAwaitingLiveRead)
+    }
+
+    /// A day the device hasn't kept, and a brief whose workspace isn't chosen, read behind the placeholder.
+    @MainActor
+    func testOnlyAKeptBriefInAChosenWorkspaceOpensFromItsCopy() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: ["/vault", "/other"],
+                                             names: ["2026-10-04.morning.json", "2026-10-03.morning.json"], deck: Self.deckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+
+        let seen = StateLog()
+        client.readGate = { await MainActor.run { seen.states.append(viewModel.state) } }
+        await viewModel.show(date: "2026-10-03")
+        XCTAssertEqual(seen.states.first, .loading, "only today's brief is kept")
+        XCTAssertEqual(viewModel.state, .ready)
+
+        store.setWorkspace(nil, for: server)
+        let fresh = makeViewModel(client)
+        await fresh.load()
+        XCTAssertEqual(fresh.state, .needsWorkspace(["/vault", "/other"]), "a workspace being chosen never shows the last one's brief")
+        XCTAssertFalse(fresh.isAwaitingLiveRead)
+    }
+
     func testAHabitsSupportingInkIsNeverTheGlowFaded() {
         XCTAssertEqual(DeckPalette.book.secondaryInk, HermexPaper.knowledge.secondaryInk)
         XCTAssertEqual(DeckPalette.opener.secondaryInk, Color.hxTextSecondary, "a neutral card's supporting text is neutral")
@@ -2596,6 +2675,15 @@ actor DeckFeedbackStub: FeedbackDataClient {
 @MainActor
 final class StateLog {
     var states: [DailyDeckState] = []
+}
+
+/// What a deck opened from its copy showed while the server's read was in flight.
+final class CopyReadLog: @unchecked Sendable {
+    var title: String?
+    var canFile: Bool?
+    var isOfflineCopy: Bool?
+    /// What File It returned mid-read; nil until tried.
+    var filed: DailyDeckFilingResult??
 }
 
 final class Flag: @unchecked Sendable {

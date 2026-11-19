@@ -206,7 +206,7 @@ struct DeckMandarinCard: View {
             MandarinTakeaway(tag: nil, text: item.hanzi, pinyin: item.pinyin,
                              note: [item.example, item.exampleEn ?? item.note].compactMap { $0 }.joined(separator: "\n"),
                              palette: palette, speaker: speaker)
-                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
             if let error = practice.recallError {
                 Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(palette.colors.secondaryInk)
             }
@@ -329,7 +329,7 @@ struct DeckMandarinCard: View {
     private func feedbackBlocks(_ feedback: DeckMandarinFeedback) -> some View {
         MandarinTakeaway(tag: "Said naturally", text: feedback.natural, pinyin: feedback.naturalPinyin, note: nil,
                          palette: palette, speaker: speaker)
-            .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+            .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
         ForEach(feedback.gaps, id: \.self) { gap in
             row("New word", gap.hanzi, pinyin: gap.pinyin,
                 note: [gap.en, gap.build].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
@@ -375,7 +375,7 @@ struct DeckMandarinCard: View {
 
     private func row(_ tag: String, _ text: String, pinyin: String?, note: String?) -> some View {
         MandarinRow(tag: tag, text: text, pinyin: pinyin, note: note, palette: palette, speaker: speaker)
-            .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+            .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
     }
 
     private typealias Action = (label: String, symbol: String, run: () -> Void)
@@ -574,7 +574,7 @@ struct MandarinCueChips: View {
                 MandarinRow(tag: phrase.kindLabel ?? "Phrase", text: phrase.hanzi, pinyin: phrase.pinyin,
                             note: [phrase.example, phrase.exampleEn, phrase.note].compactMap { $0 }.joined(separator: "\n"),
                             palette: palette, speaker: speaker)
-                    .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                    .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
             }
         }
     }

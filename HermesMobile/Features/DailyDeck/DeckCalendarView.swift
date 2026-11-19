@@ -90,7 +90,7 @@ struct DeckCalendarView: View {
                         NavigationLink(value: WeekRoute.year) {
                             row(symbol: "square.grid.3x3", title: "Your year in weeks")
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.chatTactile(.card))
                     }
                     monthHeader
                     weekdayHeader
@@ -257,7 +257,7 @@ struct DeckCalendarView: View {
             row(symbol: review.kind == "weekly" ? "calendar.badge.clock" : "calendar", title: review.label,
                 status: sealed ? ("Sealed", "checkmark.seal") : filed ? ("Filed", "checkmark") : nil, framed: false)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
     }
 
     /// A tappable row: a review, or the way into the year of weeks.
