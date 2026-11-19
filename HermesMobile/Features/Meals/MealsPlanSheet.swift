@@ -115,7 +115,7 @@ private struct PlanChoice: View {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.capsule))
     }
 }
 
@@ -138,19 +138,40 @@ private struct PlanLoadState<Value: Equatable, Content: View>: View {
     @ViewBuilder let content: (Value) -> Content
 
     var body: some View {
-        switch state {
-        case .loading:
-            ProgressView().frame(maxWidth: .infinity, minHeight: 200)
-        case .unavailable:
-            ContentUnavailableView {
-                Label { Text(verbatim: "No planner on this server") } icon: { Image(systemName: "calendar") }
-            } description: {
-                Text(verbatim: "This server doesn't serve the weekend planner. It needs the Meals API from your hermes-webui fork.")
+        Group {
+            switch state {
+            case .loading:
+                // The step's heading and a card of rows, still, until the step loads.
+                VStack(alignment: .leading, spacing: BrainStyle.l) {
+                    HXPlaceholderLines(trailingInsets: [120, 40])
+                    HXPlaceholderLines()
+                        .padding(16)
+                        .hxCard()
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: "Loading"))
+            case .unavailable:
+                ContentUnavailableView {
+                    Label { Text(verbatim: "No planner on this server") } icon: { Image(systemName: "calendar") }
+                } description: {
+                    Text(verbatim: "This server doesn't serve the weekend planner. It needs the Meals API from your hermes-webui fork.")
+                }
+            case .failed(let message):
+                HXFailedView(title: "Couldn't load this step", message: message) { Task { await retry() } }
+            case .loaded(let value):
+                content(value)
             }
-        case .failed(let message):
-            HXFailedView(title: "Couldn't load this step", message: message) { Task { await retry() } }
-        case .loaded(let value):
-            content(value)
+        }
+        .hxLoadSwap(phase)
+    }
+
+    /// Which branch shows, for `.hxLoadSwap`; never the step's payload.
+    private var phase: Int {
+        switch state {
+        case .loading: 0
+        case .loaded: 1
+        case .unavailable: 2
+        case .failed: 3
         }
     }
 }
@@ -297,7 +318,7 @@ private struct MealsPlanReviewStep: View {
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.chatTactile(.card))
                 .foregroundStyle(atlas.glow)
             }
         } footer: {
@@ -400,7 +421,7 @@ private struct MealsPlanLeftStep: View {
                         .padding(.vertical, 10)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                     .accessibilityAddTraits(model.checked.contains(item.text) ? .isSelected : [])
                 }
             }
@@ -498,7 +519,7 @@ private struct MealsPlanFillStep: View {
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.capsule))
                     .accessibilityHint(Text(verbatim: "Adds it to the first open night"))
                 }
             }

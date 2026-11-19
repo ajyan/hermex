@@ -215,7 +215,7 @@ struct MealsAddLinkSheet: View {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.capsule))
     }
 }
 

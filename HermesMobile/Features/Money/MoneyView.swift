@@ -23,6 +23,7 @@ struct MoneyView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(phase)
             .hxNavigationTitle("Money", subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -54,11 +55,22 @@ struct MoneyView: View {
         return (viewModel.isFixture ? "Fixtures · " : "") + "Updated " + MoneyView.relativeTime(asOf)
     }
 
+    /// Which branch shows, for `.hxLoadSwap`; never the snapshot itself.
+    private var phase: Int {
+        switch viewModel.state {
+        case .idle, .loading: 0
+        case .ready: 1
+        case .needsWorkspace: 2
+        case .noSnapshot: 3
+        case .failed: 4
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .idle, .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Money", paper: .money)
         case .needsWorkspace(let paths):
             workspacePicker(paths)
         case .noSnapshot:
@@ -214,7 +226,7 @@ struct MoneyView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .hxCardSurface(.neutral)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .accessibilityHint(Text(verbatim: "Opens the market card"))
     }
 
@@ -262,7 +274,7 @@ struct MoneyView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .hxCardSurface(.neutral)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .accessibilityElement(children: .combine)
         .accessibilityHint(Text(verbatim: "Opens spending"))
     }

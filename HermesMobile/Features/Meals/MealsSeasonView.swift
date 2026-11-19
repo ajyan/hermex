@@ -150,6 +150,7 @@ struct MealsSeasonView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(phase)
             .hxNavigationTitle(title)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -174,11 +175,21 @@ struct MealsSeasonView: View {
         return "Season"
     }
 
+    /// Which branch shows, for `.hxLoadSwap`; never the payload.
+    private var phase: Int {
+        switch model.state {
+        case .loading: 0
+        case .loaded: 1
+        case .unavailable: 2
+        case .failed: 3
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch model.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "the season", paper: paper)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No season pages on this server") } icon: { Image(systemName: "leaf") }
@@ -286,7 +297,7 @@ struct MealsSeasonView: View {
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                     .accessibilityLabel(Text(verbatim: "\(pick.name), \(pick.count ?? 0) times"))
                 }
             }
@@ -304,7 +315,7 @@ struct MealsSeasonView: View {
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.capsule))
                 }
             }
         }

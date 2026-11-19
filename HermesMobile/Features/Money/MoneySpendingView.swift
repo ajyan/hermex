@@ -139,7 +139,7 @@ struct MoneySpendingView: View {
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.capsule))
         .accessibilityHint(Text(verbatim: "Starts a chat with Atlas"))
     }
 

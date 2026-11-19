@@ -23,6 +23,7 @@ struct MealsBookView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(phase)
             .hxNavigationTitle("Recipes", subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -48,11 +49,21 @@ struct MealsBookView: View {
         return book.dishes.count == 1 ? "1 dish" : "\(book.dishes.count) dishes"
     }
 
+    /// Which branch shows, for `.hxLoadSwap`; never the payload.
+    private var phase: Int {
+        switch viewModel.state {
+        case .loading: 0
+        case .loaded: 1
+        case .unavailable: 2
+        case .failed: 3
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Recipes", paper: paper)
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Recipes on this server") } icon: { Image(systemName: "book.closed") }
@@ -113,7 +124,7 @@ struct MealsBookView: View {
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.capsule))
                 }
             }
         }
@@ -159,7 +170,7 @@ struct MealsBookView: View {
                                             .frame(minHeight: 44)
                                             .contentShape(Rectangle())
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.chatTactile(.capsule))
                                 }
                             }
                         }
@@ -192,7 +203,7 @@ struct MealsBookView: View {
             .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .overlay(alignment: .top) { Rectangle().fill(paper.edge).frame(height: 0.5) }
         .accessibilityElement(children: .combine)
     }
@@ -235,7 +246,7 @@ struct MealsBookView: View {
                     )
                     .padding(.horizontal, 16)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.chatTactile(.card))
             }
         }
         .hxCard()
