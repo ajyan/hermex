@@ -1131,24 +1131,23 @@ struct DeckCardView: View {
     /// File It (Seal the week on a weekly review), then Rate earlier cards on today's morning deck.
     @ViewBuilder
     private func fileButton() -> some View {
-        let filed = viewModel.isFiled && !viewModel.hasChanges
-        // The card's one filled button wears its glow (Seal the week on the dusk review included); only on a
-        // neutral card (the habit tracker, the opener's paper) is it Nous blue.
-        let nous = palette.isNeutralCard
+        // The card's one filled button wears its glow (Seal the week on the dusk review included) through the
+        // card's `\.hxPaper`; only on a neutral card (the habit tracker, the opener's paper) is it Nous blue.
+        // Disabled until the server's deck is read (a device copy shows first) and while nothing changed.
         let sealsWeek = viewModel.isSealedWeekly
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(nous ? Color.hxOnAccent : palette.onInk) }
+                if viewModel.filing == .filing { ProgressView() }
                 Text(verbatim: sealsWeek ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
                      : viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(nous ? Color.hxOnAccent : palette.onInk)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(nous ? Color.accentColor.opacity(filed ? 0.35 : 1) : palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
+            .frame(minHeight: 32)
         }
-        .buttonStyle(.plain)
-        .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+        .disabled(!viewModel.canFile || !viewModel.hasChanges)
+        // Filing landed: the morning's last act.
+        .hxSensoryFeedback(.success, trigger: viewModel.filing) { old, new in old == .filing && new == .idle }
         .padding(.top, 28)
         if let labelQueue {
             RateRecentCardsLink(queue: labelQueue, palette: palette)
