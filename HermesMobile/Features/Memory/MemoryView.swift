@@ -52,80 +52,91 @@ struct MemoryView: View {
             .transcriptLinks()
     }
 
-    @ViewBuilder
+    /// Which of the screen's states is up. `.hxLoadSwap` crossfades on this,
+    /// never on the text, so a refresh or a save doesn't fade the page.
+    private enum Phase: Hashable {
+        case loading, failed, loaded
+    }
+
+    private var phase: Phase {
+        if viewModel.hasLoaded { return .loaded }
+        if viewModel.errorMessage != nil, !viewModel.isLoading { return .failed }
+        return .loading
+    }
+
     private var content: some View {
-        if viewModel.isLoading && !viewModel.hasLoaded {
-            ProgressView("Loading memory...")
-        } else if let errorMessage = viewModel.errorMessage, !viewModel.hasLoaded {
-            ContentUnavailableView {
-                Label("Could Not Load Memory", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(errorMessage)
-            } actions: {
-                Button("Try Again") {
+        Group {
+            switch phase {
+            case .loading:
+                MemoryLoadingPlaceholder()
+            case .failed:
+                HXFailedView(title: String(localized: "Couldn't load memory"), message: viewModel.errorMessage) {
                     Task { await loadMemory() }
                 }
+            case .loaded:
+                memorySections
             }
-        } else if !viewModel.hasLoaded {
-            ProgressView("Loading memory...")
-        } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    ForEach(MemorySection.allCases) { section in
-                        VStack(alignment: .leading, spacing: 8) {
-                            MemorySectionHeader(
-                                section: section,
-                                modifiedAt: viewModel.modifiedAt(for: section),
-                                isEditingDisabled: viewModel.isSaving
-                            ) {
-                                viewModel.clearActionError()
-                                editingSection = section
-                            }
+        }
+        .hxLoadSwap(phase)
+    }
+
+    private var memorySections: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                ForEach(MemorySection.allCases) { section in
+                    VStack(alignment: .leading, spacing: 8) {
+                        MemorySectionHeader(
+                            section: section,
+                            modifiedAt: viewModel.modifiedAt(for: section),
+                            isEditingDisabled: viewModel.isSaving
+                        ) {
+                            viewModel.clearActionError()
+                            editingSection = section
+                        }
+                        .padding(.horizontal, 4)
+
+                        MemorySectionContent(
+                            section: section,
+                            content: viewModel.content(for: section)
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .hxCard()
+                    }
+                }
+
+                if viewModel.showsProjectContext {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ProjectContextSectionHeader(modifiedAt: viewModel.projectContextMtime)
                             .padding(.horizontal, 4)
 
-                            MemorySectionContent(
-                                section: section,
-                                content: viewModel.content(for: section)
-                            )
+                        MarkdownRenderer(content: viewModel.projectContextText ?? "")
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .hxCard()
-                        }
-                    }
 
-                    if viewModel.showsProjectContext {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ProjectContextSectionHeader(modifiedAt: viewModel.projectContextMtime)
-                                .padding(.horizontal, 4)
-
-                            MarkdownRenderer(content: viewModel.projectContextText ?? "")
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .hxCard()
-
-                            ProjectContextSectionFooter(
-                                detail: viewModel.projectContextDetail,
-                                isShadowed: viewModel.isProjectContextShadowed
-                            )
-                            .font(AppFont.footnote())
-                            .foregroundStyle(Color.hxTextSecondary)
-                            .padding(.horizontal, 4)
-                        }
+                        ProjectContextSectionFooter(
+                            detail: viewModel.projectContextDetail,
+                            isShadowed: viewModel.isProjectContextShadowed
+                        )
+                        .font(AppFont.footnote())
+                        .foregroundStyle(.hxSecondary)
+                        .padding(.horizontal, 4)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-                .padding(.bottom, 32)
             }
-            .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
-            .refreshable {
-                await loadMemory()
-            }
-            // Wide tables fade into the card they sit on.
-            .environment(\.markdownTableEdgeFadeColor, Color.hxSurface)
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 32)
         }
+        .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        .refreshable {
+            await loadMemory()
+        }
+        // Wide tables fade into the card they sit on.
+        .environment(\.markdownTableEdgeFadeColor, Color.hxSurface)
     }
 
     private func loadMemory() async {
@@ -362,5 +373,36 @@ private extension MemorySection {
         case .soul:
             return "sparkles"
         }
+    }
+}
+
+/// The page's first frame while memory loads: each section's real header over
+/// a card of static placeholder lines, so the text lands where the lines stood.
+/// Static, and VoiceOver hears one "Loading memory".
+private struct MemoryLoadingPlaceholder: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                ForEach(MemorySection.allCases) { section in
+                    VStack(alignment: .leading, spacing: 8) {
+                        MemoryHeaderTitle(title: section.title, systemImage: section.systemImage)
+                            .padding(.horizontal, 4)
+
+                        HXPlaceholderLines()
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .hxCard()
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+        }
+        .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        .scrollDisabled(true)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Loading memory"))
     }
 }

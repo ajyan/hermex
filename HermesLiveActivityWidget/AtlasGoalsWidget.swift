@@ -115,7 +115,9 @@ private struct AtlasGoalRow: View {
             } else {
                 Button(intent: GoalWidgetCheckInIntent(slug: item.slug, commitment: item.commitment, done: !item.isDone)) {
                     // The whole row's height takes the tap, though the widget keeps rows compact.
+                    // While the check-in runs, the system dims the mark until the reload lands.
                     mark
+                        .invalidatableContent()
                         .frame(maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }

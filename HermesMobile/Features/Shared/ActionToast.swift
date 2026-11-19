@@ -48,7 +48,7 @@ final class ActionToastState {
     }
 
     static func transition(reduceMotion: Bool) -> AnyTransition {
-        reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity)
+        HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion)
     }
 
     static func animation(reduceMotion: Bool) -> Animation {

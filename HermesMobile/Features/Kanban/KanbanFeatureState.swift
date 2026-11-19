@@ -466,10 +466,11 @@ final class KanbanFeatureState {
         self.defaults = defaults
     }
 
-    /// Whether the Card list shows its "Refreshing Board" row: while a Board loads with no
-    /// snapshot on screen (first load, Board switch) or with one fetched under other filters
-    /// (a filter change). Live, poll, mutation, and pull refreshes of the Board on screen
-    /// update the rows in place without it.
+    /// Whether the Board shows it is refreshing: while a Board loads with no snapshot on
+    /// screen (first load, Board switch), as a "Refreshing Board" row in the Card list, or
+    /// with one fetched under other filters (a filter change), as a spinner in the Board
+    /// picker over the stale Cards. Live, poll, mutation, and pull refreshes of the Board on
+    /// screen update the rows in place without it.
     var showsBoardLoadingRow: Bool {
         isRefreshing && (snapshot == nil || snapshotRequest != filteredBoardRequest)
     }

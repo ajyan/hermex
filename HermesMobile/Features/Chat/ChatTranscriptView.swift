@@ -122,7 +122,19 @@ struct ChatTranscriptView: View {
     /// What the call that just ended saved; shown under the last turn until the next message.
     var callReceipt: CallReceipt? = nil
 
+    /// The skeleton crossfades into the transcript (or the empty or failed state) once,
+    /// on `swap`. Keyed on a Bool that is false whenever any message is on screen, so
+    /// appends, streaming, and scrolling never run inside this animation. Only leaving
+    /// the skeleton animates: the load starts after the first frame, and fading the empty
+    /// state into the skeleton would draw out that frame.
     var body: some View {
+        let showsSkeleton = isLoading && messages.isEmpty
+        stateContent
+            .animation(showsSkeleton ? nil : HXMotion.swap(reduceMotion: reduceMotion), value: showsSkeleton)
+    }
+
+    @ViewBuilder
+    private var stateContent: some View {
         if isLoading && messages.isEmpty {
             ChatTranscriptLoadingSkeletonView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

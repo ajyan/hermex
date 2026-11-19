@@ -121,6 +121,8 @@ private struct AtlasMealsWidgetView: View {
                         .foregroundStyle(paper.onGlow)
                         .frame(maxWidth: .infinity, minHeight: 36)
                         .background(paper.glow, in: Capsule())
+                        // Dimmed by the system while the log runs, until the reload lands.
+                        .invalidatableContent()
                 }
                 .buttonStyle(.plain)
                 if meals.syncFailed {

@@ -10,6 +10,9 @@ struct TasksView: View {
     /// "Ran Recently" shows a few rows until the user asks for the rest. View
     /// state only: every fresh visit starts compact.
     @State private var isShowingAllRecentRuns = false
+    /// False until the first load settles, so the frame before `.task` starts
+    /// shows the placeholder rather than flashing "No Tasks".
+    @State private var hasLoadedOnce = false
 
     /// Rows "Ran Recently" shows before it needs a "Show all" row.
     private static let compactRecentRunCount = 3
@@ -81,32 +84,43 @@ struct TasksView: View {
             }
             .task {
                 await loadTasks()
+                hasLoadedOnce = true
             }
     }
 
-    @ViewBuilder
+    /// Which of the screen's states is up. `.hxLoadSwap` crossfades on this,
+    /// never on the jobs, so a refresh with new rows doesn't fade the list.
+    private enum Phase: Hashable {
+        case loading, failed, empty, loaded
+    }
+
+    private var phase: Phase {
+        if !viewModel.jobs.isEmpty { return .loaded }
+        if viewModel.isLoading || !hasLoadedOnce { return .loading }
+        if viewModel.errorMessage != nil { return .failed }
+        return .empty
+    }
+
     private var content: some View {
-        if viewModel.isLoading && viewModel.jobs.isEmpty {
-            ProgressView("Loading tasks...")
-        } else if let errorMessage = viewModel.errorMessage, viewModel.jobs.isEmpty {
-            ContentUnavailableView {
-                Label("Could Not Load Tasks", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(errorMessage)
-            } actions: {
-                Button("Try Again") {
+        Group {
+            switch phase {
+            case .loading:
+                TasksLoadingPlaceholder()
+            case .failed:
+                HXFailedView(title: String(localized: "Couldn't load tasks"), message: viewModel.errorMessage) {
                     Task { await loadTasks() }
                 }
+            case .empty:
+                ContentUnavailableView {
+                    Label("No Tasks", systemImage: "calendar.badge.clock")
+                } description: {
+                    Text("Scheduled jobs from the Hermes server will appear here.")
+                }
+            case .loaded:
+                agenda
             }
-        } else if viewModel.jobs.isEmpty {
-            ContentUnavailableView {
-                Label("No Tasks", systemImage: "calendar.badge.clock")
-            } description: {
-                Text("Scheduled jobs from the Hermes server will appear here.")
-            }
-        } else {
-            agenda
         }
+        .hxLoadSwap(phase)
     }
 
     private var sections: [TaskAgendaSection] {
@@ -318,6 +332,65 @@ struct TasksView: View {
         if let lastError = viewModel.lastError {
             onAPIError(lastError)
         }
+    }
+}
+
+/// The agenda's first frame while the jobs load: a section of rows shaped like
+/// `CronJobRowView` (status dot, name, schedule line), redacted. Static, so it
+/// costs nothing on screen, and VoiceOver hears one "Loading tasks".
+private struct TasksLoadingPlaceholder: View {
+    private static let rows: [(name: String, meta: String)] = [
+        ("Morning briefing", "7:00 AM · Every day"),
+        ("Inbox sweep", "9:30 AM · Weekdays"),
+        ("Weekly review draft", "Sunday 6:00 PM · Every week"),
+        ("Backup check", "11:00 PM · Every day"),
+    ]
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(Self.rows.indices, id: \.self) { index in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Circle()
+                            .fill(Color(.tertiarySystemFill))
+                            .frame(width: 8, height: 8)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: Self.rows[index].name)
+                                .font(AppFont.subheadline(weight: .semibold))
+                            Text(verbatim: Self.rows[index].meta)
+                                .font(AppFont.caption())
+                                .foregroundStyle(.hxSecondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .listRowBackground(Color.hxSurface)
+                }
+            } header: {
+                HXSectionHeader(title: "Later today")
+                    .textCase(nil)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .scrollDisabled(true)
+        .background(Color.hxCanvas)
+        // The agenda's filter bar, so the rows don't drop by its height when the jobs land.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Picker(selection: .constant(TaskFilter.all)) {
+                ForEach(TaskFilter.allCases) { filter in
+                    Text(filter.title(count: 0)).tag(filter)
+                }
+            } label: {
+                EmptyView()
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(Color.hxCanvas)
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Loading tasks"))
     }
 }
 

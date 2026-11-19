@@ -38,8 +38,30 @@ struct ActivityView: View {
             }
     }
 
-    @ViewBuilder
+    /// Which of the screen's states is up. `.hxLoadSwap` crossfades on this,
+    /// never on the events, so live pages and refreshes don't fade the list.
+    private enum Phase: Hashable {
+        case notInstalled, notConsented, serviceDown, failed, loading, timeline
+    }
+
+    private var phase: Phase {
+        switch viewModel.state {
+        case .notInstalled: .notInstalled
+        case .notConsented: .notConsented
+        case .serviceDown where viewModel.events.isEmpty: .serviceDown
+        case .failed where viewModel.events.isEmpty: .failed
+        case .idle: .loading
+        case .loading where viewModel.events.isEmpty: .loading
+        default: .timeline
+        }
+    }
+
     private var content: some View {
+        stateContent.hxLoadSwap(phase)
+    }
+
+    @ViewBuilder
+    private var stateContent: some View {
         switch viewModel.state {
         case .notInstalled:
             ContentUnavailableView("Activity isn't set up on this server", systemImage: "tray")
@@ -54,7 +76,7 @@ struct ActivityView: View {
                 }
             }
         case .idle, .loading where viewModel.events.isEmpty:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            ActivityLoadingPlaceholder()
         default:
             timeline
         }
@@ -167,6 +189,43 @@ struct ActivityView: View {
         .padding(.vertical, 8)
         // Matches the navigation bar and list, so no seam shows under the picker.
         .background(Color.hxCanvas)
+    }
+}
+
+/// The timeline's first frame while it loads: a day of rows shaped like
+/// `ActivityRow` (tool tile, title, command, source line), with sample text,
+/// redacted. Static, and VoiceOver hears one "Loading activity".
+private struct ActivityLoadingPlaceholder: View {
+    var body: some View {
+        List {
+            Section {
+                ForEach(0..<5, id: \.self) { _ in
+                    HStack(alignment: .top, spacing: 12) {
+                        ActivityToolTile(symbol: "terminal")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(verbatim: "Terminal")
+                                .font(AppFont.subheadline(weight: .semibold))
+                                .foregroundStyle(Color.hxTextPrimary)
+                            Text(verbatim: "git status --short")
+                                .font(AppFont.mono(style: .caption))
+                                .foregroundStyle(.hxSecondary)
+                            Text(verbatim: "Chat · Allowed · 9:41 AM")
+                                .font(AppFont.caption())
+                                .foregroundStyle(.hxSecondary)
+                        }
+                    }
+                    .listRowBackground(Color.hxSurface)
+                }
+            } header: {
+                HXSectionHeader(title: "Today")
+                    .textCase(nil)
+            }
+        }
+        .scrollDisabled(true)
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Loading activity"))
     }
 }
 

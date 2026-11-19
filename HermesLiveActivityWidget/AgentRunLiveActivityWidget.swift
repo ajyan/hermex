@@ -219,15 +219,21 @@ private struct AgentRunLockScreenView: View {
 }
 
 /// Bounded detail chips: a bot's counts, or a webui run's counts and freshness (#644).
-/// Only the system-drawn relative time moves; the app never repaints this row.
+/// Only the system-drawn relative time moves; the app never repaints this row. Chips keep
+/// their place as identity, so a count that changes between updates rolls its digits
+/// (ActivityKit animates the content-state change) instead of swapping the chip.
 private struct AgentRunChipRow: View {
     let chips: [AgentRunDetailChip]
     let isDimmed: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(chips, id: \.self) { chip in
+            ForEach(chips.indices, id: \.self) { index in
+                let chip = chips[index]
                 label(for: chip)
+                    .contentTransition(chip.isCount && !reduceMotion ? .numericText() : .identity)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(isDimmed || !chip.isCount ? AgentRunLiveActivityTheme.secondaryText : AgentRunLiveActivityTheme.primaryText)
                     .lineLimit(1)
