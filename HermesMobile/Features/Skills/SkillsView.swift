@@ -7,6 +7,9 @@ struct SkillsView: View {
     @State private var viewModel: SkillsViewModel
     @State private var selectedSkill: SkillSummary?
     @State private var searchText = ""
+    /// False until the first load settles, so the frame before `.task` starts
+    /// shows the placeholder rather than flashing "No Skills".
+    @State private var hasLoadedOnce = false
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
         self.server = server
@@ -36,6 +39,7 @@ struct SkillsView: View {
             }
             .task {
                 await loadSkills()
+                hasLoadedOnce = true
             }
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search skills...")
     }
@@ -44,56 +48,74 @@ struct SkillsView: View {
         viewModel.filteredGroupedSkills(searchText: searchText)
     }
 
-    @ViewBuilder
+    /// Which of the screen's states is up. `.hxLoadSwap` crossfades on this,
+    /// never on the skills, so a refresh or a toggle doesn't fade the list. Search
+    /// results and "No Results" share `.loaded`, so typing never fades the screen.
+    private enum Phase: Hashable {
+        case loading, failed, empty, loaded
+    }
+
+    private var phase: Phase {
+        if viewModel.skills.isEmpty {
+            if viewModel.isLoading || !hasLoadedOnce { return .loading }
+            return viewModel.errorMessage != nil ? .failed : .empty
+        }
+        return .loaded
+    }
+
     private var content: some View {
-        if viewModel.isLoading && viewModel.skills.isEmpty {
-            ProgressView("Loading skills...")
-        } else if let errorMessage = viewModel.errorMessage, viewModel.skills.isEmpty {
-            ContentUnavailableView {
-                Label("Could Not Load Skills", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(errorMessage)
-            } actions: {
-                Button("Try Again") {
+        Group {
+            switch phase {
+            case .loading:
+                SkillsLoadingPlaceholder()
+            case .failed:
+                HXFailedView(title: String(localized: "Couldn't load skills"), message: viewModel.errorMessage) {
                     Task { await loadSkills() }
                 }
-            }
-        } else if viewModel.skills.isEmpty {
-            ContentUnavailableView {
-                Label("No Skills", systemImage: "hammer")
-            } description: {
-                Text("Skills from the Hermes server will appear here.")
-            }
-        } else if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && filteredGroups.isEmpty {
-            ContentUnavailableView {
-                Label("No Results", systemImage: "magnifyingglass")
-            } description: {
-                Text("No skills match \"\(searchText)\".")
-            }
-        } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    ForEach(filteredGroups, id: \.category) { group in
-                        SkillCategorySection(
-                            category: group.category,
-                            skills: group.skills,
-                            server: server,
-                            togglingSkillNames: viewModel.togglingSkillNames,
-                            onToggleSkill: { skill, enabled in
-                                await toggle(skill: skill, enabled: enabled)
-                            },
-                            onAPIError: onAPIError
-                        )
-                    }
+            case .empty:
+                ContentUnavailableView {
+                    Label("No Skills", systemImage: "hammer")
+                } description: {
+                    Text("Skills from the Hermes server will appear here.")
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 32)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            case .loaded:
+                if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && filteredGroups.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Results", systemImage: "magnifyingglass")
+                    } description: {
+                        Text("No skills match \"\(searchText)\".")
+                    }
+                } else {
+                    skillList
+                }
             }
-            .refreshable {
-                await loadSkills()
+        }
+        .hxLoadSwap(phase)
+    }
+
+    private var skillList: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                ForEach(filteredGroups, id: \.category) { group in
+                    SkillCategorySection(
+                        category: group.category,
+                        skills: group.skills,
+                        server: server,
+                        togglingSkillNames: viewModel.togglingSkillNames,
+                        onToggleSkill: { skill, enabled in
+                            await toggle(skill: skill, enabled: enabled)
+                        },
+                        onAPIError: onAPIError
+                    )
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .refreshable {
+            await loadSkills()
         }
     }
 
@@ -142,7 +164,7 @@ private struct SkillCategorySection: View {
                             } : nil
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                     .opacity(skill.disabled == true ? 0.55 : 1)
                     .contextMenu {
                         if canToggle(skill) {
@@ -437,7 +459,7 @@ private struct SkillLinkedFilesSection: View {
                         .padding(.vertical, 9)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
 
                     if index < fileNames.count - 1 {
                         Divider()
@@ -493,4 +515,43 @@ struct SkillLinkedFileView: View {
 
 extension String: @retroactive Identifiable {
     public var id: String { self }
+}
+
+/// The list's first frame while skills load: one category of `SkillRow`s with
+/// sample text, redacted, so the real cards land where these stood. Static, and
+/// VoiceOver hears one "Loading skills".
+private struct SkillsLoadingPlaceholder: View {
+    private static let skills = [
+        SkillSummary(name: "Summarize a thread", category: nil, description: "Reads a conversation and writes a short summary.", path: nil),
+        SkillSummary(name: "Draft a reply", category: nil, description: "Writes a first draft in your voice.", path: nil),
+        SkillSummary(name: "Plan the week", category: nil, description: "Turns notes into a plan with dates.", path: nil),
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                HXSectionHeader(title: "Writing")
+                    .padding(.horizontal, 4)
+
+                VStack(spacing: 0) {
+                    ForEach(Self.skills.indices, id: \.self) { index in
+                        if index > 0 {
+                            PrepRowDivider()
+                        }
+                        SkillRow(skill: Self.skills[index])
+                    }
+                }
+                .padding(.horizontal, 14)
+                .hxCard()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollDisabled(true)
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Loading skills"))
+    }
 }

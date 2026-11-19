@@ -34,22 +34,37 @@ struct FeedbackInboxView: View {
             }
     }
 
-    @ViewBuilder
+    /// Which of the screen's states is up. `.hxLoadSwap` crossfades on this,
+    /// never on the entries, so a refresh or a decision doesn't fade the inbox.
+    private enum Phase: Hashable {
+        case loading, unavailable, failed, empty, loaded
+    }
+
+    private var phase: Phase {
+        switch viewModel.state {
+        case .loading: .loading
+        case .unavailable: .unavailable
+        case .failed: .failed
+        case .loaded: viewModel.sections.isEmpty ? .empty : .loaded
+        }
+    }
+
     private var content: some View {
+        stateContent.hxLoadSwap(phase)
+    }
+
+    @ViewBuilder
+    private var stateContent: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            FeedbackLoadingPlaceholder()
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No feedback inbox on this server") } icon: { Image(systemName: "message") }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load feedback") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load feedback", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded:
             let sections = viewModel.sections
@@ -141,6 +156,70 @@ struct FeedbackInboxView: View {
             }
         }
         .hxCard()
+    }
+}
+
+/// The inbox's first frame while it loads: a group header over two request
+/// cards and a card of rows, shaped like the real ones, with sample text,
+/// redacted. Static, and VoiceOver hears one "Loading feedback".
+private struct FeedbackLoadingPlaceholder: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                HXSectionHeader(title: "Approve to build tonight", trailing: "2")
+                    .padding(.top, 4)
+                ForEach(0..<2, id: \.self) { _ in
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(verbatim: "Make the brief open faster")
+                                .font(AppFont.display(style: .headline))
+                                .foregroundStyle(HermexPaper.request.glow)
+                            Text(verbatim: "Opens from the copy on the phone, then refreshes.")
+                                .font(AppFont.subheadline())
+                                .foregroundStyle(Color.hxTextPrimary)
+                            FlowRow(spacing: 6) { HXChip(paper: .tool, label: "Daily Deck") }
+                                .padding(.top, 5)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Button {} label: { Text(verbatim: "Build") }
+                            .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+                            .fixedSize()
+                    }
+                    .padding(.leading, 14)
+                    .padding(.trailing, 12)
+                    .padding(.vertical, 12)
+                    .glowSurface(.request, cornerRadius: HXRadius.lg)
+                }
+                HXSectionHeader(title: "In progress")
+                    .padding(.top, 12)
+                VStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { index in
+                        if index > 0 {
+                            PrepRowDivider().padding(.leading, 14)
+                        }
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(verbatim: "Fix the sleep chart labels")
+                                .font(AppFont.body())
+                                .foregroundStyle(Color.hxTextPrimary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(verbatim: "Building")
+                                .font(AppFont.footnote())
+                                .foregroundStyle(.hxSecondary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                    }
+                }
+                .hxCard()
+            }
+            .padding(16)
+            .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+        .scrollDisabled(true)
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Loading feedback"))
     }
 }
 
