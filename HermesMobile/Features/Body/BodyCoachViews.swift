@@ -3,9 +3,9 @@ import SwiftUI
 // Small pieces Baki's coaching shares across the workout, Body home and the Form page: the slot a
 // lift's cue diagram will fill, the focus pips, what he is watching, and the pain-score stepper.
 
-/// Where a lift's animated cue diagram goes: a 96 pt square beside the cue on the open lift's card,
-/// and a 220 pt tall stage above the title on the Form page (`large`). The diagrams ship in a later
-/// change, keyed by lift id; until then the slot draws nothing and takes no room.
+/// A lift's moving cue diagram where the coaching shows it: a 96 pt square beside the cue on the
+/// open lift's card, and a 220 pt tall stage above the title on the Form page (`large`). A lift
+/// with no diagram draws nothing and takes no room.
 struct CueDiagramSlot: View {
     let liftID: String
     var large = false
@@ -15,8 +15,21 @@ struct CueDiagramSlot: View {
     /// The stage's height on the Form page.
     static let largeHeight: CGFloat = 220
 
+    private var paper: HermexPaper { .training }
+
     var body: some View {
-        EmptyView()
+        if CueDiagramLibrary.shared.figure(for: liftID) != nil {
+            if large {
+                // On the Form page's wash card, which sits on the canvas.
+                CueDiagramView(liftID: liftID, paper: paper, stage: .hxCanvas)
+                    .frame(height: Self.largeHeight)
+                    .frame(maxWidth: .infinity)
+            } else {
+                // On the open lift's card, which is filled with the paper's card colour.
+                CueDiagramView(liftID: liftID, paper: paper, stage: paper.card)
+                    .frame(width: Self.side, height: Self.side)
+            }
+        }
     }
 }
 
