@@ -14,6 +14,7 @@ struct AtlasStatusView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle("Status", subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
@@ -29,7 +30,7 @@ struct AtlasStatusView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Status")
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Status on this server") } icon: { Image(systemName: "waveform.path.ecg") }
@@ -67,7 +68,7 @@ struct AtlasStatusView: View {
             ForEach(Array(status.tiles.enumerated()), id: \.element.id) { index, tile in
                 if index > 0 { Divider().overlay(Color.hxSeparator) }
                 Button { onOpen(.statusTile(tile.id)) } label: { row(tile) }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(Text(verbatim: AtlasStatusCopy.accessibility(tile)))
                     .accessibilityAddTraits(.isButton)
@@ -144,6 +145,7 @@ struct AtlasStatusTileView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(tile?.title ?? "Status", subtitle: tile.map { AtlasStatusCopy.word($0.state) })
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
@@ -153,7 +155,7 @@ struct AtlasStatusTileView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            HXModuleHomePlaceholder(name: "Status")
         case .unavailable:
             ContentUnavailableView(String("No Status on this server"), systemImage: "waveform.path.ecg")
         case .failed(let message):
@@ -274,6 +276,18 @@ struct AtlasStatusTileView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 4)
         .hxCard()
+    }
+}
+
+private extension AtlasStatusScreenState {
+    /// Which branch shows, for `.hxLoadSwap`; never the answer itself, so a refresh doesn't fade.
+    var phase: Int {
+        switch self {
+        case .loading: 0
+        case .loaded: 1
+        case .unavailable: 2
+        case .failed: 3
+        }
     }
 }
 
