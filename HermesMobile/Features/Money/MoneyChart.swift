@@ -47,7 +47,7 @@ struct MoneyChart: View {
         .chartLegend(.hidden)
         .chartXSelection(value: $selection)
         .onChange(of: selection) { _, date in onScrub(date) }
-        .sensoryFeedback(.selection, trigger: scrubbed?.d)
+        .hxSensoryFeedback(.selection, trigger: scrubbed?.d)
         .accessibilityElement()
         .accessibilityLabel(Text(verbatim: "Net worth chart"))
         .accessibilityValue(Text(verbatim: accessibilitySummary))

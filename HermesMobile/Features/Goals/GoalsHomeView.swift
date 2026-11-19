@@ -86,7 +86,7 @@ struct GoalsHomeView: View {
             }
             .refreshable { await viewModel.load() }
             .safeAreaInset(edge: .bottom, spacing: 0) { followUps(home) }
-            .sensoryFeedback(.success, trigger: viewModel.landedCheckIns)
+            .hxSensoryFeedback(.success, trigger: viewModel.landedCheckIns)
             .sheet(isPresented: $showsAgentGoals) { GoalsAgentList(goals: home.agentGoals) }
         }
     }

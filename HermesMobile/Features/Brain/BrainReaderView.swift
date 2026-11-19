@@ -245,7 +245,7 @@ struct BrainReaderView: View {
             } message: {
                 Text(verbatim: "Your text went out, but the server didn't record it on their page.")
             }
-            .sensoryFeedback(.success, trigger: loggedCount)
+            .hxSensoryFeedback(.success, trigger: loggedCount)
             .sheet(isPresented: $showsHubPages) {
                 if let hub = viewModel.page?.hub {
                     BrainHubPagesSheet(hub: hub, currentID: viewModel.id, onPick: jump)
@@ -263,7 +263,7 @@ struct BrainReaderView: View {
                 guard labelsAvailable, !labels.isLoaded(feature: key.feature, item: key.item) else { return }
                 try? await labels.load(feature: key.feature, item: key.item)
             }
-            .sensoryFeedback(.error, trigger: failedSteps)
+            .hxSensoryFeedback(.error, trigger: failedSteps)
             .onDisappear { stepTask?.cancel() }
     }
 

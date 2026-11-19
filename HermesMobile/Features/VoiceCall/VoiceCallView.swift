@@ -257,6 +257,7 @@ struct VoiceCallView: View {
     /// Start call was tapped on a call that waits for it.
     @State private var isStartApproved = false
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(chat: ChatViewModel, server: URL, onAPIError: @escaping (Error) -> Void, openingTurn: String? = nil,
          waitsForTap: Bool = false, onTurnTimed: (([Int]) -> Void)? = nil,
@@ -373,11 +374,11 @@ struct VoiceCallView: View {
                 guard let announcement else { return }
                 AccessibilityNotification.Announcement(announcement).post()
             }
-            .sensoryFeedback(trigger: controller?.lastSentTurn) { _, sent in
+            .hxSensoryFeedback(trigger: controller?.lastSentTurn) { _, sent in
                 sent == nil ? nil : .impact(weight: .light)
             }
             // Cutting Atlas off answers in the hand at once.
-            .sensoryFeedback(trigger: controller?.interruptions ?? 0) { old, new in
+            .hxSensoryFeedback(trigger: controller?.interruptions ?? 0) { old, new in
                 new > old ? .impact(weight: .light) : nil
             }
             .sheet(isPresented: permissionSheetBinding, onDismiss: { onClose() }) {
@@ -593,7 +594,7 @@ struct VoiceCallView: View {
                     controller?.setMuted(!isMuted)
                 } label: {
                     Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
-                        .contentTransition(.symbolEffect(.replace))
+                        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Circle())
                 }

@@ -488,7 +488,7 @@ struct WorkoutSetRow: View, Equatable {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.success, trigger: row.done) { old, new in !old && new }
+        .hxSensoryFeedback(.success, trigger: row.done) { old, new in !old && new }
         .accessibilityLabel(Text(verbatim: row.done ? "\(setName) done" : "Mark \(setName.lowercased()) done"))
     }
 

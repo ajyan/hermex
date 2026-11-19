@@ -87,8 +87,8 @@ struct PrepRunView: View {
                 didLoad = true
                 await viewModel.load()
             }
-            .sensoryFeedback(.success, trigger: passCount)
-            .sensoryFeedback(.impact(weight: .light), trigger: warmupCount)
+            .hxSensoryFeedback(.success, trigger: passCount)
+            .hxSensoryFeedback(.impact(weight: .light), trigger: warmupCount)
     }
 
     /// Changes when a recall passes, for the success haptic; misses get none.

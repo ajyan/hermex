@@ -60,6 +60,13 @@ class FindingsTests(unittest.TestCase):
                  ("HermesMobile/Features/A.swift", 2, "BrainHomeDivider()")]
         self.assertEqual(drift.findings(lines, gated=True), [])
 
+    def test_raw_sensory_feedback_is_flagged_outside_config_only(self):
+        lines = [("HermesMobile/Features/A.swift", 1, ".sensoryFeedback(.success, trigger: n)"),
+                 ("HermesMobile/Features/A.swift", 2, ".hxSensoryFeedback(.success, trigger: n)"),
+                 ("HermesMobile/Config/AppTheme.swift", 3, "content.sensoryFeedback(trigger: t) { _, _ in nil }")]
+        self.assertEqual([(rule.title, n) for rule, _, n in drift.findings(lines, gated=False)],
+                         [("raw sensoryFeedback", 1)])
+
 
 if __name__ == "__main__":
     unittest.main()

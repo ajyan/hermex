@@ -64,6 +64,10 @@ RULES: list[Rule] = [
          re.compile(r"(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear)\(|withAnimation *\{|"
                     r"withAnimation\(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear|default)\b)"),
          CONFIG),
+    Rule("raw sensoryFeedback",
+         "use .hxSensoryFeedback, which honors Settings' Haptic Feedback switch",
+         re.compile(r"\.sensoryFeedback\("),
+         CONFIG),
     Rule("retry copy",
          'a failure offers "Try again" through HXFailedView (DESIGN.md § Failed state)',
          re.compile(r'"(Retry|Try Again)"')),

@@ -282,7 +282,7 @@ struct DeckFrontWeek: View {
     var body: some View {
         // One stack, so the landing haptic plays once rather than once per part.
         VStack(alignment: .leading, spacing: 0) { parts }
-            .sensoryFeedback(.success, trigger: model?.landedCheckIns ?? 0)
+            .hxSensoryFeedback(.success, trigger: model?.landedCheckIns ?? 0)
     }
 
     @ViewBuilder

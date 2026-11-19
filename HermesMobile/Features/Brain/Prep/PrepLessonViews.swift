@@ -292,7 +292,7 @@ struct PrepDayCompleteView: View {
             .padding(BrainStyle.l)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
-        .sensoryFeedback(.success, trigger: closed)
+        .hxSensoryFeedback(.success, trigger: closed)
         .onAppear {
             withAnimation(HXMotion.draw(reduceMotion: reduceMotion)) { closed = true }
         }

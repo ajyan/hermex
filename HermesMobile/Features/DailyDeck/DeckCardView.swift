@@ -1026,7 +1026,7 @@ struct DeckCardView: View {
                 .accessibilityAddTraits(.isHeader)
             DeckWeekGrid(rows: card.weekRows, deckDate: viewModel.date)
                 .padding(.top, 12)
-                .sensoryFeedback(.success, trigger: goalCheckIns?.landedCheckIns ?? 0)
+                .hxSensoryFeedback(.success, trigger: goalCheckIns?.landedCheckIns ?? 0)
             Text(verbatim: "What Atlas learned")
                 .font(AppFont.display(style: .subheadline, weight: .semibold))
                 .foregroundStyle(Color.hxTextPrimary)
@@ -1910,7 +1910,7 @@ private struct SwipeUpForFeedback: ViewModifier {
                 if isDragging { isArmed = pull >= Self.threshold }
             }
             .overlay(alignment: .bottom) { cue }
-            .sensoryFeedback(.impact(weight: .light), trigger: isArmed) { _, armed in armed }
+            .hxSensoryFeedback(.impact(weight: .light), trigger: isArmed) { _, armed in armed }
             .accessibilityActions {
                 if let action {
                     Button(action: action) { Text(verbatim: "Send Feedback") }
