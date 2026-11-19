@@ -245,17 +245,3 @@ final class GoalsHomeViewModel {
         error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled
     }
 }
-
-extension BrainLoadState {
-    /// The state's case without its payload, for `.hxLoadSwap` on Goals and Body screens: loading,
-    /// loaded, unavailable or failed. A refresh that brings new data keeps the phase, so it doesn't
-    /// crossfade the screen.
-    var loadSwapPhase: Int {
-        switch self {
-        case .loading: 0
-        case .loaded: 1
-        case .unavailable: 2
-        case .failed: 3
-        }
-    }
-}

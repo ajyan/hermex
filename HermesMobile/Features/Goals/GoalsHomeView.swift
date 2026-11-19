@@ -24,7 +24,7 @@ struct GoalsHomeView: View {
 
     var body: some View {
         content
-            .hxLoadSwap(viewModel.state.loadSwapPhase)
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle("Goals")
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {

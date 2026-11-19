@@ -43,7 +43,7 @@ struct WorkoutView: View {
 
     var body: some View {
         content
-            .hxLoadSwap(viewModel.state.loadSwapPhase)
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(title, subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }

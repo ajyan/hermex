@@ -152,11 +152,11 @@ final class GoalsViewModelsTests: XCTestCase {
 
     func testLoadSwapPhaseIgnoresThePayload() throws {
         let one = BrainLoadState<GoalDetail>.loaded(try detail())
-        XCTAssertEqual(one.loadSwapPhase, BrainLoadState<GoalDetail>.loaded(try detail()).loadSwapPhase)
-        XCTAssertEqual(BrainLoadState<GoalDetail>.failed("a").loadSwapPhase, BrainLoadState<GoalDetail>.failed("b").loadSwapPhase)
-        XCTAssertEqual(Set([BrainLoadState<GoalDetail>.loading.loadSwapPhase, one.loadSwapPhase,
-                            BrainLoadState<GoalDetail>.unavailable.loadSwapPhase,
-                            BrainLoadState<GoalDetail>.failed("a").loadSwapPhase]).count, 4)
+        XCTAssertEqual(one.phase, BrainLoadState<GoalDetail>.loaded(try detail()).phase)
+        XCTAssertEqual(BrainLoadState<GoalDetail>.failed("a").phase, BrainLoadState<GoalDetail>.failed("b").phase)
+        XCTAssertEqual(Set([BrainLoadState<GoalDetail>.loading.phase, one.phase,
+                            BrainLoadState<GoalDetail>.unavailable.phase,
+                            BrainLoadState<GoalDetail>.failed("a").phase]).count, 4)
     }
 
     func testYesterdayIsOfferedOnceTheGoalHadBegun() throws {

@@ -36,7 +36,7 @@ struct GoalDetailView: View {
                     viewModel.reopened(detail)
                 }
             } else {
-                content.hxLoadSwap(viewModel.state.loadSwapPhase)
+                content.hxLoadSwap(viewModel.state.phase)
             }
         }
         .hxNavigationTitle(record == nil ? title : "Finished", subtitle: record?.subtitle)

@@ -17,7 +17,7 @@ struct BodySessionView: View {
 
     var body: some View {
         content
-            .hxLoadSwap(viewModel.state.loadSwapPhase)
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(BodySessionCopy.title(id: viewModel.id), subtitle: BodySessionCopy.date(id: viewModel.id))
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }

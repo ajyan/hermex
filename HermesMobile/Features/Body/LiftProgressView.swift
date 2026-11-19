@@ -16,7 +16,7 @@ struct LiftProgressView: View {
 
     var body: some View {
         content
-            .hxLoadSwap(viewModel.state.loadSwapPhase)
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(title, subtitle: viewModel.subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {

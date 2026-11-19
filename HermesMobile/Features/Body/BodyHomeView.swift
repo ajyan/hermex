@@ -24,7 +24,7 @@ struct BodyHomeView: View {
 
     var body: some View {
         content
-            .hxLoadSwap(viewModel.state.loadSwapPhase)
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle("Body", subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {

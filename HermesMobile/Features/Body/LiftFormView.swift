@@ -17,7 +17,7 @@ struct LiftFormView: View {
 
     var body: some View {
         content
-            .hxLoadSwap(viewModel.state.loadSwapPhase)
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(title, subtitle: "Form")
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
