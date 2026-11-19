@@ -187,9 +187,12 @@ struct BrainReaderView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .id(viewModel.id)
             .transition(reduceMotion ? .opacity : .asymmetric(
                 insertion: .move(edge: stepEdge).combined(with: .opacity), removal: .opacity))
+            // The saved copy before the first frame, so the zoom into the page lands on it.
+            .onAppear { viewModel.showSavedCopy() }
             .hxNavigationTitle(viewModel.page?.item.title ?? "")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(
@@ -252,8 +255,8 @@ struct BrainReaderView: View {
                 }
             }
             .task(id: viewModel.id) {
-                // First appear, or back on screen after an earlier load was cancelled.
-                if viewModel.state == .loading {
+                // First appear, or back on screen after an earlier load was cancelled (saved copy or not).
+                if !viewModel.hasFetched {
                     await viewModel.load()
                 }
             }
@@ -360,7 +363,7 @@ struct BrainReaderView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            BrainPagePlaceholder()
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Brain on this server") } icon: { Image(systemName: "brain") }
@@ -385,7 +388,8 @@ struct BrainReaderView: View {
                     ? BrainPageRating(labels: labels, key: ratingKey) : nil,
                 focusIdea: viewModel.module == opened.module && viewModel.id == opened.id ? focusIdea : nil,
                 // Facts are edited on the live page only: a saved copy can't be written to.
-                onEditFacts: page.person?.editable != nil && !viewModel.isShowingCachedCopy ? { showsFacts = true } : nil
+                onEditFacts: page.person?.editable != nil && viewModel.hasFetched && !viewModel.isShowingCachedCopy
+                    ? { showsFacts = true } : nil
             )
             .refreshable { await viewModel.load() }
         }

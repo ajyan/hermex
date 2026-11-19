@@ -301,6 +301,8 @@ final class BrainShelfViewModel {
     /// The loaded entries as cards, built once per load, never while scrolling.
     private(set) var cards: [BrainShelfLayout.Card] = []
     private(set) var isShowingCachedCopy = false
+    /// True while the page shown is the device's saved copy rather than one the server sent.
+    private var shownIsSaved = false
 
     private let client: any BrainDataClient
     private let cache: BrainCacheHandle
@@ -327,10 +329,21 @@ final class BrainShelfViewModel {
         return false
     }
 
+    /// Shows the device's copy while nothing is on screen, so the page opens on it instead of a
+    /// placeholder. The fetch that follows replaces it; only a failed one says it's a saved copy.
+    func showSavedCopy() {
+        guard !isLoaded, let saved = cache.load(BrainShelf.self, kind: shelfCacheKind, id: kind.rawValue) else { return }
+        show(saved, cached: false)
+        shownIsSaved = true
+    }
+
     func load() async {
         generation += 1
         let token = generation
-        if !isLoaded { state = .loading }
+        if !isLoaded {
+            showSavedCopy()
+            if !isLoaded { state = .loading }
+        }
         do {
             let fetched = try await client.shelf(kind: kind)
             guard !Task.isCancelled, token == generation else { return }
@@ -344,10 +357,11 @@ final class BrainShelfViewModel {
                 cards = []
                 isShowingCachedCopy = false
                 state = .unavailable
-            } else if isLoaded, !isShowingCachedCopy {
+            } else if isLoaded, !shownIsSaved {
                 // A failed refresh keeps the page already shown.
-            } else if let saved = cache.load(BrainShelf.self, kind: shelfCacheKind, id: kind.rawValue) {
-                show(saved, cached: true)
+            } else if isLoaded {
+                // The saved copy shown while it loaded stays, now marked as one.
+                isShowingCachedCopy = true
             } else {
                 state = .failed(error.localizedDescription)
             }
@@ -361,6 +375,7 @@ final class BrainShelfViewModel {
             state = .loaded(shelf)
         }
         isShowingCachedCopy = cached
+        shownIsSaved = cached
     }
 }
 
@@ -403,9 +418,25 @@ final class BrainShelfHomeViewModel {
         await load(now: now)
     }
 
+    /// The last load's counts, saved on their own so the home reads three numbers on appear
+    /// instead of decoding every letter.
+    private static let countsCacheKind = "shelf-counts"
+
+    /// Shows the saved counts while no rows are on screen, so "Your writing" takes its place on the
+    /// home at once instead of pushing Browse down when the pages answer.
+    func showSavedCopy() {
+        guard rows.isEmpty, let saved = cache.load([String: Int].self, kind: Self.countsCacheKind, id: "") else { return }
+        var counts: [BrainShelfKind: Int] = [:]
+        for kind in BrainShelfKind.allCases {
+            if let count = saved[kind.rawValue] { counts[kind] = count }
+        }
+        rows = BrainShelfLayout.homeRows(counts)
+    }
+
     func load(now: Date = .now) async {
         generation += 1
         let token = generation
+        showSavedCopy()
         let client = self.client
         let fetched = await withTaskGroup(of: (BrainShelfKind, BrainShelf?).self) { group in
             for kind in BrainShelfKind.allCases {
@@ -426,7 +457,13 @@ final class BrainShelfHomeViewModel {
             }
         }
         let next = BrainShelfLayout.homeRows(counts)
-        if next != rows { rows = next }
+        if next != rows {
+            rows = next
+            if !counts.isEmpty {
+                cache.store(Dictionary(uniqueKeysWithValues: counts.map { ($0.key.rawValue, $0.value) }),
+                            kind: Self.countsCacheKind, id: "")
+            }
+        }
         if fetched.count == BrainShelfKind.allCases.count { lastLoaded = now }
     }
 }

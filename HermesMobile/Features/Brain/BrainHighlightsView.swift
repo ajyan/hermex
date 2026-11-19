@@ -60,13 +60,16 @@ struct BrainHighlightsView: View {
             }
         }
         .brainListStyle()
+        .hxLoadSwap(viewModel.state.phase)
         .refreshable { await viewModel.load() }
         .hxNavigationTitle(BrainModuleID.highlights.defaultTitle)
         .background(Color.hxCanvas.ignoresSafeArea())
+        // The saved copy before the first frame, so the list opens on it.
+        .onAppear { viewModel.showSavedCopy() }
         .task {
             // Load once; a pop back from a book keeps the pages already scrolled.
-            // Re-run a first load that was cancelled before it finished, or it spins forever.
-            guard !didLoad || viewModel.state == .loading else { return }
+            // Re-run a first load that was cancelled before it answered, saved copy or not.
+            guard !didLoad || !viewModel.hasFetched else { return }
             didLoad = true
             await viewModel.load()
         }
@@ -158,11 +161,14 @@ struct BrainHighlightsBookView: View {
 
     var body: some View {
         content
+            .hxLoadSwap(viewModel.state.phase)
             .hxNavigationTitle(viewModel.page?.item.title ?? "")
             .background(Color.hxCanvas.ignoresSafeArea())
+            // The saved copy before the first frame, so the zoom into the book lands on it.
+            .onAppear { viewModel.showSavedCopy() }
             .task {
-                // Re-run a first load that was cancelled before it finished, or it spins forever.
-                guard !didLoad || viewModel.state == .loading else { return }
+                // Re-run a first load that was cancelled before it answered, saved copy or not.
+                guard !didLoad || !viewModel.hasFetched else { return }
                 didLoad = true
                 await viewModel.load()
             }
@@ -172,7 +178,7 @@ struct BrainHighlightsBookView: View {
     private var content: some View {
         switch viewModel.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            BrainPagePlaceholder(label: "Loading book")
         case .unavailable:
             ContentUnavailableView {
                 Label { Text(verbatim: "No Brain on this server") } icon: { Image(systemName: "brain") }
