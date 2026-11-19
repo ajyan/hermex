@@ -194,7 +194,7 @@ struct DeckIdeaBody: View {
                     .textSelection(.enabled)
             }
             if !idea.parts.isEmpty {
-                DeckPartsList(parts: idea.parts.map { ($0.label, $0.text, $0.quote) }, palette: palette)
+                DeckPartsList(parts: idea.parts.map { ($0.label, $0.text, $0.quote) }, palette: palette, folded: true)
                     .padding(.top, 18)
             }
             if let linked = idea.linked {
@@ -261,10 +261,14 @@ struct DeckAnswerBoxLabel: View {
 }
 
 /// "The parts": a bullet per part, its label bold before its text, and the source's line it stands on under it.
-/// An idea card's parts, and a Piece card's steps.
+/// A Piece card's steps. An idea card folds them (`folded`): a row per label, and a tap opens that part's text
+/// and line under it, one part at a time, so the card reads short until he asks for more (6012848c55f4).
 struct DeckPartsList: View {
     let parts: [(label: String?, text: String, quote: String?)]
     let palette: DeckPalette
+    var folded = false
+    @State private var openIndex: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -272,26 +276,93 @@ struct DeckPartsList: View {
                 .font(AppFont.footnote(weight: .semibold))
                 .foregroundStyle(palette.secondaryInk)
                 .accessibilityAddTraits(.isHeader)
-                .padding(.bottom, 8)
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(verbatim: "•").accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 6) {
-                            (Text(verbatim: part.label.map { "\($0): " } ?? "").font(AppFont.subheadline(weight: .semibold))
-                                + Text(verbatim: part.text).font(AppFont.subheadline()))
-                                .fixedSize(horizontal: false, vertical: true)
-                            if let quote = part.quote, !quote.isEmpty {
-                                DeckQuoteRow(text: quote, at: nil, palette: palette)
+                .padding(.bottom, folded ? 2 : 8)
+            if folded {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+                        foldedRow(index: index, part: part)
+                            .overlay(alignment: .top) { Rectangle().fill(palette.colors.edge).frame(height: 0.5) }
+                    }
+                }
+                .overlay(alignment: .bottom) { Rectangle().fill(palette.colors.edge).frame(height: 0.5) }
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(verbatim: "•").accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 6) {
+                                (Text(verbatim: part.label.map { "\($0): " } ?? "").font(AppFont.subheadline(weight: .semibold))
+                                    + Text(verbatim: part.text).font(AppFont.subheadline()))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let quote = part.quote, !quote.isEmpty {
+                                    DeckQuoteRow(text: quote, at: nil, palette: palette)
+                                }
                             }
                         }
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .accessibilityElement(children: .combine)
                     }
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .accessibilityElement(children: .combine)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// One folded part: its label as a full-width row with a chevron; open, its text and the line it stands on.
+    /// A part with no label shows its text as the row.
+    @ViewBuilder
+    private func foldedRow(index: Int, part: (label: String?, text: String, quote: String?)) -> some View {
+        let isOpen = openIndex == index
+        let label = part.label.flatMap { $0.isEmpty ? nil : $0 }
+        if label == nil, (part.quote ?? "").isEmpty {  // nothing to open: the text is the whole part
+            Text(verbatim: part.text)
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { openIndex = isOpen ? nil : index }
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(verbatim: label ?? part.text)
+                            .font(AppFont.subheadline(weight: label == nil ? .regular : .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(palette.secondaryInk)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(Text(verbatim: isOpen ? "Open" : "Closed"))
+                .accessibilityHint(Text(verbatim: isOpen ? "Hides this part" : "Shows this part"))
+                if isOpen {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if label != nil {
+                            Text(verbatim: part.text)
+                                .font(AppFont.subheadline())
+                                .foregroundStyle(Color.hxTextPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
+                        }
+                        if let quote = part.quote, !quote.isEmpty {
+                            DeckQuoteRow(text: quote, at: nil, palette: palette)
+                        }
+                    }
+                    .padding(.bottom, 14)
+                    .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
+                }
+            }
+        }
     }
 }
 
