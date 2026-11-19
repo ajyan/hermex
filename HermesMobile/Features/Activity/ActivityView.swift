@@ -224,8 +224,9 @@ private struct ActivityLoadingPlaceholder: View {
         .scrollDisabled(true)
         .redacted(reason: .placeholder)
         .allowsHitTesting(false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Loading activity"))
+        // List rows are their own accessibility cells, so hide them all and speak one label instead.
+        .accessibilityHidden(true)
+        .overlay { Color.clear.accessibilityElement().accessibilityLabel(Text("Loading activity")) }
     }
 }
 

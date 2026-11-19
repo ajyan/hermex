@@ -1095,10 +1095,14 @@ struct KanbanStatusFocusView: View {
 
     private var cardList: some View {
         let visibleCards = model.visibleCards
+        var ids = Hasher()
+        for card in visibleCards { ids.combine(card.cardID) }
+        let cardIDs = ids.finalize()
         return List {
-            // Only with nothing on screen. Over stale Cards (a filter change) the Board
-            // picker shows the spinner instead, so the rows don't shift down and back.
-            if model.showsBoardLoadingRow, model.snapshot == nil {
+            // Only with no Card on screen. Over stale Cards (a filter change) the Board
+            // picker shows the spinner instead, so the rows don't shift down and back; with
+            // none matching, this row stands in for an empty state that isn't final yet.
+            if model.showsBoardLoadingRow, model.snapshot == nil || visibleCards.isEmpty {
                 HStack {
                     Spacer()
                     ProgressView("Refreshing Board")
@@ -1107,7 +1111,7 @@ struct KanbanStatusFocusView: View {
                 .listRowSeparator(.hidden)
             }
 
-            if model.isRefreshing, model.snapshot == nil {
+            if model.showsBoardLoadingRow, model.snapshot == nil || visibleCards.isEmpty {
                 EmptyView()
             } else if visibleCards.isEmpty {
                 emptyContent
@@ -1130,11 +1134,11 @@ struct KanbanStatusFocusView: View {
             }
         }
         // Cards leaving or joining the list (a Status or filter change, a live update)
-        // slide on `swap`. Keyed on the IDs alone, so a Card whose fields change in place
-        // doesn't animate the list; search results snap so typing stays immediate.
+        // slide on `swap`. Keyed on a hash of the IDs alone, so a Card whose fields change in
+        // place doesn't animate the list; search results snap so typing stays immediate.
         .animation(
             model.searchText.isEmpty ? HXMotion.swap(reduceMotion: reduceMotion) : nil,
-            value: visibleCards.map(\.cardID)
+            value: cardIDs
         )
         .listStyle(.plain)
         .scrollContentBackground(.hidden)

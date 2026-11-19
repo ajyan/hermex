@@ -98,17 +98,20 @@ struct ChatDrawerView<ServerMenu: View>: View {
                 if !isSearching { composeButton }
             }
 
-            if let status {
-                AtlasStatusDrawerBar(note: status) { onOpen(.status) }
-                    .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+            VStack(spacing: 0) {
+                if let status {
+                    AtlasStatusDrawerBar(note: status) { onOpen(.status) }
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                }
+                settingsBar
+                    // Opaque and on top, so the Status bar rises from behind it rather than across it.
+                    .background(Color.hxCanvas)
+                    .zIndex(1)
             }
-            settingsBar
-                // Opaque and on top, so the Status bar rises from behind it rather than across it.
-                .background(Color.hxCanvas)
-                .zIndex(1)
+            // The Status bar rises above Settings when Status first answers, even with the drawer
+            // open. Only the bottom bars animate, never the session list above them.
+            .animation(HXMotion.swap(reduceMotion: reduceMotion), value: status != nil)
         }
-        // The Status bar rises above Settings when Status first answers, even with the drawer open.
-        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: status != nil)
         .background(Color.hxCanvas.ignoresSafeArea())
     }
 

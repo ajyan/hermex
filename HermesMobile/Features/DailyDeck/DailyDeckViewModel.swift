@@ -437,14 +437,23 @@ final class DailyDeckViewModel {
             // A newer load owns the state.
         } catch {
             if inPlace {
-                if isAwaitingLiveRead, date == self.date, kind == self.kind, (error as? URLError)?.code != .cancelled {
+                if isAwaitingLiveRead, date == self.date, kind == self.kind {
                     isAwaitingLiveRead = false
-                    isOfflineCopy = true
+                    // "Offline copy" only when the server couldn't be reached; any other failure leaves the
+                    // copy up unlabelled, as a failed revalidation does.
+                    isOfflineCopy = Self.isUnreachable(error)
                 }
                 return
             }
             if !openDeviceCopy(offline: true) { state = .failed(error.localizedDescription) }
         }
+    }
+
+    /// Whether a read failed because the server couldn't be reached, not because it answered with an error.
+    static func isUnreachable(_ error: Error) -> Bool {
+        guard let code = (error as? URLError)?.code else { return false }
+        return [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost,
+                .dnsLookupFailed, .internationalRoamingOff, .dataNotAllowed, .secureConnectionFailed].contains(code)
     }
 
     /// Shows this device's copy of the deck asked for, when it has one (today's morning brief, once it has been

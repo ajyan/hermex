@@ -2492,6 +2492,36 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertFalse(viewModel.isAwaitingLiveRead)
     }
 
+    /// A server that answers with an error was reached: the copy stays up, but not as the offline copy.
+    @MainActor
+    func testACopyWhoseReadFailsOnAReachableServerIsNotTheOfflineCopy() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        await makeViewModel(client).load()
+
+        client.listingErrors[DailyDeckPaths.directory] = URLError(.badServerResponse)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertFalse(viewModel.isOfflineCopy)
+        XCTAssertFalse(viewModel.isAwaitingLiveRead)
+    }
+
+    /// Choosing another workspace drops the last one's deck copy, so it never opens as the new one's brief.
+    @MainActor
+    func testChangingTheWorkspaceDropsTheLastWorkspacesCopy() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        await makeViewModel(client).load()
+        XCTAssertNotNil(store.deckCopy(for: server, date: "2026-10-04", kind: "morning"))
+
+        store.setWorkspace("/vault", for: server)
+        XCTAssertNotNil(store.deckCopy(for: server, date: "2026-10-04", kind: "morning"), "the same workspace keeps it")
+        store.setWorkspace("/other", for: server)
+        XCTAssertNil(store.deckCopy(for: server, date: "2026-10-04", kind: "morning"))
+    }
+
     /// A day the device hasn't kept, and a brief whose workspace isn't chosen, read behind the placeholder.
     @MainActor
     func testOnlyAKeptBriefInAChosenWorkspaceOpensFromItsCopy() async {

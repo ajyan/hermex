@@ -389,8 +389,9 @@ private struct TasksLoadingPlaceholder: View {
         }
         .redacted(reason: .placeholder)
         .allowsHitTesting(false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Loading tasks"))
+        // List rows are their own accessibility cells, so hide them all and speak one label instead.
+        .accessibilityHidden(true)
+        .overlay { Color.clear.accessibilityElement().accessibilityLabel(Text("Loading tasks")) }
     }
 }
 

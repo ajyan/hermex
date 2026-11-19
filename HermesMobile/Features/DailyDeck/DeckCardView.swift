@@ -1137,7 +1137,10 @@ struct DeckCardView: View {
         let sealsWeek = viewModel.isSealedWeekly
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView() }
+                if viewModel.filing == .filing {
+                    ProgressView()
+                        .tint(ChatDecisionButtonStyle.primaryColors(on: palette.isNeutralCard ? nil : palette.colors).text)
+                }
                 Text(verbatim: sealsWeek ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
                      : viewModel.isFiled ? "File Changes" : "File It")
             }
