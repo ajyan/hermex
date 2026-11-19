@@ -147,7 +147,7 @@ struct YearOfWeeksView: View {
             .accessibilityLabel(Text(verbatim: spoken(tile)))
         if opens {
             Button { open(tile.weekEnding) } label: { face.contentShape(Rectangle()) }
-                .buttonStyle(.plain)
+                .buttonStyle(.chatTactile(.card))
         } else {
             face
         }

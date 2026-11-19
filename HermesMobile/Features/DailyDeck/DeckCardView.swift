@@ -317,7 +317,7 @@ struct DeckCardView: View {
                 viewModel.opened(diagram.isMap ? "map" : "diagram", on: card.id)
                 openDiagram = diagram
             } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .padding(.top, index == 0 ? 18 : 10)
             .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))
             .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
@@ -357,7 +357,7 @@ struct DeckCardView: View {
         Button { isWriting = true } label: {
             DeckAnswerBoxLabel(text: written, prompt: "Your take", palette: palette)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
         .padding(.top, 12)
         .accessibilityLabel(Text(verbatim: written.flatMap { $0.isEmpty ? nil : "Your take: \($0). Edit" } ?? "Write your take"))
         if !isOpen, viewModel.currentCardID == card.id, viewModel.index < viewModel.visiblePages.count - 1 {
@@ -370,7 +370,7 @@ struct DeckCardView: View {
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(palette.ink, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .padding(.top, 16)
             .accessibilityHint(Text(verbatim: "Shows the next card"))
         }
@@ -545,7 +545,7 @@ struct DeckCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityLabel(Text(verbatim: "Your reflection: \(text). Edit"))
         } else {
             Button { isWriting = true } label: {
@@ -555,7 +555,7 @@ struct DeckCardView: View {
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(palette.ink, in: Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
         }
     }
 
@@ -977,7 +977,7 @@ struct DeckCardView: View {
                 .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 0.5))
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.capsule))
         .padding(.top, 18)
         .accessibilityLabel(Text(verbatim: "New question"))
         .accessibilityHint(Text(verbatim: "Shows another question for this week"))
