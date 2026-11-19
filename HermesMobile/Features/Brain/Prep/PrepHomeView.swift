@@ -149,7 +149,7 @@ struct PrepRunButton: View {
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.run))) {
                 label(title, enabled: true)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             .accessibilityLabel(Text(verbatim: fullWidth ? title : "\(title) today's run"))
         }
     }
@@ -269,13 +269,13 @@ struct PrepWeakSpotsSection: View {
                 BrainRow(leading: { PrepGapStatusDot(status: gap.status) }, title: gap.label,
                          trailing: PrepCopy.gapRowDetail(gap))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
         case .lesson(let lesson):
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lessonRun(lesson.id)))) {
                 BrainRow(leading: { PrepMissedLessonMark() }, title: lesson.title, subtitle: "In reviews",
                          trailing: "Try it now", trailingTint: Color.accentColor)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityHint(Text(verbatim: "Asks one question on this lesson now"))
         }
     }
@@ -472,7 +472,7 @@ struct PrepPracticeLink: View {
                     .background(Color.accentColor, in: Capsule())
                     .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
             if let detail {
                 Text(verbatim: detail)
                     .font(BrainStyle.meta)

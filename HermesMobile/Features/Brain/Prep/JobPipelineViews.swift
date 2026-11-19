@@ -38,7 +38,7 @@ struct PrepPipelineSection: View {
                                 BrainRow(leading: { EmptyView() }, title: row.name, subtitle: JobCopy.pipelineLine(row),
                                          subtitleLineLimit: 2)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.chatTactile(.card))
                         }
                         PrepRowDivider()
                         Button { adding = true } label: {
@@ -124,7 +124,7 @@ struct PrepInterviewPackCard: View {
         switch pack.start {
         case .route(let route):
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(route))) { PrepPrimaryLabel(title: title) }
-                .buttonStyle(.plain)
+                .buttonStyle(.chatTactile(.capsule))
         case .call(let part) where openMockCall.isAvailable:
             PrepPrimaryButton(title: mock.isStarting ? "Starting…" : title, enabled: !mock.isStarting) {
                 Task { await mock.startCompanyCall(app: pack.id, part: part, open: openMockCall) }
@@ -133,7 +133,7 @@ struct PrepInterviewPackCard: View {
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.application(pack.id)))) {
                 PrepPrimaryLabel(title: title)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
         }
     }
 
@@ -143,7 +143,7 @@ struct PrepInterviewPackCard: View {
 
     private func link<Label: View>(_ route: PrepRoute, hint: String, @ViewBuilder label: () -> Label) -> some View {
         NavigationLink(value: ShellPushDestination.brainRoute(.prep(route)), label: label)
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.card))
             .accessibilityHint(Text(verbatim: hint))
     }
 
@@ -195,7 +195,7 @@ struct JobNextInterviewCard: View {
                     HXChip(paper: .prep, symbol: "list.bullet", label: "Prep plan")
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.chatTactile(.capsule))
         })
     }
 }

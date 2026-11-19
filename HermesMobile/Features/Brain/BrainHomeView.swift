@@ -254,7 +254,7 @@ struct BrainHomeView: View {
                                 .frame(minHeight: BrainStyle.minTapTarget)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.chatTactile(.capsule))
                         .accessibilityHint(Text(verbatim: "Starts a chat with Atlas"))
                     }
                 }
@@ -349,7 +349,7 @@ struct BrainHomeView: View {
                 .padding(.horizontal, BrainStyle.cardHorizontalPadding)
                 .zoomSource(for: .brainRoute(route), cornerRadius: HXRadius.sm)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chatTactile(.card))
     }
 }
 

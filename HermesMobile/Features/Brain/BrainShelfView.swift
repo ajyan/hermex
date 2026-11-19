@@ -153,7 +153,7 @@ struct BrainShelfCard: View {
                         .frame(minHeight: BrainStyle.minTapTarget)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.chatTactile(.capsule))
                 .accessibilityHint(Text(verbatim: "Opens the idea this answers"))
             }
         }
@@ -183,7 +183,7 @@ struct BrainShelfHomeSection: View {
                         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
                         .zoomSource(for: destination, cornerRadius: HXRadius.sm)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.chatTactile(.card))
                 }
             }
         }
