@@ -417,6 +417,14 @@ final class WorkoutFinishTests: XCTestCase {
         XCTAssertFalse(WorkoutFinishCopy.summary(session, now: Date()).contains("min"))
     }
 
+    /// A workout logged after the fact, all at once, has no length worth showing.
+    func testSummaryUnderAMinuteLeavesOutTheMinutes() throws {
+        var session = try finishedSession()
+        session.started = "2026-11-13T10:06:12"
+        session.finished = "2026-11-13T10:06:16"
+        XCTAssertEqual(WorkoutFinishCopy.summary(session, now: Date()), "7 lifts · 0 went up")
+    }
+
     func testTitleAndKicker() {
         XCTAssertEqual(WorkoutFinishCopy.title(day: "push"), "Push done")
         XCTAssertEqual(WorkoutFinishCopy.kicker(day: "legs"), "Baki · after Legs")

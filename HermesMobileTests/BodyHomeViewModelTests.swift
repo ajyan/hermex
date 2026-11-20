@@ -289,6 +289,12 @@ final class BodyHomeCopyTests: XCTestCase {
         let session = try PrepDecoding.decode(BodySessionSummary.self, from: Data(
             #"{"id":"a","day":"pull","label":"Pull","date":"2026-11-28","minutes":46,"trimmed":true}"#.utf8))
         XCTAssertTrue(BodyHomeCopy.sessionSubtitle(session).hasSuffix("46 min · one set dropped"))
+        // Logged all at once: no "0 min".
+        let instant = try PrepDecoding.decode(BodySessionSummary.self, from: Data(
+            #"{"id":"b","day":"pull","label":"Pull","date":"2026-11-13","minutes":0,"auto_finished":true}"#.utf8))
+        XCTAssertEqual(BodyHomeCopy.sessionSubtitle(instant),
+                       "\(BodyHomeCopy.sessionDate("2026-11-13")) · saved itself")
+        XCTAssertEqual(BodyHomeCopy.doneToday([instant], today: "2026-11-13"), "Pull done")
     }
 
     func testAPastWorkoutsTitleAndChips() throws {
