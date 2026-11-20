@@ -203,14 +203,15 @@ enum WorkoutFinishCopy {
     static func kicker(day: String) -> String { "Baki · after \(day.capitalized)" }
 
     /// "52 min · 11 lifts · 2 went up". Minutes run from the start to `finished`, or to `now` while
-    /// he is still on the check; they're left out when the session has no readable start.
+    /// he is still on the check; they're left out when the session has no readable start or ran
+    /// under a minute.
     static func summary(_ session: BodySession, finished: String? = nil, now: Date) -> String {
         let done = session.exercises.filter { $0.section != .warmup && $0.sets.contains(where: \.done) }
         var parts: [String] = []
         if let start = session.started.flatMap(date) {
             let end = (finished ?? session.finished).flatMap(date) ?? now
             let minutes = Int((end.timeIntervalSince(start) / 60).rounded())
-            if minutes >= 0 { parts.append("\(minutes) min") }
+            if let length = BodyHomeCopy.minutes(minutes) { parts.append(length) }
         }
         parts.append(done.count == 1 ? "1 lift" : "\(done.count) lifts")
         parts.append("\(done.filter(\.up).count) went up")

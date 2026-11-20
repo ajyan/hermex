@@ -166,10 +166,17 @@ enum BodyHomeCopy {
         return "Baki · after \(latest.session.label), \(sessionDate(latest.session.date))"
     }
 
+    /// "52 min", or nil for a workout with no length worth showing: no start, or under a minute
+    /// (one logged after the fact, all at once).
+    static func minutes(_ minutes: Int?) -> String? {
+        guard let minutes, minutes > 0 else { return nil }
+        return "\(minutes) min"
+    }
+
     /// "Fri, Nov 27 · 52 min · one set dropped"; a workout the server closed ends "saved itself".
     static func sessionSubtitle(_ session: BodySessionSummary) -> String {
         var parts = [sessionDate(session.date)]
-        if let minutes = session.minutes { parts.append("\(minutes) min") }
+        if let length = minutes(session.minutes) { parts.append(length) }
         if session.trimmed { parts.append("one set dropped") }
         if session.autoFinished { parts.append("saved itself") }
         return parts.joined(separator: " · ")
@@ -247,7 +254,7 @@ enum BodyHomeCopy {
     static func doneToday(_ sessions: [BodySessionSummary], today: String) -> String? {
         guard let session = sessions.first(where: { $0.date == today }) else { return nil }
         let label = session.label.isEmpty ? session.day.capitalized : session.label
-        return ["\(label) done", session.minutes.map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
+        return ["\(label) done", minutes(session.minutes)].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// The phone's calendar day as the server writes dates, "2026-11-30".
