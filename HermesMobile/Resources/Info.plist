@@ -112,9 +112,9 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Atlas connects to your Hermes backend on your local network to load bots and chat.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Atlas needs microphone access to dictate text into the message composer.</string>
+	<string>Atlas uses the microphone for dictation and for the sound of the stories you record for the Daily Brief.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Atlas needs camera access to capture and attach photos directly in chat.</string>
+	<string>Atlas uses the camera to take photos for chat and to record the stories you practise telling in the Daily Brief. Recordings stay on your phone.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Atlas uses Face ID to unlock the app when the lock is on.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -1650,6 +1650,47 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(DeckCopy.invitation(for: back), "Write back")
     }
 
+    static let storyJSON = #"""
+    {"date": "2026-10-04", "kind": "morning", "cards": [{"id": "story", "type": "prompt", "kind": "story",
+      "files_to": "story", "title": "You were 9", "question": "When did you get caught doing something you weren't supposed to?",
+      "alt_questions": ["What was the best day of that fall?"], "reason": "Tell a story · Fall 2003",
+      "context": "Growing up in New York",
+      "techniques": [{"id": "peak", "name": "Start at the peak", "how": "Open on the moment you got caught."},
+                     {"id": "pause", "name": "Pause before the key line"}, {"name": "no id"}],
+      "ref": {"topic": "story", "year": 2003, "season": "fall", "age": 9}}]}
+    """#
+
+    func testTellAStoryIsAPromptInThePracticePaper() throws {
+        let card = try DailyDeck.decode(Self.storyJSON).cards[0]
+        XCTAssertTrue(card.isStory && !card.isPast && !card.isFuture)
+        XCTAssertEqual(card.techniques.map(\.id), ["peak", "pause"], "a technique without an id is dropped")
+        XCTAssertEqual(card.techniques.first?.how, "Open on the moment you got caught.")
+        XCTAssertNil(card.techniques.last?.how)
+        XCTAssertEqual(DeckPalette.of(card).name, "Tell a story")
+        XCTAssertEqual(DeckPalette.of(card).colors, HermexPaper.notes)
+        XCTAssertEqual(card.kindLabel(.of(card), advisor: "Coach"), "Tell a story · Fall 2003",
+                       "the time from the reason, not the advisor")
+        XCTAssertEqual(DeckCopy.invitation(for: card), "What did you notice?")
+        XCTAssertEqual(card.context, "Growing up in New York")
+        XCTAssertTrue(try DailyDeck.decode(Self.timeCardsJSON).cards.allSatisfy { $0.techniques.isEmpty })
+    }
+
+    @MainActor
+    func testAStorysTechniqueAndRatingsAnswerItAndRatingsToggle() async throws {
+        store.setWorkspace("/vault", for: server)
+        let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.storyJSON))
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.isStory })
+        model.setStatus("technique", "peak", for: card)
+        model.setScore("voice", 3, for: card)
+        model.setScore("energy", 4, for: card)
+        model.setScore("energy", 4, for: card)
+        let answer = try XCTUnwrap(model.answer(for: card))
+        XCTAssertEqual(answer.statuses?["technique"], "peak")
+        XCTAssertEqual(answer.scores, ["voice": 3], "tapping the chosen rating again clears it")
+        XCTAssertTrue(answer.isAnswer(for: card))
+    }
+
     @MainActor
     func testAMessagesReturnDefaultsToAYearAndFilesOnlyWhenPicked() async throws {
         store.setWorkspace("/vault", for: server)

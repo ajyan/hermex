@@ -173,7 +173,10 @@ struct DeckCardView: View {
                 case .weekHeld: WeekHeldCard(card: card, palette: palette, viewModel: viewModel)
                 case .weekPlan: WeekPlanCard(card: card, palette: palette, viewModel: viewModel)
                 case .weekLetter: WeekLetterCard(card: card, palette: palette, viewModel: viewModel)
-                default: if card.isIdea { idea } else if isJobCard { jobReading } else { reading }
+                default:
+                    if card.isStory {
+                        DeckStoryCard(card: card, palette: palette, viewModel: viewModel, isOpen: isOpen) { isWriting = true }
+                    } else if card.isIdea { idea } else if isJobCard { jobReading } else { reading }
                 }
                 // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
                 // end is in view while it is still the next card under the stack, so it's checked again on arrival.
