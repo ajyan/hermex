@@ -831,13 +831,16 @@ struct BodyLiftPoint: Decodable, Hashable, Sendable {
     }
 }
 
+/// One session of a lift. `skipped` is a day the lift was in the workout and no set was ticked; it
+/// has no reps.
 struct BodyLiftSession: Decodable, Hashable, Sendable {
     let date: String
     let weightLabel: String
     let reps: [Int]
     let note: String?
+    let skipped: Bool
 
-    private enum CodingKeys: String, CodingKey { case date, weightLabel = "weight_label", reps, note }
+    private enum CodingKeys: String, CodingKey { case date, weightLabel = "weight_label", reps, note, skipped }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -845,6 +848,7 @@ struct BodyLiftSession: Decodable, Hashable, Sendable {
         weightLabel = c.string(.weightLabel)
         reps = (try? c.decodeIfPresent([Int].self, forKey: .reps)) ?? []
         note = c.optional(String.self, .note)
+        skipped = c.bool(.skipped)
     }
 }
 
