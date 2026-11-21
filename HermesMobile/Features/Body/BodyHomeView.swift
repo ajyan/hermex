@@ -25,6 +25,7 @@ struct BodyHomeView: View {
     var body: some View {
         content
             .hxLoadSwap(viewModel.state.phase)
+            .hxSensoryFeedback(.success, trigger: viewModel.landedLogs)
             .hxNavigationTitle("Body", subtitle: subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -75,7 +76,9 @@ struct BodyHomeView: View {
                     thisWeek(home)
                     bakiCard(watching: home.watching)
                     if !home.lifts.isEmpty { lifts(home.lifts) }
-                    if !home.activityRows.isEmpty { activity(home.activityRows) }
+                    if !home.activityRows.isEmpty || home.logKinds.contains("yoga") {
+                        activity(home.activityRows, logsYoga: home.logKinds.contains("yoga"))
+                    }
                     if let sleep = home.sleep { sleepRow(sleep) }
                 }
                 // A proposal decided leaves its place, and one the server refused comes back to it;
@@ -83,6 +86,8 @@ struct BodyHomeView: View {
                 .animation(HXMotion.swap(reduceMotion: reduceMotion), value: home.proposals.count)
                 .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.noteLoaded)
                 .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.latestNote?.session.id)
+                // A yoga session he logs joins the list, and one he removes leaves it.
+                .animation(HXMotion.swap(reduceMotion: reduceMotion), value: home.activityRows.map(\.id))
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
@@ -274,7 +279,7 @@ struct BodyHomeView: View {
                     BodyWeekDots(title: "Walked", subtitle: "8,000 steps or more", states: week.walked)
                 }
                 if !week.yoga.isEmpty {
-                    BodyWeekDots(title: "Yoga", subtitle: week.yogaLabel ?? "From Garmin", states: week.yoga)
+                    BodyWeekDots(title: "Yoga", subtitle: week.yogaLabel ?? (home.logKinds.contains("yoga") ? "Logged or from Garmin" : "From Garmin"), states: week.yoga)
                 }
                 if let active = week.active {
                     PrepRowDivider()
@@ -405,9 +410,10 @@ struct BodyHomeView: View {
         activity.highlight != nil || activity.trimmed ? paper.glow : Color.hxTextSecondary
     }
 
-    /// His workouts among the runs, walks and yoga Garmin recorded, newest first. A workout opens
-    /// its page; what the watch recorded has none.
-    private func activity(_ rows: [BodyActivity]) -> some View {
+    /// His workouts among the runs, walks and yoga Garmin recorded or he logged, newest first. A
+    /// workout opens its page; what the watch recorded has none; what he logged can be removed.
+    /// The card ends with Log yoga when the server takes it.
+    private func activity(_ rows: [BodyActivity], logsYoga: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HXSectionHeader(title: "Activity", trailing: "Lifts, runs, walks, yoga")
             VStack(spacing: 0) {
@@ -417,13 +423,67 @@ struct BodyHomeView: View {
                         NavigationLink(value: ShellPushDestination.bodySession(row.id)) { activityRow(row) }
                             .buttonStyle(.chatTactile(.card))
                             .accessibilityHint(Text(verbatim: "Opens this workout and Baki's note"))
+                    } else if row.removable {
+                        HStack(spacing: 0) {
+                            activityRow(row)
+                            removeMenu(row)
+                        }
                     } else {
                         activityRow(row)
                     }
                 }
+                if logsYoga {
+                    if !rows.isEmpty { PrepRowDivider().padding(.leading, 14) }
+                    logYogaMenu
+                }
             }
             .hxCard()
+            if let error = viewModel.activityError {
+                Text(verbatim: error)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxDanger)
+            }
         }
+    }
+
+    /// Yoga from a video has no watch behind it, so he says how long it was: one tap logs it today.
+    private var logYogaMenu: some View {
+        Menu {
+            Section {
+                ForEach(BodyHomeCopy.yogaLengths, id: \.self) { minutes in
+                    Button { Task { await viewModel.logYoga(minutes: minutes) } } label: {
+                        Text(verbatim: "\(minutes) min")
+                    }
+                }
+            } header: {
+                Text(verbatim: "How long was it?")
+            }
+        } label: {
+            Label { Text(verbatim: "Log yoga") } icon: { Image(systemName: "plus") }
+                .font(AppFont.subheadline())
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .disabled(viewModel.changingActivity)
+        .accessibilityHint(Text(verbatim: "Adds a yoga session to today"))
+    }
+
+    /// The way back for something he logged by hand.
+    private func removeMenu(_ row: BodyActivity) -> some View {
+        Menu {
+            Button(role: .destructive) { Task { await viewModel.remove(row) } } label: {
+                Label { Text(verbatim: "Remove") } icon: { Image(systemName: "trash") }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(AppFont.subheadline())
+                .foregroundStyle(.hxSecondary)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .disabled(viewModel.changingActivity)
+        .accessibilityLabel(Text(verbatim: "More for \(row.label), \(BodyHomeCopy.sessionDate(row.date))"))
     }
 
     private func activityRow(_ row: BodyActivity) -> some View {

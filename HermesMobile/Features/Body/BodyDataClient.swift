@@ -25,6 +25,11 @@ protocol BodyDataClient: Sendable {
     /// Makes cue `index` the one Baki uses on a lift and returns its new form card. `lift` is the
     /// cue card's key (`form.lift`), which on an alternate week is not the lift's own id.
     func pickCue(lift: String, index: Int) async throws -> BodyForm
+    /// Logs something he did with no watch on (a yoga video), dated today, and returns home as it
+    /// is afterwards. `kind` is one of home's `logKinds`.
+    func logActivity(kind: String, minutes: Int) async throws -> BodyHome
+    /// Takes back an activity he logged by hand (`removable`) and returns home as it is afterwards.
+    func removeActivity(id: String) async throws -> BodyHome
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol, decoding with
@@ -95,6 +100,25 @@ struct APIClientBodyAdapter: BodyDataClient {
         let result: BodyCuePickResult = try decode(try await apiClient.sendData(
             endpoint: .bodyCue, method: "POST", body: CueRequest(lift: lift, cue: index)))
         return result.form
+    }
+
+    func logActivity(kind: String, minutes: Int) async throws -> BodyHome {
+        try decode(try await apiClient.sendData(
+            endpoint: .bodyActivity, method: "POST", body: LogActivityRequest(kind: kind, minutes: minutes)))
+    }
+
+    func removeActivity(id: String) async throws -> BodyHome {
+        try decode(try await apiClient.sendData(
+            endpoint: .bodyActivity, method: "POST", body: RemoveActivityRequest(remove: id)))
+    }
+
+    private struct LogActivityRequest: Encodable {
+        let kind: String
+        let minutes: Int
+    }
+
+    private struct RemoveActivityRequest: Encodable {
+        let remove: String
     }
 
     private struct CueRequest: Encodable {

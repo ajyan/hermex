@@ -170,7 +170,8 @@ final class BodyModelsTests: APIClientTestCase {
         XCTAssertEqual(home.week.active?.goal, 150)
         XCTAssertEqual(home.week.active?.pip, 15)
         XCTAssertFalse(home.week.enough)
-        XCTAssertEqual(home.activity.map(\.id), ["garmin-101", "garmin-100", "2026-11-27-pull"], "junk is dropped")
+        XCTAssertEqual(home.activity.map(\.id), ["yoga-2026-12-01-ab12cd34", "garmin-100", "2026-11-27-pull"], "junk is dropped")
+        XCTAssertNil(home.activity[0].source, "he logged the yoga himself")
         XCTAssertEqual(home.activity.map(\.isLift), [false, false, true])
         XCTAssertEqual(home.activity[1].distanceLabel, "4.6 mi")
         XCTAssertEqual(home.activity[1].source, "Garmin")
@@ -189,7 +190,9 @@ final class BodyModelsTests: APIClientTestCase {
         XCTAssertNil(home.week.active)
         XCTAssertFalse(home.week.enough)
         XCTAssertTrue(home.activity.isEmpty)
+        XCTAssertTrue(home.logKinds.isEmpty, "an older server takes no logged yoga")
         let row = try XCTUnwrap(home.activityRows.first)
+        XCTAssertFalse(row.removable)
         XCTAssertEqual(row.id, "2026-11-30-push")
         XCTAssertTrue(row.isLift)
         XCTAssertEqual(row.minutes, 41)
@@ -349,6 +352,27 @@ final class BodyModelsTests: APIClientTestCase {
         XCTAssertEqual(check["effort"] as? String, "easy")
         XCTAssertEqual((check["pain"] as? [String: Any])?["lift"] as? String, "incline-bench")
         XCTAssertNotNil(bodies["POST /api/body/plan"]?["rotation"])
+    }
+
+    func testLoggingAndRemovingAnActivityPostTheirBodiesAndDecodeHome() async throws {
+        var bodies: [[String: Any]] = []
+        let client = makeClient { request in
+            XCTAssertEqual("\(request.httpMethod ?? "") \(request.url?.path ?? "")", "POST /api/body/activity")
+            if let data = apiTestBodyData(from: request), let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                bodies.append(object)
+            }
+            return apiTestJSONResponse(String(decoding: try Self.fixture("home.json"), as: UTF8.self), for: request)
+        }
+        let body = APIClientBodyAdapter(apiClient: client)
+        let home = try await body.logActivity(kind: "yoga", minutes: 25)
+        _ = try await body.removeActivity(id: "yoga-2026-12-01-ab12cd34")
+        XCTAssertEqual(home.logKinds, ["yoga"])
+        XCTAssertEqual(home.activity.map(\.removable), [true, false, false])
+        XCTAssertEqual(bodies.count, 2)
+        XCTAssertEqual(bodies[0]["kind"] as? String, "yoga")
+        XCTAssertEqual(bodies[0]["minutes"] as? Int, 25)
+        XCTAssertEqual(bodies[1].keys.sorted(), ["remove"])
+        XCTAssertEqual(bodies[1]["remove"] as? String, "yoga-2026-12-01-ab12cd34")
     }
 
     func testDecideSendsAcceptAndSkip() async throws {

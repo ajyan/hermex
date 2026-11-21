@@ -418,13 +418,14 @@
   ],
   "activity": [
     {
-      "id": "garmin-101",
+      "id": "yoga-2026-12-01-ab12cd34",
       "kind": "yoga",
       "label": "Yoga",
       "date": "2026-12-01",
       "minutes": 25,
       "distance_label": null,
-      "source": "Garmin"
+      "source": null,
+      "removable": true
     },
     {
       "id": "garmin-100",
@@ -450,5 +451,8 @@
       "source": null
     },
     "junk"
+  ],
+  "log_kinds": [
+    "yoga"
   ]
 }

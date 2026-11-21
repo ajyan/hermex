@@ -250,6 +250,8 @@ enum Endpoint {
     case bodyProposal
     case bodySleep
     case bodyCue
+    /// POST: log something done with no watch on (`kind`, `minutes`) or take one back (`remove`).
+    case bodyActivity
     /// The Meals screen (same fork module): GET the week around the phone's local `day`, GET the
     /// dish library, POST a week's nights, POST a logged night, POST a new dish without a recipe.
     case mealsHome(day: String)
@@ -678,6 +680,8 @@ enum Endpoint {
             return "/api/body/sleep"
         case .bodyCue:
             return "/api/body/cue"
+        case .bodyActivity:
+            return "/api/body/activity"
         case .mealsHome:
             return "/api/meals/home"
         case .mealsDishes:

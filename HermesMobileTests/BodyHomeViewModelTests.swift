@@ -57,6 +57,24 @@ private final class FakeBodyClient: BodyDataClient, @unchecked Sendable {
     func savePlan(_ plan: BodyPlan) async throws -> BodyPlan { throw URLError(.unsupportedURL) }
     func sleepHistory() async throws -> SleepHistory? { throw URLError(.unsupportedURL) }
     func pickCue(lift: String, index: Int) async throws -> BodyForm { throw URLError(.unsupportedURL) }
+
+    var activityResults: [Result<BodyHome, Error>] = []
+
+    func logActivity(kind: String, minutes: Int) async throws -> BodyHome {
+        try lock.withLock {
+            _log.append("log:\(kind):\(minutes)")
+            guard !activityResults.isEmpty else { throw URLError(.badServerResponse) }
+            return try activityResults.removeFirst().get()
+        }
+    }
+
+    func removeActivity(id: String) async throws -> BodyHome {
+        try lock.withLock {
+            _log.append("remove:\(id)")
+            guard !activityResults.isEmpty else { throw URLError(.badServerResponse) }
+            return try activityResults.removeFirst().get()
+        }
+    }
 }
 
 @MainActor
@@ -451,5 +469,66 @@ final class BodyHomeCopyTests: XCTestCase {
         XCTAssertEqual(BodyHomeCopy.weekValue([.done, .off, .done, .today], subtitle: "Push, Legs"),
                        "Monday and Wednesday. Push, Legs")
         XCTAssertEqual(BodyHomeCopy.weekValue([.today], subtitle: nil), "none yet this week")
+    }
+}
+
+/// Logging yoga by hand and taking it back, on Body home.
+@MainActor
+final class BodyActivityLogTests: XCTestCase {
+    private func home(phaseLabel: String? = nil) throws -> BodyHome {
+        let base = try PrepDecoding.decode(BodyHome.self, from: BodyModelsTests.fixture("home.json"))
+        guard let phaseLabel else { return base }
+        return BodyHome(phase: base.phase, phaseLabel: phaseLabel, starts: nil, next: nil, week: base.week, sleep: nil,
+                        lifts: [], sessions: [], logKinds: ["yoga"], proposals: [], gaps: [])
+    }
+
+    private func loaded(_ model: BodyHomeViewModel) -> BodyHome? {
+        if case .loaded(let home) = model.state { return home }
+        return nil
+    }
+
+    private func activity(_ json: String) throws -> BodyActivity {
+        try PrepDecoding.decode(BodyActivity.self, from: Data(json.utf8))
+    }
+
+    func testLoggingYogaShowsTheHomeTheServerAnswersWithAndAFailureKeepsWhatWasThere() async throws {
+        let client = FakeBodyClient()
+        let before = try home()
+        let after = try home(phaseLabel: "After")
+        client.homeResults = [.success(before)]
+        let model = BodyHomeViewModel(client: client)
+        await model.load()
+
+        client.activityResults = [.failure(URLError(.timedOut))]
+        await model.logYoga(minutes: 25)
+        XCTAssertEqual(model.activityError, "Couldn't save that. Try again.")
+        XCTAssertEqual(loaded(model)?.phaseLabel, before.phaseLabel, "nothing shows as logged")
+        XCTAssertEqual(model.landedLogs, 0)
+        XCTAssertFalse(model.changingActivity)
+
+        client.activityResults = [.success(after)]
+        await model.logYoga(minutes: 25)
+        XCTAssertNil(model.activityError)
+        XCTAssertEqual(loaded(model)?.phaseLabel, "After")
+        XCTAssertEqual(model.landedLogs, 1, "the haptic plays once the server has it")
+        XCTAssertEqual(client.log.filter { $0.hasPrefix("log:") }, ["log:yoga:25", "log:yoga:25"])
+    }
+
+    func testOnlyWhatHeLoggedCanBeRemoved() async throws {
+        let client = FakeBodyClient()
+        client.homeResults = [.success(try home())]
+        let model = BodyHomeViewModel(client: client)
+        await model.load()
+        let garmin = try activity(#"{"id":"garmin-1","kind":"yoga","label":"Yoga","date":"2026-11-21","source":"Garmin"}"#)
+        await model.remove(garmin)
+        XCTAssertFalse(client.log.contains { $0.hasPrefix("remove:") })
+
+        let logged = try activity(#"{"id":"yoga-2026-11-21-ab12","kind":"yoga","label":"Yoga","date":"2026-11-21","minutes":25,"removable":true}"#)
+        XCTAssertEqual(BodyHomeCopy.activitySubtitle(logged), "\(BodyHomeCopy.sessionDate("2026-11-21")) · 25 min")
+        client.activityResults = [.success(try home(phaseLabel: "No yoga"))]
+        await model.remove(logged)
+        XCTAssertEqual(client.log.last, "remove:yoga-2026-11-21-ab12")
+        XCTAssertEqual(model.landedLogs, 0, "a removal is not a success to celebrate")
+        XCTAssertEqual(loaded(model)?.phaseLabel, "No yoga")
     }
 }

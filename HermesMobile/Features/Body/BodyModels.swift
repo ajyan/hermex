@@ -739,6 +739,8 @@ struct BodyActivity: Decodable, Hashable, Sendable, Identifiable {
     let distanceLabel: String?
     /// "Garmin" for what the watch recorded; nil for his own workouts.
     let source: String?
+    /// He logged this by hand, so he can take it back.
+    let removable: Bool
     let trimmed: Bool
     let autoFinished: Bool
     let highlight: String?
@@ -747,7 +749,7 @@ struct BodyActivity: Decodable, Hashable, Sendable, Identifiable {
     var isLift: Bool { kind == "lift" }
 
     private enum CodingKeys: String, CodingKey {
-        case id, kind, label, date, minutes, distanceLabel = "distance_label", source, trimmed,
+        case id, kind, label, date, minutes, distanceLabel = "distance_label", source, removable, trimmed,
              autoFinished = "auto_finished", highlight, note
     }
 
@@ -760,6 +762,7 @@ struct BodyActivity: Decodable, Hashable, Sendable, Identifiable {
         minutes = c.optional(Int.self, .minutes)
         distanceLabel = c.optional(String.self, .distanceLabel)
         source = c.optional(String.self, .source)
+        removable = c.bool(.removable)
         trimmed = c.bool(.trimmed)
         autoFinished = c.bool(.autoFinished)
         highlight = c.optional(String.self, .highlight)
@@ -775,6 +778,7 @@ struct BodyActivity: Decodable, Hashable, Sendable, Identifiable {
         minutes = session.minutes
         distanceLabel = nil
         source = nil
+        removable = false
         trimmed = session.trimmed
         autoFinished = session.autoFinished
         highlight = session.highlight
@@ -857,6 +861,8 @@ struct BodyHome: Decodable, Hashable, Sendable {
     let sessions: [BodySessionSummary]
     /// His workouts among what Garmin recorded, newest first; empty from an older server (`activityRows`).
     let activity: [BodyActivity]
+    /// What he can log by hand ("yoga"); empty from a server that can't take it.
+    let logKinds: [String]
     let proposals: [BodyProposal]
     /// Accepted weight changes still waiting for their lift's next session.
     let changes: [BodyChange]
@@ -866,8 +872,8 @@ struct BodyHome: Decodable, Hashable, Sendable {
     let watching: [BodyWatching]
 
     private enum CodingKeys: String, CodingKey {
-        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, activity, proposals,
-             changes, gaps, watching
+        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, activity,
+             logKinds = "log_kinds", proposals, changes, gaps, watching
     }
 
     init(from decoder: Decoder) throws {
@@ -881,6 +887,7 @@ struct BodyHome: Decodable, Hashable, Sendable {
         lifts = c.lossy(BodyHomeLift.self, .lifts)
         sessions = c.lossy(BodySessionSummary.self, .sessions)
         activity = c.lossy(BodyActivity.self, .activity)
+        logKinds = c.strings(.logKinds)
         proposals = c.lossy(BodyProposal.self, .proposals)
         changes = c.lossy(BodyChange.self, .changes)
         gaps = c.strings(.gaps)
