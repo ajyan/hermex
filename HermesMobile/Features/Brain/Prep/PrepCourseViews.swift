@@ -3,7 +3,7 @@ import SwiftUI
 // Prep home's top and its course: the readiness pips, the Today card, and the path of units and lesson
 // nodes. The path shows the unit being taught; "All units" opens the rest (passed units as rows with
 // their ready count, other open units folded to one row, the next unit locked with Test out, the rest counted
-// in one line). The path wears the `.prep` paper; only real controls are Nous blue (Start on the Today
+// in one line). The path wears the `.prep` paper; real controls wear the Prep glow (Start on the Today
 // card); rewards are gold marks only.
 
 /// Today's done/total as a ring, the number inside.
@@ -109,7 +109,7 @@ private struct PrepReadinessPip: View {
                 if opens {
                     Image(systemName: "chevron.right")
                         .font(BrainStyle.meta.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(HermexPaper.prep.glow)
                         .accessibilityHidden(true)
                 }
             }
@@ -245,7 +245,7 @@ struct PrepUnitPath: View {
                 Button { showsAll.toggle() } label: {
                     Text(verbatim: showsAll ? "Show only this unit" : "All \(course.units.count) units")
                         .font(BrainStyle.rowSubtitle)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(HermexPaper.prep.glow)
                         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                         .contentShape(Rectangle())
                 }

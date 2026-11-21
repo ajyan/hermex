@@ -280,7 +280,7 @@ struct PrepDayCompleteView: View {
                         Button { openBrainRoute.replaceTop(.prep(.bonus)) } label: {
                             Text(verbatim: "One more round")
                                 .font(AppFont.body(weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(HermexPaper.prep.glow)
                                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
                                 .contentShape(Rectangle())
                         }
@@ -410,7 +410,7 @@ struct PrepLessonView: View {
                                 Button { showsAnswer = true } label: {
                                     Text(verbatim: "Show the answer")
                                         .font(BrainStyle.rowSubtitle)
-                                        .foregroundStyle(Color.accentColor)
+                                        .foregroundStyle(HermexPaper.prep.glow)
                                         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                                         .contentShape(Rectangle())
                                 }

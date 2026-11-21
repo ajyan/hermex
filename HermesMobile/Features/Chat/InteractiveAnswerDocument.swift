@@ -5,17 +5,25 @@ import SwiftUI
 struct InteractiveAnswerTheme: Equatable {
     let isDark: Bool
     let canvas, surface, text, text2, sep, accent, ok, warn, danger: String
+    /// Text on a solid accent fill: light `onAccent` (white) as the vault's diagrams were drawn for, or the
+    /// paper's `onGlow` (its ink in dark mode, where glows are pastel).
+    let onAccent: String
 
-    static func current(_ colorScheme: ColorScheme) -> InteractiveAnswerTheme {
+    /// `paper` is the object the tool belongs to (a Brief card's map, a Brain page's diagram): its controls
+    /// then wear that paper's glow instead of Nous blue (DESIGN.md principle 5). Chat passes none.
+    static func current(_ colorScheme: ColorScheme, paper: HermexPaper? = nil) -> InteractiveAnswerTheme {
         let isDark = colorScheme == .dark
         let palette = isDark ? HermexPalette.dark : HermexPalette.light
         func hex(_ token: HermexToken) -> String { hexString(palette[token] ?? 0) }
+        let white = hexString(HermexPalette.light[.onAccent] ?? 0)
+        let accent = paper.map { String(format: "#%06X", isDark ? $0.values.glowDark : $0.values.glowLight) }
         return InteractiveAnswerTheme(
             isDark: isDark,
             canvas: hex(.canvas), surface: hex(.surface),
             text: hex(.textPrimary), text2: hex(.textSecondary), sep: hex(.separator),
-            accent: hexString(isDark ? HermexPalette.accentDark : lightAccent),
-            ok: hex(.success), warn: hex(.warning), danger: hex(.danger)
+            accent: accent ?? hexString(isDark ? HermexPalette.accentDark : lightAccent),
+            ok: hex(.success), warn: hex(.warning), danger: hex(.danger),
+            onAccent: isDark ? paper.map { String(format: "#%06X", $0.values.ink) } ?? white : white
         )
     }
 
@@ -52,7 +60,7 @@ enum InteractiveAnswerDocument {
         <style>
         :root {
           --canvas: \(theme.canvas); --surface: \(theme.surface); --text: \(theme.text); --text2: \(theme.text2);
-          --sep: \(theme.sep); --accent: \(theme.accent); --ok: \(theme.ok); --warn: \(theme.warn); --danger: \(theme.danger);
+          --sep: \(theme.sep); --accent: \(theme.accent); --on-accent: \(theme.onAccent); --ok: \(theme.ok); --warn: \(theme.warn); --danger: \(theme.danger);
           --font: -apple-system, system-ui, sans-serif;
           color-scheme: \(theme.isDark ? "dark" : "light");
         }
@@ -63,6 +71,8 @@ enum InteractiveAnswerDocument {
         input, select, textarea { background: var(--canvas); border: 1px solid var(--sep); border-radius: 10px; padding: 8px 10px; }
         button { border: 0; border-radius: 999px; padding: 8px 14px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; }
         :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        /* Vault diagrams write white text on accent fills inline; a paper's dark glow is pastel, so read --on-accent. */
+        [style*="background:var(--accent)"], [style*="background: var(--accent)"] { color: var(--on-accent) !important; }
         </style>
         <script>
         (function () {

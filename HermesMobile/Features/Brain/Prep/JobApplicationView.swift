@@ -126,10 +126,11 @@ struct JobApplicationView: View {
             Image(systemName: "chevron.down").font(AppFont.caption2(weight: .semibold))
         }
         .font(AppFont.subheadline(weight: .medium))
-        .foregroundStyle(Color.accentColor)
+        .foregroundStyle(HermexPaper.prep.glow)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Color.hxSurface, in: Capsule())
+        .background(HermexPaper.prep.wash, in: Capsule())
+        .overlay(Capsule().strokeBorder(HermexPaper.prep.edge, lineWidth: 0.5))
     }
 
     // MARK: Interviews
@@ -153,7 +154,7 @@ struct JobApplicationView: View {
                     Button { booking = JobInterviewDraft(appID: app.row.id, interview: nil) } label: {
                         Label { Text(verbatim: "Book an interview") } icon: { Image(systemName: "plus") }
                             .font(BrainStyle.rowSubtitle)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(HermexPaper.prep.glow)
                             .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                     }
                     .buttonStyle(.plain)
@@ -529,7 +530,7 @@ struct JobOnePagerView: View {
             ForEach(items, id: \.url) { source in
                 if let url = URL(string: source.url) {
                     Button { openURL(url) } label: {
-                        Text(verbatim: source.title).font(BrainStyle.meta).foregroundStyle(Color.accentColor)
+                        Text(verbatim: source.title).font(BrainStyle.meta).foregroundStyle(HermexPaper.prep.glow)
                     }
                     .buttonStyle(.plain)
                 }

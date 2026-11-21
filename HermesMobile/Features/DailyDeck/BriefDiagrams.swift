@@ -92,6 +92,8 @@ struct OpenDiagramLabel: View {
 /// `atlas-ui` tool in an interactive answer card. None of them has a composer, so the tool's "Ask Atlas" does nothing here.
 struct DiagramSheet: View {
     let title: String
+    /// The object the diagram opened from; its controls wear this paper's glow.
+    var paper: HermexPaper? = nil
     /// Reads the diagram's `atlas-ui` fragment.
     let load: @MainActor () async throws -> String
 
@@ -125,7 +127,8 @@ struct DiagramSheet: View {
         if let fragment {
             InteractiveAnswerCard(
                 block: .card(fragment: fragment, title: InteractiveAnswerBlock.title(in: fragment) ?? title),
-                source: fragment
+                source: fragment,
+                paper: paper
             )
         } else if failed {
             HXFailedView(title: "Couldn't load the diagram", message: "Check your connection to the server.") {

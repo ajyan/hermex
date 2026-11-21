@@ -541,7 +541,7 @@ struct BrainReaderContent: View {
         }
         .sheet(isPresented: $showsDiagram) {
             if let diagram = page.diagram {
-                DiagramSheet(title: diagram.title ?? page.item.title) { diagram.html }
+                DiagramSheet(title: diagram.title ?? page.item.title, paper: page.item.module.paper) { diagram.html }
             }
         }
     }

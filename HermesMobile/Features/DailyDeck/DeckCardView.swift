@@ -220,7 +220,7 @@ struct DeckCardView: View {
             })
         }
         .sheet(item: $openDiagram) { entry in
-            DiagramSheet(title: entry.title ?? "Diagram") { [viewModel] in try await viewModel.diagramFragment(entry) }
+            DiagramSheet(title: entry.title ?? "Diagram", paper: palette.isNeutralCard ? nil : palette.colors) { [viewModel] in try await viewModel.diagramFragment(entry) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(verbatim: palette.name))
@@ -574,8 +574,6 @@ struct DeckCardView: View {
                     .accessibilityLabel(Text(verbatim: "Comes back in \(option.label)"))
                 }
             }
-            // The chips are controls, so the chosen one stays Nous blue on the dusk card (DESIGN.md).
-            .environment(\.hxPaper, nil)
         }
     }
 

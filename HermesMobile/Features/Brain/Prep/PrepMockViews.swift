@@ -4,7 +4,7 @@ import SwiftUI
 
 // The voice mock ladders: two rows on Prep home, a brief screen per ladder with Start call, and the
 // graded result after hang-up. Cards are `.prep` wash cards like every Prep card; Start call is
-// a control, so it alone wears Nous blue. Only the candidate's own quoted words are serif.
+// a control, so it alone is filled, in the Prep glow. Only the candidate's own quoted words are serif.
 
 // MARK: - Home section
 
@@ -184,7 +184,7 @@ struct PrepMockBriefView: View {
     }
 }
 
-/// Start call: a full-width Nous blue capsule, "Starting…" and off while the mock starts.
+/// Start call: a full-width capsule in the Prep glow, "Starting…" and off while the mock starts.
 struct PrepStartCallButton: View {
     let isStarting: Bool
     let action: () -> Void
@@ -197,9 +197,9 @@ struct PrepStartCallButton: View {
                 Image(systemName: "phone.fill")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(isStarting ? Color.hxTextSecondary : Color.hxOnAccent)
-            .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-            .background(isStarting ? Color.hxSeparator.opacity(0.6) : Color.accentColor, in: Capsule())
+            .foregroundStyle(isStarting ? Color.hxTextSecondary : HermexPaper.prep.onGlow)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(isStarting ? HermexPaper.prep.wash : HermexPaper.prep.glow, in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -296,9 +296,9 @@ struct PrepMockResultView: View {
                 } label: {
                     Text(verbatim: viewModel.isSendingGrade ? "Sending…" : "Send for grading")
                         .font(AppFont.body(weight: .semibold))
-                        .foregroundStyle(viewModel.isSendingGrade ? Color.hxTextSecondary : Color.hxOnAccent)
-                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-                        .background(viewModel.isSendingGrade ? Color.hxSeparator.opacity(0.6) : Color.accentColor,
+                        .foregroundStyle(viewModel.isSendingGrade ? Color.hxTextSecondary : HermexPaper.prep.onGlow)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(viewModel.isSendingGrade ? HermexPaper.prep.wash : HermexPaper.prep.glow,
                                     in: Capsule())
                         .contentShape(Capsule())
                 }

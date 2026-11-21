@@ -44,7 +44,7 @@ struct PrepPipelineSection: View {
                         Button { adding = true } label: {
                             Label { Text(verbatim: "Add a company") } icon: { Image(systemName: "plus") }
                                 .font(BrainStyle.rowSubtitle)
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(HermexPaper.prep.glow)
                                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                         }
                         .buttonStyle(.plain)

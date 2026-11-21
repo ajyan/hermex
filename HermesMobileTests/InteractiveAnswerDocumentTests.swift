@@ -15,6 +15,20 @@ final class InteractiveAnswerDocumentTests: XCTestCase {
         )
     }
 
+    /// A diagram opened from an object wears its glow as the accent (DESIGN.md principle 5); chat stays Nous blue.
+    func testThemeAccentWearsTheObjectsGlow() {
+        XCTAssertEqual(InteractiveAnswerTheme.current(.light, paper: .prep).accent, "#8A2BB0")
+        XCTAssertEqual(InteractiveAnswerTheme.current(.dark, paper: .prep).accent, "#DDA2F2")
+        XCTAssertEqual(InteractiveAnswerTheme.current(.light, paper: nil).accent, "#0053FD")
+        // Dark glows are pastel, so text on an accent fill is the paper's ink there, never white.
+        let dark = InteractiveAnswerTheme.current(.dark, paper: .prep)
+        XCTAssertEqual(dark.onAccent, "#45105A")
+        XCTAssertEqual(InteractiveAnswerTheme.current(.light, paper: .prep).onAccent, "#FFFFFF")
+        let html = InteractiveAnswerDocument.html(fragment: "", theme: dark)
+        XCTAssertTrue(html.contains("--on-accent: #45105A;"))
+        XCTAssertTrue(html.contains(#"[style*="background:var(--accent)"]"#))
+    }
+
     func testThemeVariables() {
         let light = InteractiveAnswerTheme.current(.light)
         let dark = InteractiveAnswerTheme.current(.dark)

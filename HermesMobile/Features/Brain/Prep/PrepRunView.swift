@@ -521,7 +521,7 @@ struct PrepRunView: View {
                             .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(HermexPaper.prep.glow)
                 }
             }
         case .judgment, .boss:

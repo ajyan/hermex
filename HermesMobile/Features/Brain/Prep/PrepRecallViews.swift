@@ -59,7 +59,7 @@ struct PrepRecallCard: View {
             Button(action: reread) {
                 Text(verbatim: "Reread the lesson")
                     .font(BrainStyle.rowTitle)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(HermexPaper.prep.glow)
                     .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
             }
             .buttonStyle(.plain)
@@ -168,7 +168,7 @@ struct PrepRecallResultView: View {
                     Image(systemName: "bubble.left.and.text.bubble.right")
                 }
                 .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(HermexPaper.prep.glow)
                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
             }
             .buttonStyle(.plain)
@@ -243,7 +243,7 @@ struct PrepKeyPointRow: View {
                         if undoOverride.isAvailable {
                             Button { undoOverride(id) } label: {
                                 Text(verbatim: overridingPoint == id ? "Undoing…" : "Undo")
-                                    .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
+                                    .font(BrainStyle.meta).foregroundStyle(HermexPaper.prep.glow)
                                     .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
                                     .contentShape(Rectangle())
                             }
@@ -256,7 +256,7 @@ struct PrepKeyPointRow: View {
                 if Self.offersOverride(hit: hit, canOverride: canOverride, result: result) {
                     Button { overrideMissed(id) } label: {
                         Text(verbatim: overridingPoint == id ? "Saving…" : "I had that ›")
-                            .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
+                            .font(BrainStyle.meta).foregroundStyle(HermexPaper.prep.glow)
                             .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
                             .contentShape(Rectangle())
                     }

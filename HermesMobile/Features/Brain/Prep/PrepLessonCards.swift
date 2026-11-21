@@ -165,7 +165,7 @@ struct PrepLessonCardsView: View {
                             } else {
                                 Text(verbatim: "Tap to check")
                                     .font(BrainStyle.rowTitle)
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(HermexPaper.prep.glow)
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
@@ -292,7 +292,7 @@ struct PrepLessonDiagramButton: View {
             .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title)"))
             .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
             .sheet(isPresented: $isOpen) {
-                DiagramSheet(title: diagram.title) { [loader, topic = diagram.topic] in try await loader(topic) }
+                DiagramSheet(title: diagram.title, paper: .prep) { [loader, topic = diagram.topic] in try await loader(topic) }
             }
         }
     }
