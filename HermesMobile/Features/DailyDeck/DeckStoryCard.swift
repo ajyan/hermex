@@ -7,6 +7,8 @@ struct DeckStoryTechnique: Decodable, Equatable, Identifiable {
     let name: String
     /// One plain line on how to do it, shown under the picks once chosen.
     let how: String?
+    /// Why it's offered today, when his feedback chose it: "from your notes", "your lowest-rated area".
+    let why: String?
 }
 
 /// The server's hearing of a telling (`POST /api/stories/listen`): the words, and at most one observation
@@ -104,6 +106,13 @@ struct DeckStoryCard: View {
                     .font(AppFont.display(style: .headline, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let thread = card.thread {
+                // Watch for: one line from his own recent notes, quoted as he wrote it (the label names the day).
+                DeckThreadView(thread: DeckThread(label: thread.label, quote: thread.quote, at: nil), palette: palette)
+                    .padding(12)
+                    .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+                    .padding(.top, 16)
+            }
             if !card.techniques.isEmpty { techniquePicker.padding(.top, 18) }
             if let video {
                 watchBack(video).padding(.top, 22)
@@ -139,7 +148,7 @@ struct DeckStoryCard: View {
                 }
             }
             if let how = technique?.how {
-                Text(verbatim: how)
+                Text(verbatim: [technique?.why.map { $0.prefix(1).uppercased() + $0.dropFirst() }, how].compactMap { $0 }.joined(separator: " · "))
                     .font(AppFont.footnote())
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
