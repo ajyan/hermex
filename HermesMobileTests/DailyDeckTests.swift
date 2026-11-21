@@ -1661,7 +1661,8 @@ final class DailyDeckTests: XCTestCase {
       "files_to": "story", "title": "You were 9", "question": "When did you get caught doing something you weren't supposed to?",
       "alt_questions": ["What was the best day of that fall?"], "reason": "Tell a story · Fall 2003",
       "context": "Growing up in New York",
-      "techniques": [{"id": "peak", "name": "Start at the peak", "how": "Open on the moment you got caught."},
+      "thread": {"label": "Watch for · your note on Thursday", "quote": "I go flat when I get to the part that matters.", "at": "2026-10-01"},
+      "techniques": [{"id": "peak", "name": "Start at the peak", "how": "Open on the moment you got caught.", "why": "from your notes"},
                      {"id": "pause", "name": "Pause before the key line"}, {"name": "no id"}],
       "ref": {"topic": "story", "year": 2003, "season": "fall", "age": 9}}]}
     """#
@@ -1672,6 +1673,10 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(card.techniques.map(\.id), ["peak", "pause"], "a technique without an id is dropped")
         XCTAssertEqual(card.techniques.first?.how, "Open on the moment you got caught.")
         XCTAssertNil(card.techniques.last?.how)
+        XCTAssertEqual(card.techniques.first?.why, "from your notes")
+        XCTAssertNil(card.techniques.last?.why)
+        XCTAssertEqual(card.thread?.label, "Watch for · your note on Thursday")
+        XCTAssertEqual(card.thread?.quote, "I go flat when I get to the part that matters.")
         XCTAssertEqual(DeckPalette.of(card).name, "Tell a story")
         XCTAssertEqual(DeckPalette.of(card).colors, HermexPaper.notes)
         XCTAssertEqual(card.kindLabel(.of(card), advisor: "Coach"), "Tell a story · Fall 2003",
