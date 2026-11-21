@@ -255,6 +255,13 @@ struct MonthValueCard: View {
                 .padding(.trailing, clearance)
                 .accessibilityAddTraits(.isHeader)
             if month?.scored == true, month?.inputFirst == true { scoreRow.padding(.top, 16) }
+            // Cared for my body carries the workouts: the week on the weekly review, the month on the monthly.
+            if let week = month?.bodyWeek { ReviewBodyWeek(week: week).padding(.top, 20) }
+            if let body = month?.bodyMonth {
+                ReviewBodyMonth(month: body, firstWeekday: month?.firstWeekday ?? 0,
+                                daysInMonth: month?.daysInMonth ?? 31, revealed: revealed, paper: palette.colors)
+                    .padding(.top, 18)
+            }
             if let stat = month?.stat {
                 // Becoming a dad carries the letters: how many, and the days written.
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -300,6 +307,116 @@ struct MonthValueCard: View {
         let valueID = card.valueID ?? card.id
         return WeekScoreRow(title: "How you lived it this week", score: viewModel.answer(for: card)?.scores?[valueID],
                             palette: palette) { viewModel.setScore(valueID, $0, for: card) }
+    }
+}
+
+// MARK: Body
+
+/// The week on the weekly review's "Cared for my body" card, drawn as Body home draws it: a row of
+/// day dots each for lifting, runs, walks and yoga, then the active minutes, and "Enough for this
+/// week" when it was. The review is frozen when it is built, so this is the week as it stood then.
+/// The vault never sends a "today" for it, since the card is read on later days too, and everything
+/// takes the card's paper.
+struct ReviewBodyWeek: View {
+    let week: DeckMonth.BodyWeekStrip
+
+    @Environment(\.hxPaper) private var paper
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                // A section title on a review card wears the card's ink, as "In your words" does.
+                Text(verbatim: "Your week")
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle((paper ?? .training).glow)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                if week.enough {
+                    Text(verbatim: "Enough for this week")
+                        .font(AppFont.caption())
+                        .foregroundStyle(.hxSecondary)
+                }
+            }
+            BodyWeekDots(title: "Lifted", subtitle: week.liftedLabel, states: week.lifted, showsWeekdays: true,
+                         closed: true)
+            BodyWeekDots(title: "Ran", subtitle: week.ranLabel, states: week.ran, closed: true)
+            if !week.walked.isEmpty {
+                BodyWeekDots(title: "Walked", subtitle: "8,000 steps or more", states: week.walked, closed: true)
+            }
+            if !week.yoga.isEmpty {
+                BodyWeekDots(title: "Yoga", subtitle: week.yogaLabel, states: week.yoga, closed: true)
+            }
+            if let active = week.active {
+                BakiRule()
+                BodyActivePips(active: active)
+            }
+        }
+    }
+}
+
+/// The month on the monthly review's "Cared for my body" card: a pip per week (filled when the
+/// week had two lifting days and its active minutes), then a calendar each for the days he lifted,
+/// ran, walked and did yoga.
+struct ReviewBodyMonth: View {
+    let month: DeckMonth.BodyMonth
+    let firstWeekday: Int
+    let daysInMonth: Int
+    let revealed: Bool
+    let paper: HermexPaper
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if !month.weeks.isEmpty { weeks }
+            if !month.weeks.isEmpty, !month.rows.isEmpty { BakiRule() }
+            if !month.rows.isEmpty {
+                MonthCalendarGrid(rows: month.rows, firstWeekday: firstWeekday, daysInMonth: daysInMonth,
+                                  revealed: revealed, paper: paper)
+            }
+        }
+    }
+
+    private var weeks: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: "Weeks with enough")
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                Text(verbatim: "2 lifting days and 150 active minutes")
+                    .font(AppFont.caption())
+                    .foregroundStyle(.hxSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 6) {
+                ForEach(Array(month.weeks.enumerated()), id: \.offset) { _, state in
+                    BodySetPip(state: ReviewBodyCopy.pip(state), size: 14)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Weeks with enough"))
+        .accessibilityValue(Text(verbatim: ReviewBodyCopy.weeksValue(month.weeks)))
+    }
+}
+
+/// The words and marks the review's Body card composes from the vault's values.
+enum ReviewBodyCopy {
+    /// A week's pip: filled when it had enough, a glow ring when it ended without, a quiet ring for
+    /// the week still running and the ones to come.
+    static func pip(_ state: BodyDayState) -> LiftPip {
+        switch state {
+        case .done: .hit
+        case .off: .short
+        case .today, .ahead, .unknown: .notDone
+        }
+    }
+
+    /// What VoiceOver reads in place of the pips: "3 of 4 weeks. 2 lifting days and 150 active
+    /// minutes." A week still running or ahead is not counted.
+    static func weeksValue(_ weeks: [BodyDayState]) -> String {
+        let ended = weeks.filter { $0 == .done || $0 == .off }.count
+        let enough = weeks.filter { $0 == .done }.count
+        let count = ended == 0 ? "No week has ended yet" : "\(enough) of \(ended) weeks"
+        return "\(count). 2 lifting days and 150 active minutes."
     }
 }
 

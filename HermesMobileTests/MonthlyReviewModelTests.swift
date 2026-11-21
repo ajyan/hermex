@@ -29,7 +29,12 @@ final class MonthlyReviewModelTests: XCTestCase {
                            "tiles": [{"label": "Slept", "value": "7h 42m", "note": "of 8h 10m needed"}],
                            "coach": {"name": "Mara Quinn", "text": "Guard the hour before bed."}}}},
       {"id": "value-body", "type": "value", "value": "body", "name": "Cared for my body", "color": "body",
-       "month": {"week_scores": [null, null, null, 5, null], "themes": [{"title": "Pain without suffering"}]}},
+       "month": {"week_scores": [null, null, null, 5, null], "themes": [{"title": "Pain without suffering"}],
+                 "first_weekday": 4, "days_in_month": 31,
+                 "body_month": {"weeks": ["done", "off", "done", "today", "later"],
+                                "rows": [{"id": "lifted", "label": "Lifted", "days": [2, 6, 9]}, "junk",
+                                         {"id": "yoga", "label": "Yoga", "days": [12]}],
+                                "lengths": {"lifted": "3 h"}}}},
       {"id": "close", "type": "close", "month": {"name": "October", "year": 2026,
        "months": [{"month": "Sep"}, {"month": "Oct", "title": "Slow and steady"}]}}
      ]}
@@ -69,6 +74,23 @@ final class MonthlyReviewModelTests: XCTestCase {
         XCTAssertEqual(sleep.nights.map(\.tier), ["good", "rough"])
         XCTAssertEqual(sleep.hrv.first?.tier, "unbalanced")
         XCTAssertEqual(sleep.coach?.name, "Mara Quinn")
+    }
+
+    func testTheBodyCardCarriesTheMonth() throws {
+        let month = try XCTUnwrap(deck().cards[5].month)
+        let body = try XCTUnwrap(month.bodyMonth)
+        XCTAssertEqual(body.weeks, [.done, .off, .done, .today, .unknown], "an unknown state is tolerated")
+        XCTAssertEqual(body.rows.map(\.id), ["lifted", "yoga"], "junk is dropped")
+        XCTAssertEqual(body.rows.first?.days, [2, 6, 9])
+        XCTAssertEqual(month.firstWeekday, 4)
+        XCTAssertEqual(month.daysInMonth, 31)
+        XCTAssertNil(month.bodyWeek)
+        XCTAssertEqual(body.weeks.map(ReviewBodyCopy.pip), [.hit, .short, .hit, .notDone, .notDone])
+        XCTAssertEqual(ReviewBodyCopy.weeksValue(body.weeks), "2 of 3 weeks. 2 lifting days and 150 active minutes.")
+        XCTAssertEqual(ReviewBodyCopy.weeksValue([.today, .ahead]),
+                       "No week has ended yet. 2 lifting days and 150 active minutes.")
+        XCTAssertEqual(BodyHomeCopy.weekValue([.off, .off], subtitle: nil, closed: true), "none that week")
+        XCTAssertNil(try deck().cards[3].month?.bodyMonth, "only the Body card carries it")
     }
 
     func testValueCardKeepsWeekScoresWithGaps() throws {

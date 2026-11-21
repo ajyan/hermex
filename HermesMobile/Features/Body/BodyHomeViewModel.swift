@@ -264,10 +264,12 @@ enum BodyHomeCopy {
 
     /// The weekday names for the done days of a Monday-first week row: "Monday and Wednesday",
     /// or "none yet this week". What VoiceOver reads in place of the dots.
-    static func doneDays(_ states: [BodyDayState]) -> String {
+    /// A week that is over (a review's) reads "none that week".
+    static func doneDays(_ states: [BodyDayState], closed: Bool = false) -> String {
         let names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         let done = states.prefix(7).enumerated().filter { $0.element == .done }.map { names[$0.offset] }
-        return done.isEmpty ? "none yet this week" : ListFormatter.localizedString(byJoining: done)
+        guard done.isEmpty else { return ListFormatter.localizedString(byJoining: done) }
+        return closed ? "none that week" : "none yet this week"
     }
 
     /// The labels of the workouts finished this week, in day order: "Push, Legs"; nil when none.
@@ -345,8 +347,8 @@ enum BodyHomeCopy {
 
     /// What VoiceOver reads for a week row's dots: the done days, then the row's subtitle
     /// ("Monday and Wednesday. Push, Legs").
-    static func weekValue(_ states: [BodyDayState], subtitle: String?) -> String {
-        [doneDays(states), subtitle].compactMap { $0 }.joined(separator: ". ")
+    static func weekValue(_ states: [BodyDayState], subtitle: String?, closed: Bool = false) -> String {
+        [doneDays(states, closed: closed), subtitle].compactMap { $0 }.joined(separator: ". ")
     }
 
     private static let parser: DateFormatter = {

@@ -22,7 +22,13 @@ final class WeeklyReviewV4Tests: XCTestCase {
        "month": {"scored": true, "input_first": true, "stat": {"value": 6, "label": "letters to her this week"},
                  "days": [1, 2, 3, 4, 5, 6], "days_in_month": 7}},
       {"id": "proud", "type": "month_question", "question": "What are you proudest of?", "color": "past",
-       "month": {"input_first": true}},
+       "month": {"input_first": true,
+                 "body_week": {"lifted": ["done", "done", "off", "off", "off", "off", "ahead"],
+                               "ran": ["off", "off", "off", "off", "off", "done", "ahead"],
+                               "walked": ["off", "off", "off", "done", "done", "off", "ahead"],
+                               "yoga": ["off", "off", "off", "off", "off", "off", "ahead"],
+                               "lifted_label": "Push, Legs · 1 h", "ran_label": "Treadmill · 58 min", "yoga_label": null,
+                               "active": {"minutes": 116, "goal": 150, "pip": 15}, "enough": false}}},
       {"id": "plan", "type": "week_plan", "color": "dusk",
        "month": {"proposal": {"intention": "One story a day", "obstacle": "Tired", "if_then": "If wiped, one story"}}},
       {"id": "keepsakes", "type": "week_letter", "range": "Nov 1, 2027", "color": "dusk",
@@ -53,6 +59,19 @@ final class WeeklyReviewV4Tests: XCTestCase {
         XCTAssertEqual(cards[5].month?.proposal?.ifThen, "If wiped, one story")
         XCTAssertEqual(cards[6].range, "Nov 1, 2027")
         XCTAssertEqual(cards[6].month?.themes.first?.title, "The night before the race")
+    }
+
+    func testACardCarriesBodysWeekWithItsSnakeCaseLines() throws {
+        let week = try XCTUnwrap(deck().cards[4].month?.bodyWeek)
+        XCTAssertEqual(week.lifted, [.done, .done, .off, .off, .off, .off, .ahead])
+        XCTAssertEqual(week.walked.filter { $0 == .done }.count, 2)
+        XCTAssertEqual(week.liftedLabel, "Push, Legs · 1 h", "the deck's decoder turns lifted_label into liftedLabel")
+        XCTAssertEqual(week.ranLabel, "Treadmill · 58 min")
+        XCTAssertNil(week.yogaLabel)
+        XCTAssertEqual(week.active?.minutes, 116)
+        XCTAssertEqual(week.active?.goal, 150)
+        XCTAssertFalse(week.enough)
+        XCTAssertNil(try deck().cards[3].month?.bodyWeek)
     }
 
     func testWeekScaleNumbersAndInputFirstCards() throws {

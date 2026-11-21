@@ -38,6 +38,11 @@ struct DeckMonth: Decodable, Equatable {
     let dayLines: [DayLine]
     /// The calendar's column letters when they aren't S–S (a week runs M–S); with them, day 1 is column 1.
     let labels: [String]
+    /// The weekly "Cared for my body" card's week: Body home's rows and active minutes, as they stood
+    /// when the review was built.
+    let bodyWeek: BodyWeekStrip?
+    /// The monthly "Cared for my body" card's month: which weeks had enough, and the days of each kind.
+    let bodyMonth: BodyMonth?
     /// A weekly value card asks for a 1–10 score.
     let scored: Bool?
     /// The weekly review puts the card's answer (slider or words) right under its title, with the
@@ -67,6 +72,56 @@ struct DeckMonth: Decodable, Equatable {
         /// A title Atlas drafted for a week that had none.
         let drafted: Bool?
         var id: Int { number }
+    }
+
+    /// A week of Body as the vault's `gym.week` writes it, without its dates. The keys are camelCase
+    /// because the deck decodes with `convertFromSnakeCase` (`BodyWeek` reads the literal keys).
+    struct BodyWeekStrip: Decodable, Equatable {
+        let lifted: [BodyDayState]
+        let ran: [BodyDayState]
+        let walked: [BodyDayState]
+        let yoga: [BodyDayState]
+        let liftedLabel: String?
+        let ranLabel: String?
+        let yogaLabel: String?
+        let active: BodyActiveMinutes?
+        let enough: Bool
+
+        private enum CodingKeys: String, CodingKey {
+            case lifted, ran, walked, yoga, liftedLabel, ranLabel, yogaLabel, active, enough
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            func states(_ key: CodingKeys) -> [BodyDayState] {
+                (try? c.decodeIfPresent([BodyDayState].self, forKey: key)) ?? []
+            }
+            lifted = states(.lifted)
+            ran = states(.ran)
+            walked = states(.walked)
+            yoga = states(.yoga)
+            liftedLabel = try? c.decodeIfPresent(String.self, forKey: .liftedLabel)
+            ranLabel = try? c.decodeIfPresent(String.self, forKey: .ranLabel)
+            yogaLabel = try? c.decodeIfPresent(String.self, forKey: .yogaLabel)
+            active = try? c.decodeIfPresent(BodyActiveMinutes.self, forKey: .active)
+            enough = (try? c.decodeIfPresent(Bool.self, forKey: .enough)) ?? false
+        }
+    }
+
+    /// A month of Body as the vault's `gym.month` writes it. `weeks` has a state per week ending in the
+    /// month: done when it had enough (two lifting days and its active minutes), off when it ended
+    /// without, today or ahead otherwise. `rows` are calendars: the days he lifted, ran, walked, did yoga.
+    struct BodyMonth: Decodable, Equatable {
+        let weeks: [BodyDayState]
+        let rows: [DotRow]
+
+        private enum CodingKeys: String, CodingKey { case weeks, rows }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            weeks = (try? c.decodeIfPresent([BodyDayState].self, forKey: .weeks)) ?? []
+            rows = ((try? c.decodeIfPresent([Lossy<DotRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
+        }
     }
 
     struct DotRow: Decodable, Equatable, Identifiable {
@@ -185,7 +240,7 @@ struct DeckMonth: Decodable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case name, totals, weeks, firstWeekday, daysInMonth, rows, pips, symbol, stat, days
         case marked, weekScores, year, months, snippets, advisors, tiles, sleep, themes, library
-        case dayLines, labels, scored, inputFirst, held, proposal
+        case dayLines, labels, scored, inputFirst, held, proposal, bodyWeek, bodyMonth
     }
 
     init(from decoder: Decoder) throws {
@@ -219,6 +274,8 @@ struct DeckMonth: Decodable, Equatable {
         inputFirst = try? c.decodeIfPresent(Bool.self, forKey: .inputFirst)
         held = try? c.decodeIfPresent(Held.self, forKey: .held)
         proposal = try? c.decodeIfPresent(Proposal.self, forKey: .proposal)
+        bodyWeek = try? c.decodeIfPresent(BodyWeekStrip.self, forKey: .bodyWeek)
+        bodyMonth = try? c.decodeIfPresent(BodyMonth.self, forKey: .bodyMonth)
     }
 }
 

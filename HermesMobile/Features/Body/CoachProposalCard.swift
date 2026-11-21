@@ -198,8 +198,11 @@ struct BakiAskRow: View {
 
 /// The hairline between the parts of Baki's card.
 struct BakiRule: View {
+    @Environment(\.hxPaper) private var paper
+
     var body: some View {
-        Rectangle().fill(HermexPaper.training.edge).frame(height: 0.5).accessibilityHidden(true)
+        // Body's edge, or the card's own on a review card in another paper.
+        Rectangle().fill((paper ?? .training).edge).frame(height: 0.5).accessibilityHidden(true)
     }
 }
 
