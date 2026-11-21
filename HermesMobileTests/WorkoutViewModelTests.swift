@@ -50,6 +50,8 @@ private final class FakeWorkoutClient: BodyDataClient, @unchecked Sendable {
     func savePlan(_ plan: BodyPlan) async throws -> BodyPlan { throw URLError(.unsupportedURL) }
     func decide(proposalID: String, accept: Bool) async throws -> BodyProposal { throw URLError(.unsupportedURL) }
     func sleepHistory() async throws -> SleepHistory? { throw URLError(.unsupportedURL) }
+    func logActivity(kind: String, minutes: Int) async throws -> BodyHome { throw URLError(.unsupportedURL) }
+    func removeActivity(id: String) async throws -> BodyHome { throw URLError(.unsupportedURL) }
     func pickCue(lift: String, index: Int) async throws -> BodyForm { throw URLError(.unsupportedURL) }
 }
 

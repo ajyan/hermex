@@ -18,6 +18,12 @@ final class BodyHomeViewModel {
     /// Baki's note on the newest finished workout, for his card. Nil until it loads, and when he
     /// hasn't written one.
     private(set) var latestNote: BodyLatestNote?
+    /// A yoga session is being logged or taken back; further taps wait for it.
+    private(set) var changingActivity = false
+    /// Why the last log or removal didn't take; cleared by the next one or a load.
+    private(set) var activityError: String?
+    /// Goes up each time the server takes a logged session, for the success haptic.
+    private(set) var landedLogs = 0
     /// The first read for Baki's note has answered (with a note, without one, or failed), so his card
     /// can say what's there instead of standing in for it.
     private(set) var noteLoaded = false
@@ -38,6 +44,7 @@ final class BodyHomeViewModel {
         do {
             let home = try await client.home()
             guard token == generation, !Task.isCancelled else { return }
+            activityError = nil
             state = .loaded(home)
             await loadLatestNote(home.sessions.first, token: token)
         } catch {
@@ -90,6 +97,38 @@ final class BodyHomeViewModel {
         if accept { await load() }
     }
 
+    /// Logs a yoga session of `minutes` for today. Home changes only once the server has saved it.
+    func logYoga(minutes: Int) async {
+        if await changeActivity({ try await $0.logActivity(kind: "yoga", minutes: minutes) }) { landedLogs += 1 }
+    }
+
+    /// Takes back an activity he logged by hand.
+    func remove(_ activity: BodyActivity) async {
+        guard activity.removable else { return }
+        _ = await changeActivity { try await $0.removeActivity(id: activity.id) }
+    }
+
+    /// Runs a log or removal and shows the home the server answers with; true when the server took
+    /// it. A newer load wins over this one's answer.
+    private func changeActivity(_ call: (BodyDataClient) async throws -> BodyHome) async -> Bool {
+        guard !changingActivity else { return false }
+        changingActivity = true
+        activityError = nil
+        defer { changingActivity = false }
+        generation += 1
+        let token = generation
+        do {
+            let home = try await call(client)
+            if token == generation { state = .loaded(home) }
+            return true
+        } catch {
+            guard !bodyIsCancellation(error) else { return false }
+            onAPIError(error)
+            activityError = "Couldn't save that. Try again."
+            return false
+        }
+    }
+
     private func replaceProposals(_ proposals: [BodyProposal]) {
         guard case .loaded(let home) = state else { return }
         state = .loaded(home.with(proposals: proposals))
@@ -106,7 +145,7 @@ final class BodyHomeViewModel {
 extension BodyHome {
     init(phase: String, phaseLabel: String, starts: String?, next: BodyNext?, week: BodyWeek, sleep: BodyHomeSleep?,
          lifts: [BodyHomeLift], sessions: [BodySessionSummary], activity: [BodyActivity] = [],
-         proposals: [BodyProposal], changes: [BodyChange] = [], gaps: [String], watching: [BodyWatching] = []) {
+         logKinds: [String] = [], proposals: [BodyProposal], changes: [BodyChange] = [], gaps: [String], watching: [BodyWatching] = []) {
         self.phase = phase
         self.phaseLabel = phaseLabel
         self.starts = starts
@@ -116,6 +155,7 @@ extension BodyHome {
         self.lifts = lifts
         self.sessions = sessions
         self.activity = activity
+        self.logKinds = logKinds
         self.proposals = proposals
         self.changes = changes
         self.gaps = gaps
@@ -125,8 +165,8 @@ extension BodyHome {
     /// This home with `proposals` swapped in.
     func with(proposals: [BodyProposal]) -> BodyHome {
         BodyHome(phase: phase, phaseLabel: phaseLabel, starts: starts, next: next, week: week, sleep: sleep,
-                 lifts: lifts, sessions: sessions, activity: activity, proposals: proposals, changes: changes,
-                 gaps: gaps, watching: watching)
+                 lifts: lifts, sessions: sessions, activity: activity, logKinds: logKinds, proposals: proposals,
+                 changes: changes, gaps: gaps, watching: watching)
     }
 
     /// The activity list's rows: the server's, or his finished workouts from a server without the list.
@@ -191,6 +231,9 @@ enum BodyHomeCopy {
         if let source = activity.source { parts.append(source) }
         return parts.joined(separator: " · ")
     }
+
+    /// The lengths the Log yoga menu offers, in minutes: the usual lengths of a video.
+    static let yogaLengths = [10, 15, 20, 30, 45, 60]
 
     /// The active-minute pips: `total` for the goal with `filled` of them earned, and `extra` small
     /// ones for each further pip's worth past the goal (no more than another goal's worth). Never
