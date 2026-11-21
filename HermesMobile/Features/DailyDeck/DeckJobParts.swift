@@ -14,6 +14,9 @@ extension DeckCard {
             detail = self.lines.first
         } else if isPast || isFuture {
             detail = self.title
+        } else if isStory {
+            // "Tell a story · Fall 2003": the reason names the time; the title is the age.
+            detail = self.reason?.components(separatedBy: " · ").last
         } else if self.type == .prompt, !isDream {
             detail = self.voice ?? advisor
         } else {
