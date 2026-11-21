@@ -86,6 +86,20 @@ enum LiftProgressCopy {
         return "Holding at \(BodyFormat.weightLabel(unit: unit, weight: lastWeight)) since \(since)."
     }
 
+    /// What VoiceOver reads for one session row: "Mon, Nov 23, 145 lb, 8, 8, 7 reps, smooth", or
+    /// "Wed, Nov 18, skipped" for a day no set was ticked.
+    static func sessionSummary(_ session: BodyLiftSession) -> String {
+        var parts = [BodyHomeCopy.sessionDate(session.date)]
+        if session.skipped {
+            parts.append("skipped")
+        } else {
+            parts.append(session.weightLabel)
+            if !session.reps.isEmpty { parts.append(session.reps.map(String.init).joined(separator: ", ") + " reps") }
+        }
+        if let note = session.note, !note.isEmpty { parts.append(note) }
+        return parts.joined(separator: ", ")
+    }
+
     /// What VoiceOver reads for the chart: "Working weight by session: 145 lb on Nov 23, 150 lb on Dec 4".
     static func chartSummary(_ series: [BodyLiftPoint], unit: String) -> String {
         let steps = series.compactMap { point -> String? in

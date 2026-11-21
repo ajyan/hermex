@@ -270,6 +270,19 @@ final class LiftProgressTests: XCTestCase {
         XCTAssertEqual(LiftProgressCopy.change(points([("2026-11-09", 145)]), unit: "lb"), "First session Nov 9.")
     }
 
+    func testASkippedDayReadsSkippedAndAnOlderServerReadsAsLifted() throws {
+        let json = #"""
+        [{"date":"2026-11-18","weight_label":"40s","reps":[],"note":null,"skipped":true},
+         {"date":"2026-11-09","weight_label":"40s","reps":[40,40],"note":"grip went"}]
+        """#
+        let rows = try PrepDecoding.decode([BodyLiftSession].self, from: Data(json.utf8))
+        XCTAssertEqual(rows.map(\.skipped), [true, false])
+        let day = BodyHomeCopy.sessionDate("2026-11-18")
+        XCTAssertEqual(LiftProgressCopy.sessionSummary(rows[0]), "\(day), skipped")
+        XCTAssertEqual(LiftProgressCopy.sessionSummary(rows[1]),
+                       "\(BodyHomeCopy.sessionDate("2026-11-09")), 40s, 40, 40 reps, grip went")
+    }
+
     func testNoWeightsMeansNoChangeLineAndNoChart() {
         let series = points([("2026-11-09", nil), ("2026-11-16", nil)])
         XCTAssertNil(LiftProgressCopy.change(series, unit: "bw"))

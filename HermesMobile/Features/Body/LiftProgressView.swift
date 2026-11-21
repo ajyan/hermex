@@ -3,7 +3,7 @@ import SwiftUI
 
 /// One lift's page (board 3), pushed as `.bodyLift(id)` from a lift row on Body home: its working
 /// weight as a step line, the way to its Form page when it has a cue card, and every session with
-/// its weight and reps.
+/// its weight and reps, or "Skipped" for a day no set was ticked.
 struct LiftProgressView: View {
     @State private var viewModel: LiftProgressViewModel
 
@@ -188,11 +188,17 @@ struct LiftProgressView: View {
                         .multilineTextAlignment(.trailing)
                 }
             }
-            FlowRow(spacing: 6) {
-                HXChip(paper: paper, label: session.weightLabel)
-                ForEach(Array(session.reps.enumerated()), id: \.offset) { _, reps in
-                    HXChip(paper: paper, label: String(reps))
-                        .monospacedDigit()
+            if session.skipped {
+                Text(verbatim: "Skipped")
+                    .font(AppFont.footnote())
+                    .foregroundStyle(.hxSecondary)
+            } else {
+                FlowRow(spacing: 6) {
+                    HXChip(paper: paper, label: session.weightLabel)
+                    ForEach(Array(session.reps.enumerated()), id: \.offset) { _, reps in
+                        HXChip(paper: paper, label: String(reps))
+                            .monospacedDigit()
+                    }
                 }
             }
         }
@@ -200,13 +206,6 @@ struct LiftProgressView: View {
         .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: sessionSummary(session)))
-    }
-
-    private func sessionSummary(_ session: BodyLiftSession) -> String {
-        var parts = [BodyHomeCopy.sessionDate(session.date), session.weightLabel]
-        if !session.reps.isEmpty { parts.append(session.reps.map(String.init).joined(separator: ", ") + " reps") }
-        if let note = session.note, !note.isEmpty { parts.append(note) }
-        return parts.joined(separator: ", ")
+        .accessibilityLabel(Text(verbatim: LiftProgressCopy.sessionSummary(session)))
     }
 }
