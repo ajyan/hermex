@@ -65,6 +65,7 @@ final class ObjectKeyTests: XCTestCase {
         let cases: [(DeckPalette, HermexPaper, String)] = [
             (.lookingBack, .dusk, "DESIGN.md: the Looking back card wears dusk"),
             (.lookingAhead, .dusk, "DESIGN.md: the Looking ahead card wears dusk"),
+            (.story, .notes, "DESIGN.md: the Tell a story card wears notes, the practice violet"),
             (.week, .dusk, "DESIGN.md: a week's review cards wear dusk"),
             (.theme, .dusk, "DESIGN.md: dusk also carries Theme"),
             (.money, .past, "DESIGN.md: the Sunday review's money card wears past, Money's"),
@@ -227,7 +228,7 @@ final class ObjectKeyTests: XCTestCase {
         ]
         let palettes: [DeckPalette] = [
             .opener, .section, .weekQuestion, .tracker, .quote, .book, .wiki, .reading, .notes, .video, .past, .journal,
-            .money, .training, .sleep, .advisor, .letter, .lookingBack, .lookingAhead, .mandarin, .dinner, .dream,
+            .money, .training, .sleep, .advisor, .letter, .lookingBack, .lookingAhead, .story, .mandarin, .dinner, .dream,
             .plain, .people, .followUps, .theme, .mood, .lessons, .recap, .changes, .week, .ask, .search,
         ]
         worn += palettes.map { ($0.colors, "DeckPalette \($0.name)") }

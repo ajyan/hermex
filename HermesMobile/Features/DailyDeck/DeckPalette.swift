@@ -85,6 +85,8 @@ struct DeckPalette: Equatable {
     static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
     static let lookingBack = DeckPalette(.dusk, symbol: "arrow.uturn.backward.circle", name: "Looking back", shortName: "Back")
     static let lookingAhead = DeckPalette(.dusk, symbol: "sunrise", name: "Looking ahead", shortName: "Ahead")
+    /// Tell a story: a minute of speaking practice on video, in the practice paper.
+    static let story = DeckPalette(.story, symbol: "waveform", name: "Tell a story", shortName: "Story")
     static let mandarin = DeckPalette(.mandarin, symbol: "character.bubble", name: "Mandarin practice", shortName: "Mandarin")
     static let dinner = DeckPalette(.meal, symbol: "fork.knife", name: "Last night's dinner", shortName: "Dinner")
     /// Atlas's questions from last night's review: Atlas's own system cards (like What changed) wear the plain paper.
@@ -162,6 +164,7 @@ struct DeckPalette: Equatable {
         case .prompt:
             if card.isPast { return .lookingBack }
             if card.isFuture { return .lookingAhead }
+            if card.isStory { return .story }
             return card.isMandarin ? .mandarin : card.isLetter ? .letter : card.isDream ? .dream : .advisor
         case .sleep: return .sleep
         case .goal:

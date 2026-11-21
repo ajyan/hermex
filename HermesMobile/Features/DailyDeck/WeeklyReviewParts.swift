@@ -343,6 +343,7 @@ enum DeckCopy {
         if card.isLetter { return "Write to her" }
         if card.isFuture { return card.thread != nil ? "Write back" : card.returns.isEmpty ? "Write it down" : "Write to future you" }
         if card.isPast { return "Write it down" }
+        if card.isStory { return "What did you notice?" }
         if card.isMandarin { return "Answer in Mandarin" }
         return card.id == "one-thing" ? "Write the one thing" : "Write a reflection"
     }

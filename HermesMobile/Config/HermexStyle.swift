@@ -110,6 +110,8 @@ extension HermexPaper {
     /// Interview prep, everywhere: its drawer row, its Brain home row, and every Prep card and screen.
     /// Orchid, its own kind: never the Brain's mint or the Mandarin card's coral.
     static let prep = HermexPaper.orchid
+    /// The Brief's Tell a story card, speaking practice: violet, kin to Lessons and Feedback (things he learns from).
+    static let story = HermexPaper.notes
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         // Every tool step is Atlas's own machinery, so all wear one paper; the chip's symbol and label say what ran.

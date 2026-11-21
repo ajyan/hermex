@@ -81,6 +81,7 @@ Named in `Config/HermexStyle.swift`. Every tool step wears `.tool` (`HermexPaper
 | The Daily Brief's Dad card (a letter to his daughter: the countdown, then her age, over the prompt) | `DeckPalette.letter` | `advisor` (the Dad advisor's paper, with a heart mark instead of the check-in's bubble) |
 | The Daily Brief's Looking back card (a story, a friend, a time of his life, or something to let go; the subject in its kind label) | `DeckPalette.lookingBack` | `dusk` (reflection: with Looking ahead and the reviews) |
 | The Daily Brief's Looking ahead card (who he's becoming, or a message to future him with "Comes back to you in" chips; a message that came back quoted as its thread) | `DeckPalette.lookingAhead` | `dusk` (the chips are controls on the card, so the chosen one fills with the `dusk` glow) |
+| The Daily Brief's Tell a story card (a time of his life and his age then, one question, three speaking techniques to pick from, then a minute on the front camera; watched back with a 1–5 dot rating each for words, voice, gestures and energy, and what he noticed). Its recording screen is always dark and wears the card's paper: the ring and stop are its glow | `DeckPalette.story` (`HermexPaper.story`) | `notes` (practice he learns from, kin to Lessons and Feedback) |
 | The Daily Brief's Mandarin practice card (Tell, Hear it, Tell again: a question from his life, his story retold naturally with its upgrades, the upgrades he used) | `DeckPalette.mandarin` | `mandarin` |
 | The Daily Brief's "Atlas asks" cards (open questions from last night's self-review, a short title over one question) | `DeckPalette.dream` | `plain` (Atlas's own system cards, like What changed, with a moon mark) |
 | The morning deck's close, the week's habit tracker | `DeckPalette.tracker`; each row `DeckFrontRow.habitPaper` | a neutral summary card; each habit's dots in its own paper (`video` sleep and lifting, both Body's, `mandarin`, `advisor` the letter, `orchid` the job search) |
@@ -103,7 +104,7 @@ These papers carry more than one kind. Each group is related (a person, saved th
 - `wiki`: everything from the Brain (see the object key).
 - `advisor`: the advisor's Check-in, Letter to her and letters in the Brain (the module and the shelf's Letters book), a person (People pages, Catch up, From your people), the Memory and Skills screens, Energy and mood.
 - `book`: the Goals drawer row.
-- `notes`: Lessons, files as objects, the Feedback inbox.
+- `notes`: Lessons, files as objects, the Feedback inbox, the Brief's Tell a story card.
 - `orchid`: Interview prep, the Daily Ask and the Brief's search card.
 - `video`: Body, Sleep.
 - `dusk` also carries Looking back and Theme.
