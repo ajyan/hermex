@@ -221,12 +221,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
     var isLetter: Bool { self.type == .prompt && self.itemKind == "letter" }
 
-    /// The Mandarin practice card: phrases to hear and a question to answer out loud. Its answer is
-    /// filed to the vault's Mandarin log, which writes the feedback shown on the next one.
+    /// The Mandarin practice card: one question from his life to tell out loud, hear retold naturally,
+    /// and tell again. Its answer is filed to the vault's Mandarin log.
     var isMandarin: Bool { self.type == .prompt && self.itemKind == "mandarin" }
-
-    /// A Mandarin card with cues asks for a short story: what happened, how he felt, what's next.
-    var mandarinTellsAStory: Bool { isMandarin && self.phrases.contains { $0.kind != nil } }
 
     /// The Looking back card: a question about a story, a friend, a time of his life, or something to let go.
     /// Its answer is filed to the vault's past/ folder, not the journal.
@@ -306,18 +303,17 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         /// A goal card's personal goals (slugs). The card checks in on them live through the Goals API;
         /// `fallback` is the brief's text for when the server can't serve them.
         let goals: [String]
-        /// A Mandarin card's three new phrases to work into the answer.
-        let phrases: [DeckPhrase]
-        /// A Mandarin card's phrasebook phrases due today, to recall from their English (Got it / Again).
-        let recall: [DeckPhrase]
-        /// A Mandarin card's feedback on the last answer filed.
-        let yesterday: DeckMandarinFeedback?
-        /// A Mandarin card's sentence pattern for the day, and the learner's progress as the deck was built.
-        let pattern: DeckMandarinPattern?
+        /// A Mandarin card's progress as the deck was built (not shown; kept for the practice record).
         let progress: DeckMandarinProgress?
-        /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
+        /// A Mandarin card's question (in `question`, as characters) in pinyin, one syllable per
+        /// character (`questionRuby`), and in English.
         let questionPinyin: String?
+        let questionRuby: [String]?
         let questionEn: String?
+        /// A Mandarin card's line naming the real thing he can tell: "Saturday you ran 10 miles."
+        let hook: String?
+        /// Who a Mandarin card has him talk with: "mom", "dad", "parents" or "baby".
+        let speaker: String?
         /// A Mandarin card's question in a few words, said to him: "Mom asks about the move".
         let scene: String?
         /// A weekly review's What changed card: the fixes whose status moved this week, newest first.
@@ -425,7 +421,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         private enum CodingKeys: String, CodingKey {
             case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
             case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-            case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, scene, rows, week
+            case progress, questionPinyin, questionRuby, questionEn, hook, speaker, scene, rows, week
             case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals, weekStart
             case piece, learned, variant, date, options, returns, front, fronts, frontReason, weekRows, yesterdayOne
             case todayAction = "today"
@@ -488,13 +484,12 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
             tags = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
             goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
-            phrases = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .phrases)) ?? []).compactMap(\.value)
-            recall = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .recall)) ?? []).compactMap(\.value)
-            yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
-            pattern = try? c.decodeIfPresent(DeckMandarinPattern.self, forKey: .pattern)
             progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
             questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
+            questionRuby = try? c.decodeIfPresent([String].self, forKey: .questionRuby)
             questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
+            hook = (try? c.decodeIfPresent(String.self, forKey: .hook)).flatMap { $0.isEmpty ? nil : $0 }
+            speaker = try? c.decodeIfPresent(String.self, forKey: .speaker)
             scene = (try? c.decodeIfPresent(String.self, forKey: .scene)).flatMap { $0.isEmpty ? nil : $0 }
             rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
             learned = ((try? c.decodeIfPresent([Lossy<DeckLearned>].self, forKey: .learned)) ?? []).compactMap(\.value)
@@ -842,132 +837,65 @@ struct DeckChangeFace: Decodable, Equatable {
     }
 }
 
-/// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
-/// A Mandarin phrase: characters, pinyin over them, English on tap. `source` says where a recall
-/// phrase came from: "chunk" (a cue), "lesson", "fix" (a correction to his answer), "gap" (a word he
-/// said in English), or "flow" (a transition feedback suggested). A cue has a `kind` (transition,
-/// feeling, everyday), a one-line `note`, and the model's example sentence from his life.
-struct DeckPhrase: Codable, Equatable, Hashable, Identifiable {
-    var id: String { hanzi }
-
-    let hanzi: String
-    let pinyin: String?
-    let en: String?
-    let source: String?
-    let kind: String?
-    let note: String?
-    let example: String?
-    let examplePinyin: String?
-    let exampleEn: String?
-
-    init(hanzi: String, pinyin: String? = nil, en: String? = nil, source: String? = nil, kind: String? = nil) {
-        self.hanzi = hanzi
-        self.pinyin = pinyin
-        self.en = en
-        self.source = source
-        self.kind = kind
-        note = nil
-        example = nil
-        examplePinyin = nil
-        exampleEn = nil
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        func text(_ key: CodingKeys) -> String? {
-            (try? c.decodeIfPresent(String.self, forKey: key)).flatMap { $0.isEmpty ? nil : $0 }
-        }
-        hanzi = try c.decode(String.self, forKey: .hanzi)
-        pinyin = text(.pinyin)
-        en = text(.en)
-        source = text(.source)
-        kind = text(.kind)
-        note = text(.note)
-        example = text(.example)
-        examplePinyin = text(.examplePinyin)
-        exampleEn = text(.exampleEn)
-    }
-
-    /// "Transition", "Feeling" or "Everyday" for a cue; nil for an older card's phrase.
-    var kindLabel: String? {
-        switch kind {
-        case "transition": "Transition"
-        case "feeling": "Feeling"
-        case "everyday": "Everyday"
-        default: nil
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case hanzi, pinyin, en, source, kind, note, example, examplePinyin, exampleEn
-    }
-}
-
-/// The local model's feedback on a Mandarin answer: what he said and a more natural way to say it,
-/// up to two fixes, the Mandarin for English he used, a flow note (older feedback: one grammar
-/// pattern), and all of it as `notes`
-/// lines. A block without `natural` doesn't decode, so nothing half-shows.
+/// The local model's feedback on a Mandarin telling: his story retold the way a native speaker would
+/// say it (with its pinyin per character) and up to three upgrades marked in it. Feedback filed before
+/// upgrades (fixes, gaps, flow) decodes with none. A block without `natural` doesn't decode, so
+/// nothing half-shows.
 struct DeckMandarinFeedback: Codable, Equatable {
-    /// His words → what a native speaker would say: the meaning in English and why.
-    struct Fix: Codable, Equatable, Hashable {
-        let said: String
-        let natural: String
-        let naturalPinyin: String?
-        let en: String?
-        let why: String?
-    }
-
-    /// An English word he used, the Mandarin for it, and how its characters build the meaning.
-    struct Gap: Codable, Equatable, Hashable {
-        let en: String
-        let hanzi: String
-        let pinyin: String?
-        let build: String?
-    }
-
-    struct Pattern: Codable, Equatable {
-        let pattern: String
-        let en: String?
-    }
-
-    /// A transition that would have joined two of his sentences, and those sentences joined by it.
-    struct Flow: Codable, Equatable {
-        let transition: String
-        let en: String?
-        let joined: String
-        let joinedPinyin: String?
-        let why: String?
-    }
-
     let said: String?
     let natural: String
-    let naturalPinyin: String?
-    let notes: [String]
-    let fixes: [Fix]
-    let gaps: [Gap]
-    let pattern: Pattern?
-    let flow: Flow?
+    let naturalRuby: [String]?
+    let upgrades: [DeckMandarinUpgrade]
+
+    init(said: String? = nil, natural: String, naturalRuby: [String]? = nil, upgrades: [DeckMandarinUpgrade] = []) {
+        self.said = said
+        self.natural = natural
+        self.naturalRuby = naturalRuby
+        self.upgrades = upgrades
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         said = try? c.decodeIfPresent(String.self, forKey: .said)
         natural = try c.decode(String.self, forKey: .natural)
-        naturalPinyin = try? c.decodeIfPresent(String.self, forKey: .naturalPinyin)
-        notes = (try? c.decodeIfPresent([String].self, forKey: .notes)) ?? []
-        fixes = ((try? c.decodeIfPresent([Lossy<Fix>].self, forKey: .fixes)) ?? []).compactMap(\.value)
-        gaps = ((try? c.decodeIfPresent([Lossy<Gap>].self, forKey: .gaps)) ?? []).compactMap(\.value)
-        pattern = try? c.decodeIfPresent(Pattern.self, forKey: .pattern)
-        flow = try? c.decodeIfPresent(Flow.self, forKey: .flow)
+        naturalRuby = try? c.decodeIfPresent([String].self, forKey: .naturalRuby)
+        upgrades = ((try? c.decodeIfPresent([Lossy<DeckMandarinUpgrade>].self, forKey: .upgrades)) ?? []).compactMap(\.value)
     }
 
-    private enum CodingKeys: String, CodingKey { case said, natural, naturalPinyin, notes, fixes, gaps, pattern, flow }
+    private enum CodingKeys: String, CodingKey { case said, natural, naturalRuby, upgrades }
 }
 
-/// The day's sentence pattern (the vault's mandarin/patterns.json): its name, an example, what it does.
-struct DeckMandarinPattern: Codable, Equatable {
-    let name: String
-    let form: String?
+/// One change worth learning: his words, the better words (in the retelling), their English and why.
+/// `fromBefore` marks a phrasebook phrase woven back in where it fit.
+struct DeckMandarinUpgrade: Codable, Equatable, Hashable {
+    let said: String
+    let better: String
+    let betterRuby: [String]?
     let en: String?
+    let why: String?
+    let fromBefore: Bool
+
+    init(said: String, better: String, betterRuby: [String]? = nil, en: String? = nil, why: String? = nil,
+         fromBefore: Bool = false) {
+        self.said = said
+        self.better = better
+        self.betterRuby = betterRuby
+        self.en = en
+        self.why = why
+        self.fromBefore = fromBefore
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        said = try c.decode(String.self, forKey: .said)
+        better = try c.decode(String.self, forKey: .better)
+        betterRuby = try? c.decodeIfPresent([String].self, forKey: .betterRuby)
+        en = (try? c.decodeIfPresent(String.self, forKey: .en)).flatMap { $0.isEmpty ? nil : $0 }
+        why = (try? c.decodeIfPresent(String.self, forKey: .why)).flatMap { $0.isEmpty ? nil : $0 }
+        fromBefore = (try? c.decodeIfPresent(Bool.self, forKey: .fromBefore)) ?? false
+    }
+
+    private enum CodingKeys: String, CodingKey { case said, better, betterRuby, en, why, fromBefore }
 }
 
 /// Phrases in the book, how many he used in this week's answers, and English words per answer this
@@ -979,6 +907,7 @@ struct DeckMandarinProgress: Codable, Equatable {
     let englishBefore: Double?
 }
 
+/// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
 struct Lossy<Value: Decodable>: Decodable {
     let value: Value?
     init(from decoder: Decoder) throws { value = try? Value(from: decoder) }

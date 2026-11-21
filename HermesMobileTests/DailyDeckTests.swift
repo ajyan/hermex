@@ -1466,38 +1466,43 @@ final class DailyDeckTests: XCTestCase {
     // MARK: - Mandarin
 
     private static let mandarinDeckJSON = """
-    {"date": "2026-10-19", "kind": "morning", "cards": [
+    {"date": "2026-11-21", "kind": "morning", "cards": [
       {"id": "mandarin", "type": "prompt", "kind": "mandarin", "files_to": "mandarin",
-       "title": "Grandma asks how marathon training is going",
-       "yesterday": {"said": "我上个周末跑了二十英里，很累但是好。", "natural": "我上个周末跑了二十英里，虽然很累，但感觉很好。",
-                     "natural_pinyin": "Wǒ shàng ge zhōu mò pǎo le èr shí yīng lǐ.", "notes": ["虽然…但… joins it more naturally."]},
-       "phrases": [{"hanzi": "最近怎么样？", "pinyin": "Zuì jìn zěn me yàng?", "en": "How have you been lately?"},
-                   {"hanzi": "我在准备马拉松。", "pinyin": "Wǒ zài zhǔn bèi mǎ lā sōng.", "en": "I'm training for a marathon."},
-                   {"hanzi": "不用担心。", "pinyin": "Bú yòng dān xīn.", "en": "Don't worry.", "review": true},
-                   {"pinyin": "no characters, dropped"}],
-       "question": "你跑步跑得怎么样了？", "question_pinyin": "Nǐ pǎo bù pǎo de zěn me yàng le?",
-       "question_en": "How is your running going?", "reason": "Mandarin practice · 1 review due"}
+       "title": "Mom asks how he has been sleeping",
+       "question": "你睡得好吗？", "question_pinyin": "Nǐ shuì de hǎo ma?",
+       "question_ruby": ["nǐ", "shuì", "de", "hǎo", "ma", ""],
+       "question_en": "Are you sleeping well?", "hook": "You've been up late studying.", "speaker": "mom",
+       "progress": {"phrases": 36}, "reason": "Mandarin practice"}
     ]}
     """
 
-    func testMandarinCardDecodesPhrasesAndYesterday() throws {
+    func testMandarinCardDecodesTheRetellCard() throws {
         let card = try DailyDeck.decode(Self.mandarinDeckJSON).cards[0]
         XCTAssertTrue(card.isMandarin)
         XCTAssertFalse(card.isLetter)
-        XCTAssertEqual(card.phrases.map(\.hanzi), ["最近怎么样？", "我在准备马拉松。", "不用担心。"], "a phrase without characters is dropped")
-        XCTAssertEqual(card.yesterday?.notes.count, 1)
-        XCTAssertEqual(card.yesterday?.naturalPinyin, "Wǒ shàng ge zhōu mò pǎo le èr shí yīng lǐ.")
-        XCTAssertEqual(card.questionPinyin, "Nǐ pǎo bù pǎo de zěn me yàng le?")
-        XCTAssertEqual(card.questionEn, "How is your running going?")
+        XCTAssertEqual(card.questionRuby, ["nǐ", "shuì", "de", "hǎo", "ma", ""])
+        XCTAssertEqual(card.hook, "You've been up late studying.")
+        XCTAssertEqual(card.mandarinScene, "Mom asks")
+        XCTAssertEqual(card.questionEn, "Are you sleeping well?")
     }
 
     func testMandarinFieldsAreOptional() throws {
-        let card = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？","yesterday":{"said":"x"}}]}"#).cards[0]
-        XCTAssertTrue(card.isMandarin)
-        XCTAssertEqual(card.phrases, [])
-        XCTAssertNil(card.yesterday, "feedback without a natural version isn't shown")
-        XCTAssertNil(card.questionPinyin)
+        let old = #"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？","scene":"Mom asks about the move","phrases":[{"hanzi":"其实"}],"yesterday":{"said":"x"}}]}"#
+        let card = try DailyDeck.decode(old).cards[0]
+        XCTAssertTrue(card.isMandarin, "a card from the warm-up days still decodes")
+        XCTAssertNil(card.questionRuby)
+        XCTAssertNil(card.hook)
+        XCTAssertEqual(card.mandarinScene, "Mom asks about the move", "an older card names its scene")
         XCTAssertTrue(card.takesText)
+    }
+
+    func testMandarinRubyTokensKeepLatinRunsWhole() {
+        let tokens = MandarinRubyText.tokens("我跟Alex说", ruby: ["wǒ", "gēn", "", "", "", "", "shuō"], emphasis: ["跟Alex"])
+        XCTAssertEqual(tokens?.map(\.text), ["我", "跟", "Alex", "说"])
+        XCTAssertEqual(tokens?.map(\.pinyin), ["wǒ", "gēn", "", "shuō"])
+        XCTAssertEqual(tokens?.map(\.emphasized), [false, true, true, false])
+        XCTAssertNil(MandarinRubyText.tokens("你好", ruby: ["nǐ"], emphasis: []), "ruby that doesn't line up shows plain")
+        XCTAssertNil(MandarinRubyText.tokens("你好", ruby: nil, emphasis: []))
     }
 
     func testMandarinCardWearsItsPaper() throws {
@@ -1544,11 +1549,12 @@ final class DailyDeckTests: XCTestCase {
         let card = try DailyDeck.decode(Self.mandarinDeckJSON).cards[0]
         let own = card.mandarinQuestion(asked: "你今天怎么样？")
         XCTAssertEqual(own.hanzi, "你今天怎么样？")
-        XCTAssertNil(own.pinyin, "the deck's pinyin belongs to the deck's question")
+        XCTAssertNil(own.ruby, "the deck's pinyin belongs to the deck's question")
         XCTAssertNil(own.english)
+        XCTAssertNil(own.hook)
         let deck = card.mandarinQuestion(asked: try XCTUnwrap(card.question))
-        XCTAssertEqual(deck.pinyin, card.questionPinyin)
-        XCTAssertEqual(deck.english, card.questionEn)
+        XCTAssertEqual(deck.ruby, card.questionRuby)
+        XCTAssertEqual(deck.hook, card.hook)
     }
 
     // MARK: - Sleep
@@ -3339,43 +3345,35 @@ private final class MandarinSpySession: ListenAudioSessionControlling {
     func deactivate() { deactivations += 1 }
 }
 
-/// A scripted Mandarin API: answers and recalls succeed with what's queued, or throw.
+/// A scripted Mandarin API: each answer succeeds with what's queued, or throws.
 private final class FakeMandarinClient: MandarinPracticeClient, @unchecked Sendable {
     var answers: [MandarinAnswerRequest] = []
-    var recalls: [MandarinRecallRequest] = []
-    var answerResult: Result<MandarinAnswerResponse, Error> = .success(MandarinAnswerResponse(feedback: nil))
-    var recallFails = false
+    var results: [Result<MandarinAnswerResponse, Error>] = []
 
     func answer(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse {
         answers.append(request)
-        return try answerResult.get()
-    }
-
-    func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse {
-        recalls.append(request)
-        if recallFails { throw URLError(.notConnectedToInternet) }
-        return try JSONDecoder().decode(MandarinRecallResponse.self, from: Data(#"{"ok":true,"progress":{"phrases":9}}"#.utf8))
+        return try (results.isEmpty ? .success(MandarinAnswerResponse(feedback: nil)) : results.removeFirst()).get()
     }
 }
 
 @MainActor
 final class MandarinPracticeTests: XCTestCase {
     private static let deckJSON = """
-    {"date": "2026-10-25", "kind": "morning", "cards": [
-      {"id": "mandarin", "type": "prompt", "kind": "mandarin", "title": "Dad asks about the job search",
-       "yesterday": {"said": "我要继续喝很多水，休息早一点。", "natural": "我要多喝水，早一点休息。",
-                     "fixes": [{"said": "休息早一点", "natural": "早一点休息", "natural_pinyin": "zǎo yì diǎn xiū xi",
-                                "en": "rest earlier", "why": "Time words go before the verb."},
-                               {"said": "bad"}],
-                     "gaps": [{"en": "anxious", "hanzi": "紧张", "pinyin": "jǐn zhāng", "build": "tight + stretched"}],
-                     "pattern": {"pattern": "因为…所以…", "en": "Reason, then result."}},
-       "phrases": [{"hanzi": "还不错", "en": "Not bad"}, {"hanzi": "在等消息", "en": ""}],
-       "recall": [{"hanzi": "宝宝一月份出生。", "en": "The baby is due in January.", "source": "lesson"},
-                  {"hanzi": "紧张", "en": "anxious", "source": "gap"}],
-       "pattern": {"id": "stpvo", "name": "Time and place before the verb", "form": "我 + 昨天 + 在家 + 看书", "en": "Who, when, where."},
-       "progress": {"phrases": 36, "used_week": 6, "english_now": 1.2, "english_before": 2.8},
-       "question": "你找工作找得怎么样了？"}
+    {"date": "2026-11-21", "kind": "morning", "cards": [
+      {"id": "mandarin", "type": "prompt", "kind": "mandarin", "title": "Mom asks how he has been sleeping",
+       "question": "你最近睡得怎么样？", "question_ruby": ["nǐ","zuì","jìn","shuì","de","zěn","me","yàng",""],
+       "hook": "You've been up late studying.", "speaker": "mom"}
     ]}
+    """
+
+    private static let feedbackJSON = """
+    {"feedback": {"said": "我昨天很早起来", "natural": "我昨天起得很早。",
+                  "natural_ruby": ["wǒ","zuó","tiān","qǐ","de","hěn","zǎo",""],
+                  "upgrades": [{"said": "很早起来", "better": "起得很早", "better_ruby": ["qǐ","de","hěn","zǎo"],
+                                "en": "got up early", "why": "How early goes after the verb.", "from_before": false},
+                               {"said": "熬夜", "better": "熬夜", "en": "stay up late", "from_before": true},
+                               {"better": "missing said, dropped"}]},
+     "used": [], "progress": {"phrases": 9}}
     """
 
     private var defaults: UserDefaults!
@@ -3389,225 +3387,102 @@ final class MandarinPracticeTests: XCTestCase {
     private func card(_ json: String = deckJSON) throws -> DeckCard { try DailyDeck.decode(json).cards[0] }
 
     private func practice(_ card: DeckCard, client: FakeMandarinClient?) -> MandarinPractice {
-        MandarinPractice(card: card, date: "2026-10-25", server: server, client: client,
+        MandarinPractice(card: card, date: "2026-11-21", server: server, client: client,
                          store: MandarinPracticeStore(defaults: defaults))
     }
 
-    func testCardDecodesRecallPatternProgressAndStructuredFeedback() throws {
-        let card = try card()
-        XCTAssertEqual(card.recall.map(\.source), ["lesson", "gap"])
-        XCTAssertNil(card.phrases[1].en, "an empty English cue is no cue")
-        XCTAssertEqual(card.pattern?.form, "我 + 昨天 + 在家 + 看书")
-        XCTAssertEqual(card.progress, DeckMandarinProgress(phrases: 36, usedWeek: 6, englishNow: 1.2, englishBefore: 2.8))
-        XCTAssertEqual(card.yesterday?.fixes.map(\.natural), ["早一点休息"], "a fix without its natural words is dropped")
-        XCTAssertEqual(card.yesterday?.gaps.first?.build, "tight + stretched")
-        XCTAssertEqual(card.yesterday?.pattern?.pattern, "因为…所以…")
+    private func response(_ json: String = feedbackJSON) throws -> MandarinAnswerResponse {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase  // as APIClient decodes
+        return try decoder.decode(MandarinAnswerResponse.self, from: Data(json.utf8))
     }
 
-    func testCuesDecodeTheirKindExampleAndYesterdaysFlow() throws {
-        let card = try card("""
-        {"date": "2026-10-31", "kind": "morning", "cards": [
-          {"id": "mandarin", "type": "prompt", "kind": "mandarin", "question": "你最近怎么样？",
-           "yesterday": {"said": "我很累。我很开心。", "natural": "我很累，不过很开心。",
-                         "flow": {"transition": "不过", "en": "but", "joined": "我很累，不过很开心。",
-                                  "joined_pinyin": "Wǒ hěn lèi, bú guò hěn kāi xīn.", "why": "A soft but."}},
-           "phrases": [{"hanzi": "不过", "pinyin": "Bú guò", "en": "but / though", "kind": "transition",
-                        "note": "A soft but.", "example": "很累，不过很开心。", "example_pinyin": "Hěn lèi, bú guò hěn kāi xīn.",
-                        "example_en": "Tired, but happy."},
-                       {"hanzi": "我有点担心", "en": "I'm a bit worried", "kind": "feeling"},
-                       {"hanzi": "还不错", "en": "Not bad"}]}
-        ]}
-        """)
-        let cue = card.phrases[0]
-        XCTAssertEqual(cue.kindLabel, "Transition")
-        XCTAssertEqual(cue.note, "A soft but.")
-        XCTAssertEqual(cue.example, "很累，不过很开心。")
-        XCTAssertEqual(cue.examplePinyin, "Hěn lèi, bú guò hěn kāi xīn.")
-        XCTAssertEqual(cue.exampleEn, "Tired, but happy.")
-        XCTAssertEqual(card.phrases.map(\.kindLabel), ["Transition", "Feeling", nil], "older cards' phrases have no kind")
-        XCTAssertTrue(card.mandarinTellsAStory)
-        let flow = try XCTUnwrap(card.yesterday?.flow)
-        XCTAssertEqual(flow.transition, "不过")
-        XCTAssertEqual(flow.joinedPinyin, "Wǒ hěn lèi, bú guò hěn kāi xīn.")
-        XCTAssertFalse(try self.card().mandarinTellsAStory, "cards before cues keep the plain question")
+    func testDecodesRetellFeedback() throws {
+        let feedback = try XCTUnwrap(try response().feedback)
+        XCTAssertEqual(feedback.natural, "我昨天起得很早。")
+        XCTAssertEqual(feedback.naturalRuby?.count, 8)
+        XCTAssertEqual(feedback.upgrades.map(\.better), ["起得很早", "熬夜"], "an upgrade without his words is dropped")
+        XCTAssertEqual(feedback.upgrades.map(\.fromBefore), [false, true])
+        XCTAssertEqual(DeckMandarinCard.note(feedback.upgrades[0]), "很早起来 → 起得很早\nHow early goes after the verb.")
+        XCTAssertEqual(DeckMandarinCard.note(feedback.upgrades[1]), "stay up late", "a phrase from before names its English")
     }
 
-    func testTheWarmUpAsksTheCuesThenYesterdaysFixesThenTheRecallEachOnce() throws {
-        let items = MandarinWarmUp.items(for: try card())
-        XCTAssertEqual(items.map(\.hanzi), ["还不错", "早一点休息", "宝宝一月份出生。", "紧张"],
-                       "a cue without English can't be asked from it")
-        XCTAssertEqual(items.map(\.source), [.cue, .fix, .recall, .recall])
-        XCTAssertEqual(items[1].en, "rest earlier")
-        XCTAssertEqual(items[1].said, "休息早一点")
-        XCTAssertEqual(items.map(\.listNote), ["Today's phrase", "From yesterday", "From your phrasebook", "From your phrasebook"])
-        let twice = try self.card("""
-        {"date": "d", "kind": "morning", "cards": [{"id": "m", "type": "prompt", "kind": "mandarin", "question": "你好吗？",
-          "phrases": [{"hanzi": "其实", "en": "actually", "note": "Tells the real story."}],
-          "recall": [{"hanzi": "其实", "en": "actually"}]}]}
-        """)
-        XCTAssertEqual(MandarinWarmUp.items(for: twice).map(\.listNote), ["Tells the real story."], "a phrase is asked once")
+    func testDecodesOldFeedback() throws {
+        let old = #"{"feedback":{"natural":"我要多喝水。","natural_pinyin":"Wǒ yào","fixes":[{"said":"a","natural":"b"}],"flow":{"transition":"不过"}},"used":["还不错"]}"#
+        let feedback = try XCTUnwrap(try response(old).feedback)
+        XCTAssertEqual(feedback.natural, "我要多喝水。")
+        XCTAssertEqual(feedback.upgrades, [])
+        XCTAssertNil(feedback.naturalRuby)
     }
 
-    func testTheCardOpensOnTheWarmUpListAndMovesToTheAnswerWhenEveryPhraseIsAnswered() async throws {
+    func testAnOldPracticeRecordStillDecodes() throws {
+        let old = #"{"warmStarted":true,"warmed":{"其实":true},"recalled":{},"answeredText":"我很累"}"#
+        let record = try JSONDecoder().decode(MandarinPracticeRecord.self, from: Data(old.utf8))
+        XCTAssertEqual(record.answeredText, "我很累")
+    }
+
+    func testStepsTellHearAgain() async throws {
         let client = FakeMandarinClient()
-        let practice = practice(try card(), client: client)
-        XCTAssertEqual(practice.steps, [.warmUp, .answer, .again])
-        XCTAssertEqual(practice.step, .warmUp)
-        XCTAssertNil(practice.currentWarmUp, "the list shows until he starts")
-        practice.startWarmUp()
-        XCTAssertEqual(practice.currentWarmUp?.hanzi, "还不错")
-        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
-        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: false)
-        XCTAssertTrue(client.recalls.isEmpty, "a cue and a fix stay on the phone")
-        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
-        XCTAssertEqual(practice.progress?.phrases, 9, "a recall brings the server's progress back")
-        XCTAssertEqual(practice.step, .warmUp)
-        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: false)
-        XCTAssertEqual(practice.step, .answer)
-        XCTAssertTrue(practice.isDone(.warmUp))
-        XCTAssertEqual(client.recalls.map(\.hanzi), ["宝宝一月份出生。", "紧张"])
-        XCTAssertEqual(client.recalls.map(\.got), [true, false])
-        XCTAssertEqual(practice.record.warmed, ["还不错": true, "早一点休息": false])
-        XCTAssertEqual(practice.record.recalled, ["宝宝一月份出生。": true, "紧张": false])
-    }
+        client.results = [.success(try response()),
+                          .success(try response(#"{"feedback":null,"used":["起得很早"]}"#))]
+        let p = practice(try card(), client: client)
+        XCTAssertEqual(p.step, .tell)
+        XCTAssertFalse(p.canOpen(.hear), "Hear it waits for a retelling")
 
-    func testSaidCountsThePhraseWhateverTheDictationAddedAroundIt() {
-        XCTAssertTrue(MandarinWarmUp.said("其实 我觉得", "其实"))
-        XCTAssertTrue(MandarinWarmUp.said("你身体好吗", "你身体好吗？"))
-        XCTAssertFalse(MandarinWarmUp.said("我觉得", "其实"))
-        XCTAssertFalse(MandarinWarmUp.said("好", "？"))
-    }
+        await p.submit("我昨天很早起来", question: nil)
+        XCTAssertEqual(p.step, .hear)
+        XCTAssertEqual(p.feedback?.upgrades.count, 2)
+        XCTAssertTrue(p.canOpen(.again))
 
-    func testAFailedRecallStaysOnThePhrase() async throws {
-        let client = FakeMandarinClient()
-        client.recallFails = true
-        let practice = practice(try card(), client: client)
-        practice.startWarmUp()
-        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
-        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
-        let phrase = try XCTUnwrap(practice.currentWarmUp)
-        XCTAssertEqual(phrase.source, .recall)
-        await practice.warm(phrase, got: true)
-        XCTAssertEqual(practice.currentWarmUp, phrase, "nothing counts until the server has it")
-        XCTAssertNotNil(practice.recallError)
-    }
-
-    func testAnswerBringsFeedbackOnceAndAgainOnlyForNewWords() async throws {
-        let client = FakeMandarinClient()
-        let feedback = try JSONDecoder().decode(MandarinAnswerResponse.self, from: Data(#"""
-        {"feedback": {"natural": "我最近面试了三家公司，有点紧张，不过感觉还不错。"}, "used": ["还不错"], "progress": {"phrases": 38}}
-        """#.utf8))
-        client.answerResult = .success(feedback)
-        let practice = practice(try card(), client: client)
-        await practice.submit("  我最近面试了三家公司，有一点anxious，可是还不错  ", question: nil)
-        XCTAssertEqual(practice.result, feedback)
-        XCTAssertEqual(practice.answering, .idle)
-        XCTAssertEqual(practice.progress?.phrases, 38)
-        XCTAssertTrue(practice.isDone(.answer))
-        XCTAssertEqual(practice.step, .again, "the feedback opens Tell it again")
-        await practice.submit("我最近面试了三家公司，有一点anxious，可是还不错", question: nil)
-        XCTAssertEqual(client.answers.count, 1, "the same answer isn't sent twice")
-        await practice.submit("我最近面试了三家公司。", question: "你好吗？")
-        XCTAssertEqual(client.answers.map(\.question), [nil, "你好吗？"])
-    }
-
-    func testAnswerWithoutFeedbackOrServerCanBeTriedAgain() async throws {
-        let client = FakeMandarinClient()
-        client.answerResult = .failure(URLError(.timedOut))
-        let practice = practice(try card(), client: client)
-        await practice.submit("还不错", question: nil)
-        XCTAssertEqual(practice.answering, .failed("Couldn't reach the server. Try again."))
-        XCTAssertNil(practice.result)
-        client.answerResult = .success(MandarinAnswerResponse(feedback: nil))
-        await practice.retry()
-        XCTAssertEqual(practice.answering, .idle)
-        XCTAssertNil(practice.result?.feedback, "no feedback yet: tomorrow's card brings it")
-        XCTAssertEqual(practice.step, .warmUp, "an answer without feedback doesn't move the card")
-        await practice.retry()
-        XCTAssertEqual(client.answers.count, 3, "an answer without feedback can be sent again")
-    }
-
-    private func reply(_ natural: String, used: [String] = []) throws -> MandarinAnswerResponse {
-        let json: [String: Any] = ["feedback": ["natural": natural], "used": used]
-        return try JSONDecoder().decode(MandarinAnswerResponse.self, from: JSONSerialization.data(withJSONObject: json))
-    }
-
-    func testTellingItAgainKeepsBothTellingsAndResumes() async throws {
-        let client = FakeMandarinClient()
-        let first = try reply("我最近还不错。", used: ["还不错"])
-        let second = try reply("我最近还不错，在等消息。", used: ["在等消息"])
-        client.answerResult = .success(first)
-        let practice = practice(try card(), client: client)
-        let early = await practice.tellAgain("还不错")
-        XCTAssertFalse(early, "there's nothing to tell again before the first telling has feedback")
-        XCTAssertTrue(client.answers.isEmpty)
-        await practice.submit("还不错", question: nil)
-        client.answerResult = .success(second)
-        let told = await practice.tellAgain("  我最近还不错，在等消息。  ")
+        p.step = .again
+        let told = await p.tellAgain("我昨天起的很早")
         XCTAssertTrue(told)
-        XCTAssertEqual(client.answers.map(\.again), [nil, true])
-        XCTAssertEqual(practice.result, first, "the first telling keeps its feedback")
-        XCTAssertEqual(practice.againText, "我最近还不错，在等消息。")
-        XCTAssertEqual(practice.againResult, second)
-        XCTAssertEqual(practice.usedCues, ["还不错", "在等消息"], "a cue said in either telling counts")
-        let resumed = self.practice(try card(), client: client)
-        XCTAssertEqual(resumed.againText, "我最近还不错，在等消息。")
-        XCTAssertEqual(resumed.againResult, second)
+        XCTAssertEqual(client.answers.last?.again, true)
+        XCTAssertEqual(p.used, ["起得很早"])
+        XCTAssertEqual(p.feedback?.natural, "我昨天起得很早。", "the second telling keeps the first one's retelling")
+
+        let reopened = practice(try card(), client: client)
+        XCTAssertEqual(reopened.step, .again, "the card resumes where he left it")
+        XCTAssertEqual(reopened.used, ["起得很早"])
     }
 
-    func testTellingItAgainThatFailsCanBeTriedAgainAsTheSecondTelling() async throws {
+    func testNoRetellingStaysOnTellWithTryAgain() async throws {
         let client = FakeMandarinClient()
-        client.answerResult = .success(try reply("好。"))
-        let practice = practice(try card(), client: client)
-        await practice.submit("好", question: nil)
-        client.answerResult = .failure(URLError(.timedOut))
-        let told = await practice.tellAgain("很好")
-        XCTAssertFalse(told, "the mic keeps his words")
-        XCTAssertEqual(practice.answering, .failed("Couldn't reach the server. Try again."))
-        XCTAssertNil(practice.againText)
-        client.answerResult = .success(try reply("很好。"))
-        await practice.retry()
-        XCTAssertEqual(client.answers.map(\.again), [nil, true, true])
-        XCTAssertEqual(practice.againText, "很好")
-        XCTAssertEqual(practice.result?.feedback?.natural, "好。")
+        client.results = [.success(MandarinAnswerResponse(feedback: nil)), .success(try response())]
+        let p = practice(try card(), client: client)
+        await p.submit("我很累", question: nil)
+        XCTAssertEqual(p.step, .tell)
+        XCTAssertNotNil(p.result)
+        await p.retry()
+        XCTAssertEqual(client.answers.map(\.text), ["我很累", "我很累"])
+        XCTAssertEqual(p.step, .hear)
     }
 
-    func testAnswerRequestSendsAgainOnlyForTheSecondTelling() throws {
-        let first = String(decoding: try JSONEncoder().encode(MandarinAnswerRequest(date: "2026-10-25", text: "好", question: nil)), as: UTF8.self)
-        XCTAssertFalse(first.contains("again"))
-        let again = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
-            MandarinAnswerRequest(date: "2026-10-25", text: "好", question: nil, again: true))) as? [String: Any]
-        XCTAssertEqual(again?["again"] as? Bool, true)
+    func testAFailedTellingKeepsTheCardAndRetries() async throws {
+        let client = FakeMandarinClient()
+        client.results = [.failure(URLError(.notConnectedToInternet)), .success(try response())]
+        let p = practice(try card(), client: client)
+        await p.submit("我很累", question: "你好吗？")
+        XCTAssertEqual(p.answering, .failed("Couldn't reach the server. Try again."))
+        XCTAssertNil(p.record.answeredText)
+        await p.retry()
+        XCTAssertEqual(client.answers.last?.question, "你好吗？", "Try again resends what failed")
+        XCTAssertEqual(p.step, .hear)
     }
 
-    func testThePracticeResumesForTheSameServerAndDayOnly() async throws {
-        let card = try card()
-        let first = practice(card, client: FakeMandarinClient())
-        first.startWarmUp()
-        for _ in 0..<3 { await first.warm(try XCTUnwrap(first.currentWarmUp), got: true) }
-        let again = practice(card, client: FakeMandarinClient())
-        XCTAssertEqual(again.step, .warmUp)
-        XCTAssertEqual(again.currentWarmUp?.hanzi, "紧张")
-        let other = MandarinPractice(card: card, date: "2026-10-25", server: URL(string: "https://other.example")!,
-                                     client: nil, store: MandarinPracticeStore(defaults: defaults))
-        XCTAssertEqual(other.step, .warmUp, "another server starts fresh")
-        XCTAssertNil(other.currentWarmUp)
-    }
-
-    func testACardWithNothingToWarmUpOnStartsAtTheAnswer() throws {
-        let card = try card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？"}]}"#)
-        let practice = practice(card, client: nil)
-        XCTAssertEqual(practice.steps, [.answer, .again])
-        XCTAssertEqual(practice.step, .answer)
+    func testTellingAgainNeedsARetelling() async throws {
+        let client = FakeMandarinClient()
+        let p = practice(try card(), client: client)
+        let told = await p.tellAgain("我很累")
+        XCTAssertFalse(told)
+        XCTAssertTrue(client.answers.isEmpty)
     }
 
     func testTheSceneNamesTheCardInTheOpenersList() throws {
         let card = try card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","title":"His mother is talking to him about the move.","scene":"Mom asks about the move","question":"你好吗？"}]}"#)
-        XCTAssertEqual(card.scene, "Mom asks about the move")
         XCTAssertEqual(DeckAheadRow.title(.card(card)), "Mom asks about the move")
-        let older = try self.card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","title":"Mom calls","scene":"","question":"你好吗？"}]}"#)
-        XCTAssertNil(older.scene)
-        XCTAssertEqual(DeckAheadRow.title(.card(older)), "Mom calls", "a card before scenes keeps its title")
+        let newer = try self.card()
+        XCTAssertEqual(DeckAheadRow.title(.card(newer)), "Mom asks", "a retell card names who he talks with, not its brief")
     }
 }
 
@@ -3752,6 +3627,82 @@ final class DeckRenderTests: XCTestCase {
             try XCTUnwrap(image.pngData()).write(to: directory.appendingPathComponent("calendar-\(name).png"))
             window.isHidden = true
             window.rootViewController = nil
+        }
+    }
+
+    /// The Mandarin card at each step (Tell, Hear it, Tell again), light and dark, as PNGs in the same folder.
+    func testRenderMandarinStepsForReview() async throws {
+        guard let folder = ProcessInfo.processInfo.environment["DECK_RENDERS"] else {
+            throw XCTSkip("Set TEST_RUNNER_DECK_RENDERS to write review renders")
+        }
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(true) }
+        let directory = URL(fileURLWithPath: folder, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let deck = #"""
+        {"version":1,"date":"2026-11-10","kind":"morning","cards":[
+          {"id":"mandarin","type":"prompt","kind":"mandarin","files_to":"mandarin","act":"writing",
+           "title":"Mom asks how he has been sleeping","question":"你最近睡得怎么样？",
+           "question_ruby":["nǐ","zuì","jìn","shuì","de","zěn","me","yàng",""],"question_en":"How have you been sleeping?",
+           "hook":"You've been studying late, and the baby is due in January.","speaker":"mom"}]}
+        """#
+        let said = "我最近睡得不好比如说我昨天很早起来 可是如果我们太晚去 睡觉来不及了"
+        let feedback = #"""
+        {"feedback":{"natural":"我最近睡得不好。比如说，我昨天起得很早。可是如果我们睡得太晚，就来不及了。",
+          "natural_ruby":["wǒ","zuì","jìn","shuì","de","bù","hǎo","","bǐ","rú","shuō","","wǒ","zuó","tiān","qǐ","de","hěn","zǎo","","kě","shì","rú","guǒ","wǒ","men","shuì","de","tài","wǎn","","jiù","lái","bù","jí","le",""],
+          "upgrades":[{"said":"很早起来","better":"起得很早","better_ruby":["qǐ","de","hěn","zǎo"],"en":"got up early","why":"How early goes after the verb, with 得."},
+                      {"said":"太晚去 睡觉","better":"睡得太晚","better_ruby":["shuì","de","tài","wǎn"],"en":"slept too late","why":"Same pattern: verb, 得, then how."}]},
+         "used":[]}
+        """#
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let first = try decoder.decode(MandarinAnswerResponse.self, from: Data(feedback.utf8))
+        var heard = MandarinPracticeRecord()
+        heard.answeredText = said
+        heard.result = first
+        var again = heard
+        again.againText = "我最近睡得不好，比如说我昨天起的很早。可是我们太晚睡觉就来不及了。"
+        again.againResult = MandarinAnswerResponse(feedback: nil, used: ["起得很早"])
+
+        let server = URL(string: "https://deck-render-tests.invalid")!
+        let morning = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 10, hour: 9))!
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let practiceStore = MandarinPracticeStore()
+        defer { UserDefaults.standard.removeObject(forKey: "dailyDeck.mandarin|\(server.absoluteString)") }
+        for (step, record) in [("tell", MandarinPracticeRecord()), ("hear", heard), ("again", again)] {
+            practiceStore.setRecord(record, for: server, date: "2026-11-10")
+            let suite = "DeckRenderTests.mandarin"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defaults.removePersistentDomain(forName: suite)
+            let store = DailyDeckStore(defaults: defaults)
+            store.setWorkspace("/vault", for: server)
+            let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-11-10.morning.json"], deck: deck)
+            let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { morning })
+            await viewModel.load()
+            let page = try XCTUnwrap(viewModel.visiblePages.first { $0.id == "mandarin" })
+            viewModel.index = try XCTUnwrap(viewModel.visiblePages.firstIndex { $0.id == "mandarin" })
+            for (name, style) in [("light", UIUserInterfaceStyle.light), ("dark", .dark)] {
+                let appeared = expectation(description: "\(step) appeared")
+                let window = UIWindow(windowScene: scene)
+                window.frame = CGRect(x: 0, y: 0, width: 402, height: 1100)
+                window.overrideUserInterfaceStyle = style
+                window.rootViewController = UIHostingController(rootView:
+                    DeckPageView(page: page, viewModel: viewModel, file: {})
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.hxCanvas.ignoresSafeArea())
+                        .onAppear { appeared.fulfill() })
+                window.makeKeyAndVisible()
+                await fulfillment(of: [appeared], timeout: 5)
+                window.layoutIfNeeded()
+                let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                    window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+                }
+                try XCTUnwrap(image.pngData()).write(to: directory.appendingPathComponent("mandarin-\(step)-\(name).png"))
+                window.isHidden = true
+                window.rootViewController = nil
+            }
+            defaults.removePersistentDomain(forName: suite)
         }
     }
 }

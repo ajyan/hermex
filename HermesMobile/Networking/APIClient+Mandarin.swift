@@ -11,8 +11,8 @@ struct MandarinAnswerRequest: Encodable, Sendable {
     var again: Bool? = nil
 }
 
-/// The feedback (nil when the model couldn't answer in time: the next morning's deck retries it),
-/// which of the card's phrases he used, and his progress after this answer.
+/// The feedback (nil when the model couldn't answer in time: the next morning's card retries it), the
+/// upgrades he said in his second telling (`used`, their better words), and his progress.
 struct MandarinAnswerResponse: Codable, Equatable, Sendable {
     let feedback: DeckMandarinFeedback?
     let used: [String]
@@ -34,33 +34,9 @@ struct MandarinAnswerResponse: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey { case feedback, used, progress }
 }
 
-/// `POST /api/mandarin/recall`: Got it moves a phrasebook phrase to its next gap, Again starts it over.
-struct MandarinRecallRequest: Encodable, Sendable {
-    let date: String
-    let hanzi: String
-    let got: Bool
-}
-
-struct MandarinRecallResponse: Decodable, Equatable, Sendable {
-    let ok: Bool?
-    let progress: DeckMandarinProgress?
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        ok = try? c.decodeIfPresent(Bool.self, forKey: .ok)
-        progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
-    }
-
-    private enum CodingKeys: String, CodingKey { case ok, progress }
-}
-
 extension APIClient {
     /// Waits up to 90 s: the server gives the local model 75 s before it answers without feedback.
     func answerMandarin(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse {
         try await send(endpoint: .mandarinAnswer, method: "POST", body: request, timeout: 90)
-    }
-
-    func recallMandarin(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse {
-        try decode(MandarinRecallResponse.self, from: try await sendData(endpoint: .mandarinRecall, method: "POST", body: request))
     }
 }
