@@ -402,6 +402,51 @@ final class BodyHomeCopyTests: XCTestCase {
             ["done", "off", "today", "ahead", "off"])
     }
 
+    func testMinutesReadInHoursFromAnHour() {
+        XCTAssertNil(BodyHomeCopy.minutes(nil))
+        XCTAssertNil(BodyHomeCopy.minutes(0))
+        XCTAssertEqual(BodyHomeCopy.minutes(59), "59 min")
+        XCTAssertEqual(BodyHomeCopy.minutes(60), "1 h")
+        XCTAssertEqual(BodyHomeCopy.minutes(78), "1 h 18 min")
+    }
+
+    func testAnActivityRowNamesItsLengthDistanceAndSource() throws {
+        let run = try activity(#"{"id":"garmin-1","kind":"run","label":"Run","date":"2026-11-21","minutes":58,"distance_label":"4.6 mi","source":"Garmin"}"#)
+        XCTAssertEqual(BodyHomeCopy.activitySubtitle(run), "\(BodyHomeCopy.sessionDate("2026-11-21")) · 58 min · 4.6 mi · Garmin")
+        let yoga = try activity(#"{"id":"garmin-2","kind":"yoga","label":"Yoga","date":"2026-11-21","source":"Garmin"}"#)
+        XCTAssertEqual(BodyHomeCopy.activitySubtitle(yoga), "\(BodyHomeCopy.sessionDate("2026-11-21")) · Garmin")
+        let lift = try activity(#"{"id":"2026-11-18-pull","kind":"lift","label":"Pull","date":"2026-11-18","minutes":20,"trimmed":true,"auto_finished":true}"#)
+        XCTAssertEqual(BodyHomeCopy.activitySubtitle(lift),
+                       "\(BodyHomeCopy.sessionDate("2026-11-18")) · 20 min · one set dropped · saved itself")
+    }
+
+    func testActivePipsFillTowardTheGoalThenCountPastIt() throws {
+        func pips(_ minutes: Int) throws -> [Int] {
+            let count = BodyHomeCopy.activePips(try active(minutes))
+            return [count.filled, count.total, count.extra]
+        }
+        XCTAssertEqual(try pips(0), [0, 10, 0])
+        XCTAssertEqual(try pips(116), [7, 10, 0], "a part pip is not filled")
+        XCTAssertEqual(try pips(150), [10, 10, 0])
+        XCTAssertEqual(try pips(225), [10, 10, 5])
+        XCTAssertEqual(try pips(900), [10, 10, 10], "past twice the goal draws no more")
+        XCTAssertEqual(BodyHomeCopy.activeValue(try active(116)), "116 of 150. Runs count double.")
+        XCTAssertEqual(BodyHomeCopy.activeValue(try active(225)), "225, past the 150 goal. Runs count double.")
+        let wide = try PrepDecoding.decode(BodyActiveMinutes.self, from: Data(#"{"minutes":0,"goal":300,"pip":10}"#.utf8))
+        XCTAssertEqual(BodyHomeCopy.activePips(wide).total, 12, "the row never outgrows its card")
+        let odd = try PrepDecoding.decode(BodyActiveMinutes.self, from: Data(#"{"minutes":40,"goal":0,"pip":0}"#.utf8))
+        let count = BodyHomeCopy.activePips(odd)
+        XCTAssertEqual([count.filled, count.total, count.extra], [1, 1, 1], "a zero pip or goal never divides by zero")
+    }
+
+    private func activity(_ json: String) throws -> BodyActivity {
+        try PrepDecoding.decode(BodyActivity.self, from: Data(json.utf8))
+    }
+
+    private func active(_ minutes: Int) throws -> BodyActiveMinutes {
+        try PrepDecoding.decode(BodyActiveMinutes.self, from: Data(#"{"minutes":\#(minutes),"goal":150,"pip":15}"#.utf8))
+    }
+
     func testWeekValueReadsTheSubtitleToo() {
         XCTAssertEqual(BodyHomeCopy.weekValue([.done, .off, .done, .today], subtitle: "Push, Legs"),
                        "Monday and Wednesday. Push, Legs")

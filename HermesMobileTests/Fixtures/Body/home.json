@@ -1,6 +1,6 @@
 {
   "phase": "build",
-  "phase_label": "Build \u00b7 6 weeks to January",
+  "phase_label": "Build · 6 weeks to January",
   "starts": null,
   "next": {
     "day": "push",
@@ -50,7 +50,34 @@
       "ahead",
       "ahead",
       "ahead"
-    ]
+    ],
+    "walked": [
+      "done",
+      "off",
+      "today",
+      "ahead",
+      "ahead",
+      "ahead",
+      "ahead"
+    ],
+    "yoga": [
+      "off",
+      "done",
+      "today",
+      "ahead",
+      "ahead",
+      "ahead",
+      "ahead"
+    ],
+    "lifted_label": null,
+    "ran_label": "Treadmill · 58 min",
+    "yoga_label": "25 min",
+    "active": {
+      "minutes": 141,
+      "goal": 150,
+      "pip": 15
+    },
+    "enough": false
   },
   "sleep": {
     "hours": 5.2,
@@ -264,7 +291,7 @@
       "id": "lat-pulldown",
       "name": "Lat pulldown",
       "day": "pull",
-      "weight_label": "\u2014",
+      "weight_label": "—",
       "up": false,
       "up_from": null,
       "dots": [
@@ -368,12 +395,12 @@
       "change": {
         "weight": 70.0
       },
-      "title": "Strict press: 70 lb for 3 \u00d7 8",
+      "title": "Strict press: 70 lb for 3 × 8",
       "why": [
-        "Stuck at 75 \u00d7 8/7/6",
-        "Dropping 10% and rebuilding usually breaks a stall in 2\u20133 weeks"
+        "Stuck at 75 × 8/7/6",
+        "Dropping 10% and rebuilding usually breaks a stall in 2–3 weeks"
       ],
-      "rule": "Stall rule: no gain in 3 sessions \u2192 reset 10% and rebuild.",
+      "rule": "Stall rule: no gain in 3 sessions → reset 10% and rebuild.",
       "status": "pending",
       "decided_at": null
     }
@@ -388,5 +415,40 @@
     {
       "lift": 42
     }
+  ],
+  "activity": [
+    {
+      "id": "garmin-101",
+      "kind": "yoga",
+      "label": "Yoga",
+      "date": "2026-12-01",
+      "minutes": 25,
+      "distance_label": null,
+      "source": "Garmin"
+    },
+    {
+      "id": "garmin-100",
+      "kind": "run",
+      "label": "Treadmill run",
+      "date": "2026-12-01",
+      "minutes": 58,
+      "distance_label": "4.6 mi",
+      "source": "Garmin"
+    },
+    {
+      "id": "2026-11-27-pull",
+      "kind": "lift",
+      "day": "pull",
+      "label": "Pull",
+      "date": "2026-11-27",
+      "minutes": 52,
+      "trimmed": true,
+      "highlight": null,
+      "note": "Left shoulder blade",
+      "auto_finished": false,
+      "distance_label": null,
+      "source": null
+    },
+    "junk"
   ]
 }

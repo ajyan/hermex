@@ -105,8 +105,8 @@ final class BodyHomeViewModel {
 
 extension BodyHome {
     init(phase: String, phaseLabel: String, starts: String?, next: BodyNext?, week: BodyWeek, sleep: BodyHomeSleep?,
-         lifts: [BodyHomeLift], sessions: [BodySessionSummary], proposals: [BodyProposal], changes: [BodyChange] = [],
-         gaps: [String], watching: [BodyWatching] = []) {
+         lifts: [BodyHomeLift], sessions: [BodySessionSummary], activity: [BodyActivity] = [],
+         proposals: [BodyProposal], changes: [BodyChange] = [], gaps: [String], watching: [BodyWatching] = []) {
         self.phase = phase
         self.phaseLabel = phaseLabel
         self.starts = starts
@@ -115,6 +115,7 @@ extension BodyHome {
         self.sleep = sleep
         self.lifts = lifts
         self.sessions = sessions
+        self.activity = activity
         self.proposals = proposals
         self.changes = changes
         self.gaps = gaps
@@ -124,8 +125,13 @@ extension BodyHome {
     /// This home with `proposals` swapped in.
     func with(proposals: [BodyProposal]) -> BodyHome {
         BodyHome(phase: phase, phaseLabel: phaseLabel, starts: starts, next: next, week: week, sleep: sleep,
-                 lifts: lifts, sessions: sessions, proposals: proposals, changes: changes, gaps: gaps,
-                 watching: watching)
+                 lifts: lifts, sessions: sessions, activity: activity, proposals: proposals, changes: changes,
+                 gaps: gaps, watching: watching)
+    }
+
+    /// The activity list's rows: the server's, or his finished workouts from a server without the list.
+    var activityRows: [BodyActivity] {
+        activity.isEmpty ? sessions.map(BodyActivity.init(session:)) : activity
     }
 }
 
@@ -166,11 +172,42 @@ enum BodyHomeCopy {
         return "Baki · after \(latest.session.label), \(sessionDate(latest.session.date))"
     }
 
-    /// "52 min", or nil for a workout with no length worth showing: no start, or under a minute
-    /// (one logged after the fact, all at once).
+    /// "52 min" or "1 h 18 min", or nil for a workout with no length worth showing: no start, or
+    /// under a minute (one logged after the fact, all at once).
     static func minutes(_ minutes: Int?) -> String? {
         guard let minutes, minutes > 0 else { return nil }
-        return "\(minutes) min"
+        guard minutes >= 60 else { return "\(minutes) min" }
+        return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min"
+    }
+
+    /// "Sat, Nov 21 · 58 min · 4.6 mi · Garmin" for what the watch recorded; a workout of his reads
+    /// as `sessionSubtitle` does.
+    static func activitySubtitle(_ activity: BodyActivity) -> String {
+        var parts = [sessionDate(activity.date)]
+        if let length = minutes(activity.minutes) { parts.append(length) }
+        if let distance = activity.distanceLabel { parts.append(distance) }
+        if activity.trimmed { parts.append("one set dropped") }
+        if activity.autoFinished { parts.append("saved itself") }
+        if let source = activity.source { parts.append(source) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The active-minute pips: `total` for the goal with `filled` of them earned, and `extra` small
+    /// ones for each further pip's worth past the goal (no more than another goal's worth). Never
+    /// more than twelve to the goal, so the row fits its card whatever the server sends.
+    static func activePips(_ active: BodyActiveMinutes) -> (filled: Int, total: Int, extra: Int) {
+        let pip = max(active.pip, 1)
+        let total = min(max(active.goal / pip, 1), 12)
+        let earned = max(active.minutes, 0) / pip
+        return (min(earned, total), total, min(max(earned - total, 0), total))
+    }
+
+    /// What VoiceOver reads after "Active minutes" in place of the pips: "116 of 150. Runs count
+    /// double.", or "225, past the 150 goal. Runs count double."
+    static func activeValue(_ active: BodyActiveMinutes) -> String {
+        let count = active.minutes >= active.goal
+            ? "\(active.minutes), past the \(active.goal) goal" : "\(active.minutes) of \(active.goal)"
+        return "\(count). Runs count double."
     }
 
     /// "Fri, Nov 27 · 52 min · one set dropped"; a workout the server closed ends "saved itself".
