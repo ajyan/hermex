@@ -145,6 +145,21 @@ extension APIClient {
                                encodedBody: jpeg, contentType: "image/jpeg")
     }
 
+    /// A telling's audio heard back by the server: its transcript and at most one observation. Throws when the
+    /// server lacks the route or its speech model is away.
+    func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var body = Data()
+        for (name, value) in [("date", date), ("technique", technique ?? ""), ("question", question ?? "")] where !value.isEmpty {
+            body.appendMultipart(textField: name, value: value, boundary: boundary)
+        }
+        body.appendMultipart(fileField: "audio", filename: "story.m4a", data: audio, boundary: boundary)
+        body.appendMultipartClosingBoundary(boundary)
+        let (data, _) = try await sendMultipart(endpoint: .storiesListen, body: body,
+                                                contentType: "multipart/form-data; boundary=\(boundary)", timeout: 90)
+        return try decode(StoryListen.self, from: data)
+    }
+
     /// Removes the week's photo; a week with none is not an error.
     func deleteWeekPhoto(weekEnding: String) async throws {
         _ = try await sendData(endpoint: .briefPhoto(weekEnding: weekEnding), method: "DELETE")

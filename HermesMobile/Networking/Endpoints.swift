@@ -288,6 +288,9 @@ enum Endpoint {
     case briefIntention
     /// The week's photo (this user's webui fork): POST a raw JPEG or DELETE, `?week_ending=YYYY-MM-DD`.
     case briefPhoto(weekEnding: String)
+    /// A Tell a story telling heard back (this user's webui fork, `api/stories_listen.py`): POST multipart
+    /// `audio` (m4a), `date`, `technique`, `question`; answers `{transcript, observation: {text, at}?}`.
+    case storiesListen
     /// The Daily Deck's Mandarin card, live (`api/vault_mandarin.py` on this user's webui fork):
     /// POST `{date, text, question?, again?}`: the retelling and its upgrades, or which he used.
     case mandarinAnswer
@@ -719,6 +722,8 @@ enum Endpoint {
             return "/api/brief/intention"
         case .briefPhoto:
             return "/api/brief/photo"
+        case .storiesListen:
+            return "/api/stories/listen"
         case .mandarinAnswer:
             return "/api/mandarin/answer"
         case .atlasStatus:

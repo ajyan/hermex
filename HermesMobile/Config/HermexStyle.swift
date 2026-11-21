@@ -464,7 +464,8 @@ struct HXFailedView: View {
                     if let message {
                         Text(verbatim: message)
                             .font(AppFont.caption())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            // The paper's secondary ink on a card, hxTextSecondary on neutral ground.
+                            .foregroundStyle(.hxSecondary)
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
