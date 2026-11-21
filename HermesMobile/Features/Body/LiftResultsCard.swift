@@ -12,7 +12,8 @@ struct BodySetPip: View {
     @Environment(\.hxPaper) private var paper
 
     var body: some View {
-        let glow = HermexPaper.training.glow
+        // Body's glow, or the card's own on a review card in another paper.
+        let glow = (paper ?? .training).glow
         Circle()
             .strokeBorder(state == .notDone ? (paper?.edge ?? Color.hxSeparator) : glow, lineWidth: 1.5)
             .background(Circle().fill(state == .hit ? glow : Color.clear))

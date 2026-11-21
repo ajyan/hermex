@@ -13,15 +13,20 @@ extension BodyDayState {
     }
 }
 
-/// One Monday-to-Sunday row of day dots on Body home ("Lifted", "Ran"), in the Daily Brief's dot
-/// language and columns. The weekday letters sit above the first row only (`showsWeekdays`).
+/// One Monday-to-Sunday row of day dots on Body home and on the weekly review's Body card ("Lifted",
+/// "Ran"), in the Daily Brief's dot language and columns. The weekday letters sit above the first row only (`showsWeekdays`).
 struct BodyWeekDots: View {
     let title: String
     var subtitle: String?
     let states: [BodyDayState]
     var showsWeekdays = false
+    /// The week is over (a review's), so an empty row reads "none that week" to VoiceOver.
+    var closed = false
 
-    private var ink: Color { HermexPaper.training.glow }
+    @Environment(\.hxPaper) private var cardPaper
+
+    /// Body's glow on Body home; on a review card, the card's own, since a review wears one paper.
+    private var ink: Color { (cardPaper ?? .training).glow }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -32,9 +37,10 @@ struct BodyWeekDots: View {
                         .font(AppFont.subheadline(weight: .semibold))
                         .foregroundStyle(Color.hxTextPrimary)
                     if let subtitle {
+                        // The paper's secondary ink on the review's Body card, hxTextSecondary on Body home.
                         Text(verbatim: subtitle)
                             .font(AppFont.caption())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(.hxSecondary)
                     }
                 }
                 Spacer(minLength: 8)
@@ -45,7 +51,7 @@ struct BodyWeekDots: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: title))
-        .accessibilityValue(Text(verbatim: BodyHomeCopy.weekValue(states, subtitle: subtitle)))
+        .accessibilityValue(Text(verbatim: BodyHomeCopy.weekValue(states, subtitle: subtitle, closed: closed)))
     }
 
     private var weekdays: some View {
@@ -54,7 +60,8 @@ struct BodyWeekDots: View {
             ForEach(0..<7, id: \.self) { index in
                 Text(verbatim: DeckDots.weekdays[index])
                     .font(AppFont.caption2(weight: state(at: index) == .today ? .heavy : nil))
-                    .foregroundStyle(state(at: index) == .today ? Color.hxTextPrimary : Color.hxTextSecondary)
+                    .foregroundStyle(state(at: index) == .today
+                        ? AnyShapeStyle(Color.hxTextPrimary) : AnyShapeStyle(.hxSecondary))
                     .frame(width: DeckDots.column)
             }
         }

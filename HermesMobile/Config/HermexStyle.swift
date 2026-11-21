@@ -100,7 +100,8 @@ extension HermexPaper {
     static let feedback = HermexPaper.notes
     /// Meals: the Daily Brief's dinner and week-of-dinners cards.
     static let meal = HermexPaper.reading
-    /// Body: workouts, lifts, Baki's notes and proposals, and the Body value on the reviews. Cyan,
+    /// Body: workouts, lifts, and Baki's notes and proposals (the reviews' Body value card wears the
+    /// review's paper, like every value card). Cyan,
     /// since a teal read as Brain's mint beside it in the drawer.
     static let training = HermexPaper.video
     /// Goals: the drawer row. Each goal wears its own `GoalPaper`; the row takes Book highlight's

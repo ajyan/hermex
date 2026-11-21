@@ -302,19 +302,9 @@ struct MonthDotsCard: View {
                 MonthWeekDots(rows: month.rows, labels: month.labels, revealed: revealed, paper: palette.colors)
                     .padding(.top, 18)
             } else {
-            Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 20) {
-                let rows = month?.rows ?? []
-                ForEach(Array(stride(from: 0, to: rows.count, by: 2)), id: \.self) { start in
-                    GridRow {
-                        ForEach(start..<min(start + 2, rows.count), id: \.self) { index in
-                            MonthCalendar(row: rows[index], firstWeekday: month?.firstWeekday ?? 0,
-                                          daysInMonth: month?.daysInMonth ?? 31, revealed: revealed,
-                                          delay: Double(index) * 0.1, paper: palette.colors)
-                        }
-                    }
-                }
-            }
-            .padding(.top, 18)
+            MonthCalendarGrid(rows: month?.rows ?? [], firstWeekday: month?.firstWeekday ?? 0,
+                              daysInMonth: month?.daysInMonth ?? 31, revealed: revealed, paper: palette.colors)
+                .padding(.top, 18)
             }
             ForEach(Array((month?.pips ?? []).enumerated()), id: \.element.id) { index, row in
                 pips(row, delay: 0.9 + Double(index) * 0.2).padding(.top, index == 0 ? 22 : 12)
@@ -344,6 +334,33 @@ struct MonthDotsCard: View {
             .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A calendar per row, two to a line (one at accessibility text sizes): the dots card's habits, and
+/// the Body card's lifting, runs, walks and yoga.
+struct MonthCalendarGrid: View {
+    let rows: [DeckMonth.DotRow]
+    let firstWeekday: Int
+    let daysInMonth: Int
+    let revealed: Bool
+    let paper: HermexPaper
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        // One to a line at accessibility sizes, where two scaled calendars outgrow the card.
+        let perRow = dynamicTypeSize.isAccessibilitySize ? 1 : 2
+        Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 20) {
+            ForEach(Array(stride(from: 0, to: rows.count, by: perRow)), id: \.self) { start in
+                GridRow {
+                    ForEach(start..<min(start + perRow, rows.count), id: \.self) { index in
+                        MonthCalendar(row: rows[index], firstWeekday: firstWeekday, daysInMonth: daysInMonth,
+                                      revealed: revealed, delay: Double(index) * 0.1, paper: paper)
+                    }
+                }
+            }
+        }
     }
 }
 
