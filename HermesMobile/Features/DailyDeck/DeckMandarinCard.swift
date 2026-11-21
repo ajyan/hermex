@@ -2,10 +2,10 @@ import AVFoundation
 import Speech
 import SwiftUI
 
-/// The Mandarin card as one conversation, moved through by its named step bar: it opens on the family
-/// member's question and the phrases for the answer (Warm up), asks each from its English and shows it
-/// (Got it / Again), takes the answer (what the dictation heard is shown to fix before it's checked),
-/// then the feedback and telling it again with it out of sight. Everything he says, he says on the card.
+/// The Mandarin card in three steps on its step bar: Tell (the question from his life, with the
+/// mic ready), Hear it (his story retold naturally with its upgrades marked, played and said along),
+/// and Tell again (with the retelling out of sight; the upgrades he used get a check). Everything he
+/// says, he says on the card.
 struct DeckMandarinCard: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -17,36 +17,31 @@ struct DeckMandarinCard: View {
     let onAnswer: (String) -> Void
 
     @State private var speaker = MandarinSpeaker()
-    /// Warm-up phrases whose Mandarin is showing, and what he said for each before seeing it.
-    @State private var revealed: Set<String> = []
-    @State private var attempts: [String: String] = [:]
-    /// Telling it again, with the feedback out of sight.
-    @State private var retelling = false
+    /// Back on the retelling after telling it again.
+    @State private var reviewing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             stepBar.padding(.trailing, 30)
             switch practice.step {
-            case .warmUp: if let item = practice.currentWarmUp { warmUpStep(item) } else { opening }
-            case .answer: answerStep
+            case .tell: tellStep
+            case .hear: hearStep
             case .again: againStep
             }
         }
         .onDisappear { speaker.stop() }
-        .onChange(of: practice.againText) { _, _ in retelling = false }  // a retried second telling landed
     }
 
     // MARK: Step bar
 
-    /// A named segment per step: done ones half ink, the current one full, the rest faint. Tell it
-    /// again opens once the answer has feedback.
+    /// A named segment per step: done ones half ink, the current one full, the rest faint.
     private var stepBar: some View {
         HStack(alignment: .top, spacing: 6) {
-            ForEach(practice.steps, id: \.self) { step in
+            ForEach(MandarinPractice.Step.allCases, id: \.self) { step in
                 let isCurrent = practice.step == step
                 let isDone = practice.isDone(step)
-                Button { change { practice.step = step } } label: {
+                Button { change { reviewing = false; practice.step = step } } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Capsule()
                             .fill(palette.ink.opacity(isCurrent ? 1 : isDone ? 0.5 : 0.15))
@@ -61,7 +56,7 @@ struct DeckMandarinCard: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(step == .again && !practice.isDone(.answer))
+                .disabled(!practice.canOpen(step))
                 .accessibilityLabel(Text(verbatim: title(step) + (isDone ? ", done" : "")))
                 .accessibilityAddTraits(isCurrent ? .isSelected : [])
             }
@@ -70,34 +65,31 @@ struct DeckMandarinCard: View {
 
     private func title(_ step: MandarinPractice.Step) -> String {
         switch step {
-        case .warmUp: "Warm up"
-        case .answer: "Answer"
-        case .again: "Tell it again"
+        case .tell: "Tell"
+        case .hear: "Hear it"
+        case .again: "Tell again"
         }
     }
 
     // MARK: The question
 
-    /// The question in full: who asks about what, the Mandarin with ▶, its pinyin and English.
+    /// Who asks, the Mandarin with pinyin over each character and ▶, then the line naming what he can tell.
     @ViewBuilder
     private var question: some View {
         let line = card.mandarinQuestion(asked: asked ?? card.question ?? "")
         VStack(alignment: .leading, spacing: 6) {
-            Label { Text(verbatim: card.scene ?? "Today's question") } icon: { Image(systemName: "character.bubble") }
+            Label { Text(verbatim: card.mandarinScene) } icon: { Image(systemName: "character.bubble") }
                 .font(AppFont.footnote(weight: .semibold))
                 .foregroundStyle(palette.ink)
             HStack(alignment: .top, spacing: 12) {
-                Text(verbatim: line.hanzi)
-                    .font(AppFont.display(style: .title2, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
+                MandarinRubyText(text: line.hanzi, ruby: line.ruby,
+                                 font: AppFont.display(style: .title2, weight: .semibold),
+                                 pinyinFont: AppFont.caption(weight: .medium), ink: palette.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 playButton(line.hanzi, size: 40)
             }
-            if let pinyin = line.pinyin {
-                Text(verbatim: pinyin).font(AppFont.subheadline(weight: .medium)).foregroundStyle(palette.ink)
-            }
-            if let english = line.english {
-                Text(verbatim: english).font(AppFont.footnote()).foregroundStyle(palette.colors.secondaryInk)
+            if let hook = line.hook ?? line.english {
+                Text(verbatim: hook).font(AppFont.footnote()).foregroundStyle(palette.colors.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -108,17 +100,17 @@ struct DeckMandarinCard: View {
     /// The question kept small above a step that isn't about it: who asks, the Mandarin, ▶.
     @ViewBuilder
     private var questionPinned: some View {
-        let hanzi = asked ?? card.question ?? ""
+        let line = card.mandarinQuestion(asked: asked ?? card.question ?? "")
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: card.scene ?? "Today's question")
+                Text(verbatim: card.mandarinScene)
                     .font(AppFont.caption(weight: .medium))
                     .foregroundStyle(palette.ink)
-                Text(verbatim: hanzi).font(AppFont.subheadline()).fixedSize(horizontal: false, vertical: true)
+                MandarinRubyText(text: line.hanzi, ruby: line.ruby, font: AppFont.subheadline(), ink: palette.ink)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button { speaker.toggle(hanzi) } label: {
-                Image(systemName: speaker.speaking == hanzi ? "stop.fill" : "play.fill")
+            Button { speaker.toggle(line.hanzi) } label: {
+                Image(systemName: speaker.speaking == line.hanzi ? "stop.fill" : "play.fill")
                     .font(AppFont.footnote(weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .frame(width: 44, height: 44)
@@ -130,116 +122,19 @@ struct DeckMandarinCard: View {
         .padding(.trailing, 2)
         .padding(.vertical, 10)
         .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
-        .padding(.bottom, 8)
     }
 
-    // MARK: Warm up
-
-    /// Before the warm-up: the question, the phrases for the answer, and the way in (or straight to answering).
-    private var opening: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            question
-            Rectangle().fill(palette.edge).frame(height: 0.5).padding(.vertical, 20)
-            Text(verbatim: "Warm up · \(practice.warmUp.count) \(practice.warmUp.count == 1 ? "phrase" : "phrases") for your answer")
-                .font(AppFont.display(style: .subheadline, weight: .semibold))
-                .foregroundStyle(palette.ink)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.bottom, 8)
-            ForEach(practice.warmUp) { item in
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: item.en).font(AppFont.body())
-                    Text(verbatim: item.listNote).font(AppFont.footnote()).foregroundStyle(palette.colors.secondaryInk)
-                }
-                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                .overlay(alignment: .top) { Rectangle().fill(palette.edge).frame(height: 0.5) }
-                .accessibilityElement(children: .combine)
-            }
-            actions(primary: ("Warm up", "mic.fill", { change { practice.startWarmUp() } }))
-                .padding(.top, 20)
-            Button { change { practice.step = .answer } } label: {
-                MandarinPillLabel(text: "Skip to answer", palette: palette)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-        }
-    }
-
-    /// One phrase: its English to say, then the Mandarin beside what he said, and Got it or Again.
-    @ViewBuilder
-    private func warmUpStep(_ item: MandarinWarmUp) -> some View {
-        let isRevealed = revealed.contains(item.hanzi)
-        questionPinned
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(verbatim: "How would you say")
-                    .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(palette.ink)
-                Spacer()
-                Text(verbatim: "\((practice.warmUp.firstIndex(of: item) ?? 0) + 1) of \(practice.warmUp.count)")
-                    .font(AppFont.caption())
-                    .foregroundStyle(palette.colors.secondaryInk)
-            }
-            Text(verbatim: "“\(item.en)”")
-                .font(AppFont.display(style: .title2, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        if isRevealed {
-            if let tried = attempts[item.hanzi] {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: "You said").font(AppFont.footnote(weight: .semibold)).foregroundStyle(palette.colors.secondaryInk)
-                    HStack(spacing: 6) {
-                        Text(verbatim: tried).font(AppFont.body()).fixedSize(horizontal: false, vertical: true)
-                        if MandarinWarmUp.said(tried, item.hanzi) {
-                            Image(systemName: "checkmark").font(AppFont.footnote(weight: .bold)).foregroundStyle(palette.ink)
-                                .accessibilityLabel(Text(verbatim: "Right"))
-                        }
-                    }
-                }
-                .accessibilityElement(children: .combine)
-            } else if let said = item.said {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: "Yesterday you said").font(AppFont.footnote(weight: .semibold)).foregroundStyle(palette.colors.secondaryInk)
-                    Text(verbatim: said).font(AppFont.body()).fixedSize(horizontal: false, vertical: true)
-                }
-                .accessibilityElement(children: .combine)
-            }
-            MandarinTakeaway(tag: nil, text: item.hanzi, pinyin: item.pinyin,
-                             note: [item.example, item.exampleEn ?? item.note].compactMap { $0 }.joined(separator: "\n"),
-                             palette: palette, speaker: speaker)
-                .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
-            if let error = practice.recallError {
-                Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(palette.colors.secondaryInk)
-            }
-            actions(primary: ("Got it", "checkmark", { Task { await practice.warm(item, got: true) } }),
-                    secondary: ("Again", "arrow.counterclockwise", { Task { await practice.warm(item, got: false) } }),
-                    busy: practice.isSavingRecall)
-                .padding(.top, 4)
-        } else {
-            MandarinMic(prompt: "Say it in Mandarin", palette: palette,
-                        alternative: ("Show me", { change { _ = revealed.insert(item.hanzi) } }),
-                        onListen: { speaker.stop() }) { text in
-                attempts[item.hanzi] = text
-                change { _ = revealed.insert(item.hanzi) }
-                return true
-            }
-            .id(item.hanzi)
-        }
-    }
-
-    // MARK: Answer
+    // MARK: Tell
 
     @ViewBuilder
-    private var answerStep: some View {
+    private var tellStep: some View {
         question
-        if !card.phrases.isEmpty {
-            MandarinCueChips(phrases: card.phrases, used: Set(practice.usedCues), palette: palette, speaker: speaker)
-        }
         switch practice.answering {
         case .waiting:
             telling("You said", answered ?? "")
             HStack(spacing: 8) {
                 ProgressView().tint(palette.ink)
-                Text(verbatim: "Checking…").font(AppFont.footnote()).foregroundStyle(palette.colors.secondaryInk)
+                Text(verbatim: "Retelling it…").font(AppFont.footnote()).foregroundStyle(palette.colors.secondaryInk)
             }
         case let .failed(message):
             telling("You said", answered ?? "")
@@ -247,9 +142,9 @@ struct DeckMandarinCard: View {
         case .idle:
             if let result = practice.result, result.feedback == nil {
                 telling("You said", answered ?? "")
-                retryLine("Feedback comes with tomorrow's card.")
+                retryLine("The retelling didn't come back.")
             } else {
-                MandarinMic(prompt: talkPrompt, palette: palette, confirms: true, editing: answered,
+                MandarinMic(prompt: "Tell it, as long as you like", palette: palette, confirms: true, editing: answered,
                             onListen: { speaker.stop() }) { text in
                     onAnswer(text)
                     return true
@@ -258,53 +153,73 @@ struct DeckMandarinCard: View {
         }
     }
 
-    private var talkPrompt: String {
-        card.mandarinTellsAStory ? "What happened → how you felt → what's next" : "Answer out loud"
+    // MARK: Hear it
+
+    @ViewBuilder
+    private var hearStep: some View {
+        questionPinned
+        telling("You said", practice.record.answeredText ?? answered ?? "")
+        if let feedback = practice.feedback {
+            retelling(feedback)
+            actions(primary: ("Tell it again", "mic.fill", {
+                speaker.stop()
+                change { reviewing = false; practice.step = .again }
+            }))
+            .padding(.top, 4)
+            Text(verbatim: "The retelling hides while you tell it.")
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.colors.secondaryInk)
+                .frame(maxWidth: .infinity)
+        }
     }
 
-    // MARK: Tell it again
+    /// The retelling with its upgrades marked and ▶, the one instruction, then a row per upgrade.
+    @ViewBuilder
+    private func retelling(_ feedback: DeckMandarinFeedback) -> some View {
+        MandarinTakeaway(tag: "Said naturally", text: feedback.natural, ruby: feedback.naturalRuby,
+                         emphasis: feedback.upgrades.map(\.better), palette: palette, speaker: speaker)
+            .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
+        Text(verbatim: "Play it and say it along once.")
+            .font(AppFont.footnote())
+            .foregroundStyle(palette.colors.secondaryInk)
+        ForEach(feedback.upgrades, id: \.self) { upgrade in
+            MandarinRow(tag: upgrade.fromBefore ? "From before" : "Upgrade", text: upgrade.better,
+                        ruby: upgrade.betterRuby, note: Self.note(upgrade), palette: palette, speaker: speaker)
+        }
+    }
+
+    /// An upgrade's note: his words → the better ones (or its English, for a phrase from before), then why.
+    static func note(_ upgrade: DeckMandarinUpgrade) -> String {
+        let first = upgrade.fromBefore ? upgrade.en : "\(upgrade.said) → \(upgrade.better)"
+        return [first, upgrade.why].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: "\n")
+    }
+
+    // MARK: Tell again
 
     @ViewBuilder
     private var againStep: some View {
         questionPinned
-        if retelling {
-            MandarinMic(prompt: "Tell it again, a little longer", palette: palette, isBusy: practice.answering == .waiting,
-                        confirms: true, onListen: { speaker.stop() }) { text in
-                let told = await practice.tellAgain(text)
-                if told { change { retelling = false } }
-                return told
+        if let again = practice.againText, !reviewing {
+            telling("Second time", again)
+            if let upgrades = practice.feedback?.upgrades, !upgrades.isEmpty {
+                MandarinUsedChips(upgrades: upgrades, used: Set(practice.used), palette: palette)
             }
-            if case let .failed(message) = practice.answering { retryLine(message) }
-            Button { change { retelling = false } } label: {
-                MandarinPillLabel(text: "Back to the feedback", palette: palette)
+            Button { change { reviewing = true } } label: {
+                MandarinPillLabel(text: "Back to the retelling", palette: palette)
             }
             .buttonStyle(.plain)
-            .disabled(practice.answering == .waiting)
+        } else if let feedback = practice.feedback, reviewing {
+            retelling(feedback)
+            Button { change { reviewing = false } } label: {
+                MandarinPillLabel(text: "Done", palette: palette)
+            }
+            .buttonStyle(.plain)
         } else {
-            if let again = practice.againText {
-                telling("First time", answered ?? "")
-                telling("Second time", again)
-            } else {
-                telling("You said", answered ?? "")
+            MandarinMic(prompt: "Tell it again, without looking", palette: palette, isBusy: practice.answering == .waiting,
+                        confirms: true, onListen: { speaker.stop() }) { text in
+                await practice.tellAgain(text)
             }
-            if let feedback = (practice.againText == nil ? practice.result : practice.againResult)?.feedback {
-                feedbackBlocks(feedback)
-            } else if case let .failed(message) = practice.answering {
-                retryLine(message)
-            }
-            if !card.phrases.isEmpty {
-                MandarinCueChips(phrases: card.phrases, used: Set(practice.usedCues), palette: palette, speaker: speaker)
-            }
-            VStack(spacing: 8) {
-                actions(primary: ("Tell it again", "mic.fill", {
-                    speaker.stop()
-                    change { retelling = true }
-                }))
-                Text(verbatim: "The feedback hides while you tell it.")
-                    .font(AppFont.footnote())
-                    .foregroundStyle(palette.colors.secondaryInk)
-            }
-            .padding(.top, 4)
+            if case let .failed(message) = practice.answering { retryLine(message) }
         }
     }
 
@@ -324,28 +239,13 @@ struct DeckMandarinCard: View {
         }
     }
 
-    /// The natural version, any new words, and one thing to try: the first fix, else the flow note.
-    @ViewBuilder
-    private func feedbackBlocks(_ feedback: DeckMandarinFeedback) -> some View {
-        MandarinTakeaway(tag: "Said naturally", text: feedback.natural, pinyin: feedback.naturalPinyin, note: nil,
-                         palette: palette, speaker: speaker)
-            .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
-        ForEach(feedback.gaps, id: \.self) { gap in
-            row("New word", gap.hanzi, pinyin: gap.pinyin,
-                note: [gap.en, gap.build].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
-        }
-        if let fix = feedback.fixes.first {
-            row("One thing to try", fix.natural, pinyin: fix.naturalPinyin,
-                note: [fix.said + " → " + fix.natural, fix.why].compactMap { $0 }.joined(separator: "\n"))
-        } else if let flow = feedback.flow {
-            let word = flow.transition + (flow.en.map { " (\($0))" } ?? "")
-            row("One thing to try", flow.joined, pinyin: flow.joinedPinyin,
-                note: [word, flow.why].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
-        }
-    }
-
+    /// A failed telling as one inline row: the warning mark, what happened, Try again.
     private func retryLine(_ message: String) -> some View {
         HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxWarning)
+                .accessibilityHidden(true)
             Text(verbatim: message)
                 .font(AppFont.footnote())
                 .foregroundStyle(palette.colors.secondaryInk)
@@ -373,69 +273,54 @@ struct DeckMandarinCard: View {
         .accessibilityHidden(true)
     }
 
-    private func row(_ tag: String, _ text: String, pinyin: String?, note: String?) -> some View {
-        MandarinRow(tag: tag, text: text, pinyin: pinyin, note: note, palette: palette, speaker: speaker)
-            .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
-    }
-
     private typealias Action = (label: String, symbol: String, run: () -> Void)
 
-    /// The step's buttons: one filled (the way forward), at most one in the paper's wash.
-    private func actions(primary: Action, secondary: Action? = nil, busy: Bool = false) -> some View {
-        HStack(spacing: 8) {
-            if let secondary {
-                Button(action: secondary.run) {
-                    Label { Text(verbatim: secondary.label) } icon: { Image(systemName: secondary.symbol) }
-                        .font(AppFont.body(weight: .semibold))
-                        .foregroundStyle(palette.ink)
-                        .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(palette.colors.wash, in: Capsule())
-                        .overlay(Capsule().strokeBorder(palette.edge, lineWidth: 0.5))
-                }
-                .buttonStyle(.plain)
-            }
-            Button(action: primary.run) {
-                Label { Text(verbatim: primary.label) } icon: { Image(systemName: primary.symbol) }
-                    .font(AppFont.body(weight: .semibold))
-                    .foregroundStyle(palette.onInk)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(palette.ink, in: Capsule())
-            }
-            .buttonStyle(.plain)
+    /// The step's one filled button: the way forward.
+    private func actions(primary: Action) -> some View {
+        Button(action: primary.run) {
+            Label { Text(verbatim: primary.label) } icon: { Image(systemName: primary.symbol) }
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(palette.onInk)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(palette.ink, in: Capsule())
         }
-        .disabled(busy)
-        .opacity(busy ? 0.6 : 1)
+        .buttonStyle(.plain)
     }
 
+    /// A step, or the retelling, replacing what's on the card.
     private func change(_ update: () -> Void) {
-        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion), update)
-    }
-}
-
-extension MandarinWarmUp {
-    /// Whether what he said has the phrase in it, ignoring punctuation and spaces the dictation adds.
-    static func said(_ text: String, _ hanzi: String) -> Bool {
-        let bare: (String) -> String = { $0.filter { !$0.isPunctuation && !$0.isWhitespace } }
-        let phrase = bare(hanzi)
-        return !phrase.isEmpty && bare(text).contains(phrase)
+        withAnimation(HXMotion.swap(reduceMotion: reduceMotion), update)
     }
 }
 
 extension DeckCard {
-    /// The Mandarin card's question line: the deck's pinyin and English only belong to its own question.
-    func mandarinQuestion(asked: String) -> (hanzi: String, pinyin: String?, english: String?) {
-        guard asked == self.question else { return (asked, nil, nil) }
-        return (asked, self.questionPinyin, self.questionEn)
+    /// The Mandarin card's question line. The deck's pinyin, English and hook belong only to its own
+    /// question; one he asked himself shows plain.
+    func mandarinQuestion(asked: String) -> (hanzi: String, ruby: [String]?, english: String?, hook: String?) {
+        guard asked == self.question else { return (asked, nil, nil, nil) }
+        return (asked, self.questionRuby, self.questionEn, self.hook)
+    }
+
+    /// Who the Mandarin card has him talk with, said to him; older cards name their scene.
+    var mandarinScene: String {
+        if let scene = self.scene { return scene }
+        switch self.speaker {
+        case "mom": return "Mom asks"
+        case "dad": return "Dad asks"
+        case "parents": return "Mom and Dad ask"
+        case "baby": return "Talk to her"
+        default: return "Today's question"
+        }
     }
 }
 
-/// One thing to keep: a tag (Fix, New word, Pattern…), the Mandarin, its pinyin, a one-line lesson,
-/// and ▶ to hear it when there is a speaker.
+/// The retelling (or any long line to keep): a tag, the Mandarin with pinyin over each character and
+/// its upgrades marked, and ▶ to hear it when there is a speaker.
 struct MandarinTakeaway: View {
     let tag: String?
     let text: String
-    let pinyin: String?
-    let note: String?
+    let ruby: [String]?
+    var emphasis: [String] = []
     let palette: DeckPalette
     let speaker: MandarinSpeaker?
 
@@ -447,19 +332,8 @@ struct MandarinTakeaway: View {
                         .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(palette.ink)
                 }
-                Text(verbatim: text)
-                    .font(AppFont.display(style: .title3, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                if let pinyin {
-                    Text(verbatim: pinyin).font(AppFont.subheadline(weight: .medium)).foregroundStyle(palette.ink)
-                }
-                if let note, !note.isEmpty {
-                    Text(verbatim: note)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 2)
-                }
+                MandarinRubyText(text: text, ruby: ruby, emphasis: emphasis, font: AppFont.body(),
+                                 pinyinFont: AppFont.caption2(weight: .medium), ink: palette.ink)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let speaker {
@@ -478,17 +352,17 @@ struct MandarinTakeaway: View {
         .padding(14)
         .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: [tag, text, note].compactMap { $0 }.joined(separator: ". ")))
+        .accessibilityLabel(Text(verbatim: [tag, text].compactMap { $0 }.joined(separator: ". ")))
         .accessibilityAction(named: Text(verbatim: "Play")) { speaker?.toggle(text) }
     }
 }
 
-/// A lighter takeaway for the ones under the main one: the same tag, Mandarin, pinyin and note, with
-/// ▶ beside it and no box.
+/// One upgrade under the retelling: its tag, the better words with pinyin over them, a note, and ▶
+/// beside it, with no box.
 struct MandarinRow: View {
     let tag: String
     let text: String
-    let pinyin: String?
+    let ruby: [String]?
     let note: String?
     let palette: DeckPalette
     let speaker: MandarinSpeaker?
@@ -499,12 +373,7 @@ struct MandarinRow: View {
                 Text(verbatim: tag)
                     .font(AppFont.caption(weight: .semibold))
                     .foregroundStyle(palette.ink)
-                Text(verbatim: text)
-                    .font(AppFont.body(weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                if let pinyin {
-                    Text(verbatim: pinyin).font(AppFont.footnote(weight: .medium)).foregroundStyle(palette.ink)
-                }
+                MandarinRubyText(text: text, ruby: ruby, font: AppFont.body(weight: .semibold), ink: palette.ink)
                 if let note, !note.isEmpty {
                     Text(verbatim: note)
                         .font(AppFont.footnote())
@@ -531,50 +400,24 @@ struct MandarinRow: View {
     }
 }
 
-/// The day's cues as chips in his English, checked once used in the answer. Tapping one peeks at its
-/// Mandarin, example and note underneath; tapping it again closes it.
-struct MandarinCueChips: View {
-    let phrases: [DeckPhrase]
+/// The day's upgrades as chips after the second telling, checked when he said them.
+struct MandarinUsedChips: View {
+    let upgrades: [DeckMandarinUpgrade]
     let used: Set<String>
     let palette: DeckPalette
-    let speaker: MandarinSpeaker
-
-    @State private var peeking: String?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: "Work these in")
+            Text(verbatim: "You used")
                 .font(AppFont.caption(weight: .semibold))
                 .foregroundStyle(palette.ink)
             FlowRow(spacing: 6) {
-                ForEach(phrases, id: \.hanzi) { phrase in
-                    let isUsed = used.contains(phrase.hanzi)
-                    let isOpen = peeking == phrase.hanzi
-                    Button {
-                        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { peeking = isOpen ? nil : phrase.hanzi }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if isUsed { Image(systemName: "checkmark").font(AppFont.caption2(weight: .bold)) }
-                            Text(verbatim: phrase.en ?? phrase.hanzi)
-                        }
-                        .font(AppFont.subheadline(weight: .medium))
-                        .foregroundStyle(isOpen ? palette.onInk : palette.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(isOpen ? palette.ink : palette.colors.wash, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text(verbatim: [phrase.kindLabel, phrase.en].compactMap { $0 }.joined(separator: ". ")))
-                    .accessibilityValue(Text(verbatim: isUsed ? "Used" : ""))
-                    .accessibilityHint(Text(verbatim: isOpen ? "Hides the Mandarin" : "Shows the Mandarin"))
+                ForEach(upgrades, id: \.self) { upgrade in
+                    let isUsed = used.contains(upgrade.better)
+                    HXChip(paper: palette.colors, symbol: isUsed ? "checkmark" : nil, label: upgrade.better, lines: 2)
+                        .accessibilityElement(children: .combine)
+                    .accessibilityValue(Text(verbatim: isUsed ? "Used" : "Not used"))
                 }
-            }
-            if let phrase = phrases.first(where: { $0.hanzi == peeking }) {
-                MandarinRow(tag: phrase.kindLabel ?? "Phrase", text: phrase.hanzi, pinyin: phrase.pinyin,
-                            note: [phrase.example, phrase.exampleEn, phrase.note].compactMap { $0 }.joined(separator: "\n"),
-                            palette: palette, speaker: speaker)
-                    .transition(HXMotion.replaceTransition(reduceMotion: reduceMotion))
             }
         }
     }
