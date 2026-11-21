@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Body's landing screen, in the module home order (DESIGN.md § Module home): the next workout,
 /// Baki's changes waiting on him, the week, then Baki's note and what he is watching, every lift,
-/// recent sessions, and last night's sleep. Pushed from the drawer as `.body`; workouts, lifts, and
+/// recent activity, and last night's sleep. Pushed from the drawer as `.body`; workouts, lifts, and
 /// the plan push from here.
 struct BodyHomeView: View {
     @State private var viewModel: BodyHomeViewModel
@@ -75,7 +75,7 @@ struct BodyHomeView: View {
                     thisWeek(home)
                     bakiCard(watching: home.watching)
                     if !home.lifts.isEmpty { lifts(home.lifts) }
-                    if !home.sessions.isEmpty { sessions(home.sessions) }
+                    if !home.activityRows.isEmpty { activity(home.activityRows) }
                     if let sleep = home.sleep { sleepRow(sleep) }
                 }
                 // A proposal decided leaves its place, and one the server refused comes back to it;
@@ -262,12 +262,24 @@ struct BodyHomeView: View {
     private func thisWeek(_ home: BodyHome) -> some View {
         let week = home.week
         return VStack(alignment: .leading, spacing: 8) {
-            HXSectionHeader(title: "This week")
+            HXSectionHeader(title: "This week", trailing: week.enough ? "Enough for this week" : nil)
             VStack(alignment: .leading, spacing: 12) {
                 BodyWeekDots(
-                    title: "Lifted", subtitle: BodyHomeCopy.liftedLabels(week: week, sessions: home.sessions),
+                    title: "Lifted",
+                    subtitle: week.liftedLabel ?? BodyHomeCopy.liftedLabels(week: week, sessions: home.sessions),
                     states: week.lifted, showsWeekdays: true)
-                BodyWeekDots(title: "Ran", subtitle: "From Garmin", states: week.ran)
+                BodyWeekDots(title: "Ran", subtitle: week.ranLabel ?? "From Garmin", states: week.ran)
+                // An older server sends neither row, nor the minutes.
+                if !week.walked.isEmpty {
+                    BodyWeekDots(title: "Walked", subtitle: "8,000 steps or more", states: week.walked)
+                }
+                if !week.yoga.isEmpty {
+                    BodyWeekDots(title: "Yoga", subtitle: week.yogaLabel ?? "From Garmin", states: week.yoga)
+                }
+                if let active = week.active {
+                    PrepRowDivider()
+                    BodyActivePips(active: active)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -386,50 +398,58 @@ struct BodyHomeView: View {
         .accessibilityHidden(true)
     }
 
-    // MARK: Sessions
+    // MARK: Activity
 
     /// A lift that went up, or a rough night's trimmed session, reads in the training glow.
-    private func detailColor(_ session: BodySessionSummary) -> Color {
-        session.highlight != nil || session.trimmed ? paper.glow : Color.hxTextSecondary
+    private func detailColor(_ activity: BodyActivity) -> Color {
+        activity.highlight != nil || activity.trimmed ? paper.glow : Color.hxTextSecondary
     }
 
-    private func sessions(_ sessions: [BodySessionSummary]) -> some View {
+    /// His workouts among the runs, walks and yoga Garmin recorded, newest first. A workout opens
+    /// its page; what the watch recorded has none.
+    private func activity(_ rows: [BodyActivity]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HXSectionHeader(title: "Sessions")
+            HXSectionHeader(title: "Activity", trailing: "Lifts, runs, walks, yoga")
             VStack(spacing: 0) {
-                ForEach(Array(sessions.prefix(5).enumerated()), id: \.element.id) { offset, session in
+                ForEach(Array(rows.prefix(6).enumerated()), id: \.element.id) { offset, row in
                     if offset > 0 { PrepRowDivider().padding(.leading, 14) }
-                    NavigationLink(value: ShellPushDestination.bodySession(session.id)) {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: session.label)
-                                .font(AppFont.subheadline(weight: .semibold))
-                                .foregroundStyle(Color.hxTextPrimary)
-                            Text(verbatim: BodyHomeCopy.sessionSubtitle(session))
-                                .font(AppFont.caption())
-                                .foregroundStyle(Color.hxTextSecondary)
-                        }
-                        Spacer(minLength: 8)
-                        if let detail = session.highlight ?? session.note {
-                            Text(verbatim: detail)
-                                .font(AppFont.caption())
-                                .foregroundStyle(detailColor(session))
-                                .multilineTextAlignment(.trailing)
-                                .lineLimit(2)
-                        }
-                        BodyChevron()
+                    if row.isLift {
+                        NavigationLink(value: ShellPushDestination.bodySession(row.id)) { activityRow(row) }
+                            .buttonStyle(.chatTactile(.card))
+                            .accessibilityHint(Text(verbatim: "Opens this workout and Baki's note"))
+                    } else {
+                        activityRow(row)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                    .accessibilityElement(children: .combine)
-                    }
-                    .buttonStyle(.chatTactile(.card))
-                    .accessibilityHint(Text(verbatim: "Opens this workout and Baki's note"))
                 }
             }
             .hxCard()
         }
+    }
+
+    private func activityRow(_ row: BodyActivity) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: row.label)
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                Text(verbatim: BodyHomeCopy.activitySubtitle(row))
+                    .font(AppFont.caption())
+                    .foregroundStyle(.hxSecondary)
+            }
+            Spacer(minLength: 8)
+            if let detail = row.highlight ?? row.note {
+                Text(verbatim: detail)
+                    .font(AppFont.caption())
+                    .foregroundStyle(detailColor(row))
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
+            }
+            if row.isLift { BodyChevron() }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }

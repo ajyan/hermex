@@ -159,6 +159,45 @@ final class BodyModelsTests: APIClientTestCase {
         XCTAssertEqual(plan.days["pull"]?.first { $0.id == "lat-pulldown" }?.load.build, nil)
     }
 
+    func testDecodesTheWeeksWalkYogaMinutesAndTheActivityList() throws {
+        let home = try decode(BodyHome.self, "home.json")
+        XCTAssertEqual(home.week.walked, [.done, .off, .today, .ahead, .ahead, .ahead, .ahead])
+        XCTAssertEqual(home.week.yoga, [.off, .done, .today, .ahead, .ahead, .ahead, .ahead])
+        XCTAssertNil(home.week.liftedLabel)
+        XCTAssertEqual(home.week.ranLabel, "Treadmill · 58 min")
+        XCTAssertEqual(home.week.yogaLabel, "25 min")
+        XCTAssertEqual(home.week.active?.minutes, 141)
+        XCTAssertEqual(home.week.active?.goal, 150)
+        XCTAssertEqual(home.week.active?.pip, 15)
+        XCTAssertFalse(home.week.enough)
+        XCTAssertEqual(home.activity.map(\.id), ["garmin-101", "garmin-100", "2026-11-27-pull"], "junk is dropped")
+        XCTAssertEqual(home.activity.map(\.isLift), [false, false, true])
+        XCTAssertEqual(home.activity[1].distanceLabel, "4.6 mi")
+        XCTAssertEqual(home.activity[1].source, "Garmin")
+        XCTAssertEqual(home.activityRows, home.activity)
+    }
+
+    func testAnOlderServersHomeHasNoNewRowsAndListsItsSessions() throws {
+        let json = """
+        {"week":{"days":["2026-11-30"],"lifted":["done"],"ran":["off"]},
+         "sessions":[{"id":"2026-11-30-push","day":"push","label":"Push","date":"2026-11-30","minutes":41,
+                      "auto_finished":true,"note":"Felt strong"}]}
+        """
+        let home = try PrepDecoding.decode(BodyHome.self, from: Data(json.utf8))
+        XCTAssertTrue(home.week.walked.isEmpty)
+        XCTAssertTrue(home.week.yoga.isEmpty)
+        XCTAssertNil(home.week.active)
+        XCTAssertFalse(home.week.enough)
+        XCTAssertTrue(home.activity.isEmpty)
+        let row = try XCTUnwrap(home.activityRows.first)
+        XCTAssertEqual(row.id, "2026-11-30-push")
+        XCTAssertTrue(row.isLift)
+        XCTAssertEqual(row.minutes, 41)
+        XCTAssertTrue(row.autoFinished)
+        XCTAssertEqual(row.note, "Felt strong")
+        XCTAssertNil(row.source)
+    }
+
     func testUnknownDayStateIsTolerated() throws {
         let json = #"{"days":["2026-11-30"],"lifted":["done","missed","ask","off","today","ahead"],"ran":[]}"#
         let week = try PrepDecoding.decode(BodyWeek.self, from: Data(json.utf8))

@@ -65,3 +65,40 @@ struct BodyWeekDots: View {
         index < states.count ? states[index] : .unknown
     }
 }
+
+/// The week's active minutes under the day rows: a pip per 15 minutes of the 150-minute goal,
+/// a glow ring until it is earned and filled after (the two marks Body home's lift rows use), and
+/// a small pip for each 15 minutes past it.
+struct BodyActivePips: View {
+    let active: BodyActiveMinutes
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: "Active minutes")
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                Text(verbatim: "Each pip is \(active.pip) min. Runs count double.")
+                    .font(AppFont.caption())
+                    .foregroundStyle(.hxSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            pips
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Active minutes"))
+        .accessibilityValue(Text(verbatim: BodyHomeCopy.activeValue(active)))
+    }
+
+    private var pips: some View {
+        let count = BodyHomeCopy.activePips(active)
+        return HStack(spacing: 5) {
+            ForEach(0..<count.total, id: \.self) { index in
+                BodySetPip(state: index < count.filled ? .hit : .short)
+            }
+            ForEach(0..<count.extra, id: \.self) { _ in
+                BodySetPip(state: .hit, size: 6)
+            }
+        }
+    }
+}

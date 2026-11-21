@@ -671,19 +671,114 @@ struct BodyNext: Decodable, Hashable, Sendable {
     }
 }
 
-/// The week, Monday to Sunday: seven ISO dates and a state per day for lifting and for running.
+/// The week's active minutes against the weekly goal, drawn as `goal / pip` pips.
+struct BodyActiveMinutes: Decodable, Hashable, Sendable {
+    let minutes: Int
+    let goal: Int
+    /// Minutes one pip stands for.
+    let pip: Int
+
+    private enum CodingKeys: String, CodingKey { case minutes, goal, pip }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        minutes = c.optional(Int.self, .minutes) ?? 0
+        goal = c.optional(Int.self, .goal) ?? 150
+        pip = c.optional(Int.self, .pip) ?? 15
+    }
+}
+
+/// The week, Monday to Sunday: seven ISO dates and a state per day for each row. `walked` (a day
+/// of 8,000 steps or more), `yoga`, the rows' lines, `active`, and `enough` are absent from an
+/// older server, which sends only `lifted` and `ran`.
 struct BodyWeek: Decodable, Hashable, Sendable {
     let days: [String]
     let lifted: [BodyDayState]
     let ran: [BodyDayState]
+    let walked: [BodyDayState]
+    let yoga: [BodyDayState]
+    /// "Push, Legs · 1 h 52 min"; nil with no workout this week.
+    let liftedLabel: String?
+    /// "Treadmill · 58 min" for a lone run, else the runs' time, "1 h 10 min"; nil with none to give.
+    let ranLabel: String?
+    /// The yoga sessions' time, "50 min"; nil with none to give.
+    let yogaLabel: String?
+    let active: BodyActiveMinutes?
+    /// The week has its lifting days and its active minutes.
+    let enough: Bool
 
-    private enum CodingKeys: String, CodingKey { case days, lifted, ran }
+    private enum CodingKeys: String, CodingKey {
+        case days, lifted, ran, walked, yoga, liftedLabel = "lifted_label", ranLabel = "ran_label",
+             yogaLabel = "yoga_label", active, enough
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         days = c.strings(.days)
         lifted = (try? c.decodeIfPresent([BodyDayState].self, forKey: .lifted)) ?? []
         ran = (try? c.decodeIfPresent([BodyDayState].self, forKey: .ran)) ?? []
+        walked = (try? c.decodeIfPresent([BodyDayState].self, forKey: .walked)) ?? []
+        yoga = (try? c.decodeIfPresent([BodyDayState].self, forKey: .yoga)) ?? []
+        liftedLabel = c.optional(String.self, .liftedLabel)
+        ranLabel = c.optional(String.self, .ranLabel)
+        yogaLabel = c.optional(String.self, .yogaLabel)
+        active = c.optional(BodyActiveMinutes.self, .active)
+        enough = c.bool(.enough)
+    }
+}
+
+/// One row of Body home's activity list: a workout of his (`kind` "lift", whose `id` is the
+/// session's) or something Garmin recorded (a run, walk, yoga session or other activity).
+struct BodyActivity: Decodable, Hashable, Sendable, Identifiable {
+    let id: String
+    let kind: String
+    let label: String
+    let date: String
+    let minutes: Int?
+    /// "4.6 mi" for a run or walk with a distance.
+    let distanceLabel: String?
+    /// "Garmin" for what the watch recorded; nil for his own workouts.
+    let source: String?
+    let trimmed: Bool
+    let autoFinished: Bool
+    let highlight: String?
+    let note: String?
+
+    var isLift: Bool { kind == "lift" }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, label, date, minutes, distanceLabel = "distance_label", source, trimmed,
+             autoFinished = "auto_finished", highlight, note
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        kind = c.string(.kind)
+        label = c.string(.label)
+        date = c.string(.date)
+        minutes = c.optional(Int.self, .minutes)
+        distanceLabel = c.optional(String.self, .distanceLabel)
+        source = c.optional(String.self, .source)
+        trimmed = c.bool(.trimmed)
+        autoFinished = c.bool(.autoFinished)
+        highlight = c.optional(String.self, .highlight)
+        note = c.optional(String.self, .note)
+    }
+
+    /// A finished workout as an activity row, for a server that sends no `activity` list.
+    init(session: BodySessionSummary) {
+        id = session.id
+        kind = "lift"
+        label = session.label
+        date = session.date
+        minutes = session.minutes
+        distanceLabel = nil
+        source = nil
+        trimmed = session.trimmed
+        autoFinished = session.autoFinished
+        highlight = session.highlight
+        note = session.note
     }
 }
 
@@ -760,6 +855,8 @@ struct BodyHome: Decodable, Hashable, Sendable {
     let sleep: BodyHomeSleep?
     let lifts: [BodyHomeLift]
     let sessions: [BodySessionSummary]
+    /// His workouts among what Garmin recorded, newest first; empty from an older server (`activityRows`).
+    let activity: [BodyActivity]
     let proposals: [BodyProposal]
     /// Accepted weight changes still waiting for their lift's next session.
     let changes: [BodyChange]
@@ -769,8 +866,8 @@ struct BodyHome: Decodable, Hashable, Sendable {
     let watching: [BodyWatching]
 
     private enum CodingKeys: String, CodingKey {
-        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, proposals, changes, gaps,
-             watching
+        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, activity, proposals,
+             changes, gaps, watching
     }
 
     init(from decoder: Decoder) throws {
@@ -783,6 +880,7 @@ struct BodyHome: Decodable, Hashable, Sendable {
         sleep = c.optional(BodyHomeSleep.self, .sleep)
         lifts = c.lossy(BodyHomeLift.self, .lifts)
         sessions = c.lossy(BodySessionSummary.self, .sessions)
+        activity = c.lossy(BodyActivity.self, .activity)
         proposals = c.lossy(BodyProposal.self, .proposals)
         changes = c.lossy(BodyChange.self, .changes)
         gaps = c.strings(.gaps)
@@ -807,12 +905,19 @@ struct BodyChange: Decodable, Hashable, Sendable {
 }
 
 extension BodyWeek {
-    static let empty = BodyWeek(days: [], lifted: [], ran: [])
+    static let empty = BodyWeek()
 
-    private init(days: [String], lifted: [BodyDayState], ran: [BodyDayState]) {
-        self.days = days
-        self.lifted = lifted
-        self.ran = ran
+    private init() {
+        days = []
+        lifted = []
+        ran = []
+        walked = []
+        yoga = []
+        liftedLabel = nil
+        ranLabel = nil
+        yogaLabel = nil
+        active = nil
+        enough = false
     }
 }
 
