@@ -9,18 +9,22 @@ struct InteractiveAnswerCard: View {
     let block: InteractiveAnswerBlock
     /// The block's raw text, for Copy code and View code.
     let source: String
+    /// The object the tool belongs to, whose glow its controls wear; nil in chat (Nous blue).
+    var paper: HermexPaper? = nil
 
     var body: some View {
         switch block {
         case .building(let title):
             InteractiveAnswerBuildingCard(title: title)
         case .card(let fragment, let title):
-            InteractiveAnswerLiveCard(
-                fragment: fragment,
-                title: title,
-                source: source,
-                cardID: InteractiveAnswerCardID.make(fragment: fragment)
-            )
+            if let paper {
+                InteractiveAnswerLiveCard(fragment: fragment, title: title, source: source,
+                                          cardID: InteractiveAnswerCardID.make(fragment: fragment), paper: paper)
+                    .tint(paper.glow)
+            } else {
+                InteractiveAnswerLiveCard(fragment: fragment, title: title, source: source,
+                                          cardID: InteractiveAnswerCardID.make(fragment: fragment), paper: nil)
+            }
         case .code:
             EmptyView()
         }
@@ -51,6 +55,7 @@ private struct InteractiveAnswerLiveCard: View {
     let title: String
     let source: String
     let cardID: String
+    let paper: HermexPaper?
 
     private enum Failure: Equatable {
         case script
@@ -194,7 +199,7 @@ private struct InteractiveAnswerLiveCard: View {
     }
 
     private var html: String {
-        InteractiveAnswerDocument.html(fragment: fragment, theme: .current(colorScheme))
+        InteractiveAnswerDocument.html(fragment: fragment, theme: .current(colorScheme, paper: paper))
     }
 
     private func handle(_ message: InteractiveAnswerBridgeMessage) {

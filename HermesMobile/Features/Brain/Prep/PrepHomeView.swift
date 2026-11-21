@@ -273,7 +273,7 @@ struct PrepWeakSpotsSection: View {
         case .lesson(let lesson):
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lessonRun(lesson.id)))) {
                 BrainRow(leading: { PrepMissedLessonMark() }, title: lesson.title, subtitle: "In reviews",
-                         trailing: "Try it now", trailingTint: Color.accentColor)
+                         trailing: "Try it now", trailingTint: HermexPaper.prep.glow)
             }
             .buttonStyle(.chatTactile(.card))
             .accessibilityHint(Text(verbatim: "Asks one question on this lesson now"))
@@ -447,7 +447,7 @@ struct PrepShowAllButton: View {
         } label: {
             Text(verbatim: showsAll ? "Show fewer" : "See all \(count)")
                 .font(BrainStyle.rowSubtitle)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(HermexPaper.prep.glow)
                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                 .contentShape(Rectangle())
         }
@@ -455,7 +455,7 @@ struct PrepShowAllButton: View {
     }
 }
 
-/// A full-width Nous-blue capsule that pushes a short practice run, with what it asks underneath:
+/// A full-width capsule in the Prep glow that pushes a short practice run, with what it asks underneath:
 /// "Practice this gap" on a gap, "Try it now" on a lesson.
 struct PrepPracticeLink: View {
     let title: String
@@ -465,12 +465,7 @@ struct PrepPracticeLink: View {
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(route))) {
-                Text(verbatim: title)
-                    .font(AppFont.body(weight: .semibold))
-                    .foregroundStyle(Color.hxOnAccent)
-                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-                    .background(Color.accentColor, in: Capsule())
-                    .contentShape(Capsule())
+                PrepPrimaryLabel(title: title)
             }
             .buttonStyle(.chatTactile(.capsule))
             if let detail {

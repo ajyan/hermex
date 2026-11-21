@@ -2,7 +2,7 @@ import SwiftUI
 
 // The story rep's cards: the telling (the prompt, an m:ss clock, the transcript and a tap-to-talk
 // mic), its graded result, and up to two follow-up probes. Like every run card they are `.prep`
-// glow cards; the mic is a control, so it alone wears Nous blue. Only the sample telling is serif.
+// glow cards; the mic is a control, so it alone is filled, in the Prep glow. Only the sample telling is serif.
 
 /// Tap to talk: on-device dictation into the answer, punctuated as it is heard and tidied on Stop,
 /// with "Original" to put back the raw words. Capture stops when the answer is sent, the card goes
@@ -12,7 +12,7 @@ struct PrepStoryMicButton: View {
     let isSubmitting: Bool
     /// The first tap that starts listening, before any words arrive.
     var onStart: () -> Void = {}
-    /// The card's main control: a filled Nous-blue capsule, because an interview answer is spoken.
+    /// The card's main control: a filled capsule in the Prep glow, because an interview answer is spoken.
     var prominent = true
     @State private var dictation = DictationModel()
     @Environment(\.dictationServer) private var server
@@ -36,10 +36,10 @@ struct PrepStoryMicButton: View {
                     }
                 }
                 .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(prominent ? Color.hxOnAccent : Color.accentColor)
+                .foregroundStyle(prominent ? HermexPaper.prep.onGlow : HermexPaper.prep.glow)
                 .frame(maxWidth: .infinity, minHeight: prominent ? 56 : BrainStyle.minTapTarget)
-                .background(prominent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.hxSurface), in: Capsule())
-                .overlay(Capsule().strokeBorder(prominent ? Color.clear : Color.hxSeparator, lineWidth: 0.5))
+                .background(prominent ? HermexPaper.prep.glow : HermexPaper.prep.wash, in: Capsule())
+                .overlay(Capsule().strokeBorder(prominent ? Color.clear : HermexPaper.prep.edge, lineWidth: 0.5))
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -171,7 +171,7 @@ struct PrepStoryTellCard: View {
                     Button(action: peek) {
                         Text(verbatim: "Peek at the cues")
                             .font(BrainStyle.rowSubtitle)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(HermexPaper.prep.glow)
                             .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
                             .contentShape(Rectangle())
                     }
@@ -213,7 +213,7 @@ struct PrepStoryTellCard: View {
                 } label: {
                     Text(verbatim: showsScript ? "Hide script" : "Show script")
                         .font(AppFont.body(weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(HermexPaper.prep.glow)
                         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                 }
                 .buttonStyle(.plain)

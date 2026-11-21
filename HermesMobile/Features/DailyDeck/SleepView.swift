@@ -190,7 +190,7 @@ private struct SleepNightCard: View {
                 if !isLastNight {
                     Button("Last night", action: showLastNight)
                         .font(AppFont.caption(weight: .semibold))
-                        .tint(.accentColor)
+                        .tint(paper.glow)
                 }
             }
         }, content: {

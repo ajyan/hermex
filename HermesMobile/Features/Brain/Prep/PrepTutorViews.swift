@@ -2,7 +2,7 @@ import SwiftUI
 
 // The tutor dialogue after a question rep (spec 2026-10-19 Track A, slice 2): the question on a run card, then
 // chat bubbles, the user's on `hxSurface` at the trailing edge and the tutor's on the Prep wash at the
-// leading edge. "Show me" (a link, so Nous blue) ends it at any point; the reply bar's mic is the only other
+// leading edge. "Show me" (a link, in the Prep glow) ends it at any point; the reply bar's mic is the only other
 // control. While the tutor thinks, its bubble shows the grading sparkle, still under Reduce Motion.
 
 /// The dialogue: the question, the first answer, each follow-up and reply, and the turn streaming in.
@@ -59,7 +59,7 @@ struct PrepTutorDialogueView: View {
                     Button(action: retry) {
                         Text(verbatim: "Try again")
                             .font(BrainStyle.rowTitle)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(HermexPaper.prep.glow)
                             .frame(minHeight: BrainStyle.minTapTarget)
                     }
                     .buttonStyle(.plain)
@@ -155,7 +155,7 @@ struct PrepTutorReplyBar: View {
             } label: {
                 Text(verbatim: "Show me")
                     .font(AppFont.body(weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(HermexPaper.prep.glow)
                     .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
             }
             .buttonStyle(.plain)

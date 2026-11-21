@@ -490,7 +490,7 @@ struct PrepStoryPageView: View {
                             .frame(minHeight: BrainStyle.minTapTarget)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(HermexPaper.prep.glow)
                 }
             }
         }
@@ -527,7 +527,7 @@ struct PrepStoryPageView: View {
                                     .frame(minHeight: BrainStyle.minTapTarget)
                             }
                             .buttonStyle(.plain)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(HermexPaper.prep.glow)
                         }
                     }
                 }

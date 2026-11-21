@@ -108,7 +108,7 @@ struct PrepChoiceView: View {
                 HStack(spacing: BrainStyle.m) {
                     optionTitle(option)
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.hxTextSecondary)
+                        .foregroundStyle(isSelected ? HermexPaper.prep.glow : Color.hxTextSecondary)
                         .accessibilityHidden(true)
                 }
                 .frame(minHeight: BrainStyle.minTapTarget)
