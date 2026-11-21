@@ -9,6 +9,46 @@ struct DeckStoryTechnique: Decodable, Equatable, Identifiable {
     let how: String?
 }
 
+/// The server's hearing of a telling (`POST /api/stories/listen`): the words, and at most one observation
+/// asked as a question, pointing `at` a second of the telling. Never a score.
+struct StoryListen: Decodable, Equatable {
+    struct Observation: Decodable, Equatable {
+        let text: String?
+        let at: Double?
+    }
+    let transcript: String?
+    let observation: Observation?
+}
+
+enum StoryListenPhase: Equatable {
+    case listening
+    /// Why it couldn't be heard, in words that say what to do.
+    case failed(String)
+
+    static func reason(for error: Error) -> String {
+        if error is StoryAudio.NoSound { return "This take has no sound. Turn the microphone on for Atlas in Settings, then tell it again." }
+        if error is URLError { return "Couldn't reach your Mac. Try again when you're connected." }
+        return "Your Mac couldn't hear it back just now."
+    }
+}
+
+/// A telling's sound as AAC in an m4a, the upload `listen(to:for:)` sends (a minute is about 1 MB).
+enum StoryAudio {
+    struct NoSound: Error {}
+
+    @Sendable static func m4a(_ video: URL) async throws -> Data {
+        let asset = AVURLAsset(url: video)
+        if try await asset.loadTracks(withMediaType: .audio).isEmpty { throw NoSound() }
+        guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            throw CocoaError(.fileReadUnknown)
+        }
+        let out = FileManager.default.temporaryDirectory.appending(path: "story-audio-\(UUID().uuidString).m4a")
+        defer { try? FileManager.default.removeItem(at: out) }
+        try await export.export(to: out, as: .m4a)
+        return try Data(contentsOf: out)
+    }
+}
+
 /// The four things he rates himself on after watching a telling back, filed as the answer's `scores` (1–5).
 enum DeckStoryRating: String, CaseIterable, Identifiable {
     case words, voice, gestures, energy
@@ -33,6 +73,10 @@ struct DeckStoryCard: View {
 
     @State private var isRecording = false
     @State private var video: StoryVideoStore.Telling?
+    /// A second of the telling to jump to (the observation's), handed to the open card's player.
+    @State private var seek: Double?
+    @State private var showsTranscript = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var store: StoryVideoStore { StoryVideoStore(server: viewModel.server) }
     private var answer: DeckAnswer? { viewModel.answer(for: card) }
@@ -70,8 +114,9 @@ struct DeckStoryCard: View {
         .task(id: viewModel.date) { refresh() }
         .fullScreenCover(isPresented: $isRecording, onDismiss: refresh) {
             StoryRecordView(question: viewModel.question(for: card), kindLabel: card.kindLabel(palette),
-                            technique: technique, paper: palette.colors, store: store, date: viewModel.date) { _ in
+                            technique: technique, paper: palette.colors, store: store, date: viewModel.date) { saved in
                 viewModel.setStatus("recorded", "yes", for: card)
+                viewModel.listen(to: saved, for: card)
             }
         }
     }
@@ -124,7 +169,7 @@ struct DeckStoryCard: View {
         VStack(alignment: .leading, spacing: 16) {
             Group {
                 if isOpen {
-                    StoryVideoPlayer(url: video.url, version: video.modified)
+                    StoryVideoPlayer(url: video.url, version: video.modified, seek: $seek)
                 } else {
                     StoryVideoStill(url: video.url, version: video.modified)
                 }
@@ -152,7 +197,94 @@ struct DeckStoryCard: View {
                 .accessibilityLabel(Text(verbatim: "What did you notice?"))
                 .accessibilityValue(Text(verbatim: answer?.text ?? "Not written yet"))
             }
+            heardBack(video)
         }
+    }
+
+    /// What the server heard: while it listens, a line; if it couldn't, why and Try again; then the one
+    /// observation (a question, with a jump to its moment on the open card) and the transcript, folded. A take
+    /// recorded but never heard back (the app closed mid-listen) offers Hear it back.
+    @ViewBuilder
+    private func heardBack(_ video: StoryVideoStore.Telling) -> some View {
+        let notes = answer?.notes ?? [:]
+        switch viewModel.storyListen(for: card) {
+        case .listening:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(verbatim: "Listening to your telling…").font(AppFont.footnote()).foregroundStyle(palette.secondaryInk)
+            }
+        case .failed(let reason):
+            HXFailedView(title: "Couldn't hear it back", message: reason, style: .inline) {
+                viewModel.listen(to: video.url, for: card)
+            }
+        case nil:
+            if let observation = notes["observation"] {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: "From the recording")
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(palette.secondaryInk)
+                    Text(verbatim: observation)
+                        .font(AppFont.body())
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if isOpen, let at = notes["observationAt"].flatMap(Double.init) {
+                        Button("Watch from \(Self.clock(at))") { seek = at }
+                            .buttonStyle(.chatDecision(.secondary))
+                            .padding(.top, 6)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+            }
+            if let transcript = notes["transcript"] {
+                transcriptRow(transcript)
+            } else if !viewModel.storyListenUnavailable {
+                Button { viewModel.listen(to: video.url, for: card) } label: { Text(verbatim: "Hear it back") }
+                    .buttonStyle(.chatDecision(.secondary))
+                    .accessibilityHint(Text(verbatim: "Sends the sound of this telling to your Mac for its transcript"))
+            }
+        }
+    }
+
+    /// The transcript folded like the idea card's parts (`DeckPartsList`): a 44 pt row with a chevron that
+    /// swaps, opening on `HXMotion.disclosure`, closed by a hairline in the paper's edge.
+    private func transcriptRow(_ transcript: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsTranscript.toggle() }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(verbatim: "Read the transcript")
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                    Spacer(minLength: 8)
+                    Image(systemName: showsTranscript ? "chevron.up" : "chevron.down")
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(palette.secondaryInk)
+                        .accessibilityHidden(true)
+                }
+                .padding(.vertical, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(Text(verbatim: showsTranscript ? "Open" : "Folded"))
+            if showsTranscript {
+                Text(verbatim: transcript)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .padding(.bottom, 12)
+            }
+        }
+        .overlay(alignment: .bottom) { Rectangle().fill(palette.colors.edge).frame(height: 0.5) }
+    }
+
+    private static func clock(_ seconds: Double) -> String {
+        let s = Int(seconds)
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     private var ratings: some View {
@@ -211,6 +343,8 @@ private struct StoryRatingRow: View {
 private struct StoryVideoPlayer: View {
     let url: URL
     let version: Date
+    /// Set to jump there and play; cleared once done.
+    @Binding var seek: Double?
     @State private var player: AVPlayer?
 
     var body: some View {
@@ -218,6 +352,13 @@ private struct StoryVideoPlayer: View {
             .task(id: version) {
                 try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
                 player = AVPlayer(playerItem: AVPlayerItem(url: url))
+            }
+            .onChange(of: seek) { _, at in
+                guard let at else { return }
+                seek = nil
+                guard let player else { return }
+                player.seek(to: CMTime(seconds: at, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                player.play()
             }
             .onDisappear { player?.pause() }
             .accessibilityLabel(Text(verbatim: "Your telling"))

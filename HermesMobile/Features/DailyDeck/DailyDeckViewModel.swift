@@ -16,6 +16,8 @@ protocol DailyDeckDataClient: Sendable {
     /// A file's bytes (the week's photo); a missing file throws a 404 `APIError`.
     func rawFile(sessionID: String, path: String) async throws -> Data
     func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws
+    /// A Tell a story telling heard back: transcript and at most one observation.
+    func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen
     func deleteWeekPhoto(weekEnding: String) async throws
     /// Drafts the Sunday review's intention from its answers so far; an empty draft when the model can't.
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft
@@ -23,6 +25,13 @@ protocol DailyDeckDataClient: Sendable {
     func goalsToday() async throws -> String
     /// Confirms a goal's commitments for a week (`POST /api/goals/week`).
     func confirmWeek(_ request: GoalWeekRequest) async throws
+}
+
+extension DailyDeckDataClient {
+    /// Servers and test doubles without the stories route: the telling simply isn't heard back.
+    func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
+        throw APIError.http(statusCode: 404, body: nil)
+    }
 }
 
 enum DailyDeckState: Equatable {
@@ -67,6 +76,13 @@ final class DailyDeckViewModel {
     private(set) var pages: [DeckPage] = []
     /// What he's answered, kept here as he types; `store` gets it `draftDelay` after the last change
     /// (`saveDraft()` writes it at once).
+    /// A Tell a story card's telling being heard back (`listen(to:for:)`), by "<date>/<card id>": the story
+    /// card's id is the same every day.
+    private(set) var storyListening: [String: StoryListenPhase] = [:]
+    /// The server answered 404 to a listen: it has no stories route, so nothing offers to hear a telling back.
+    private(set) var storyListenUnavailable = false
+    /// The listen in flight per key; a newer one (a retake) replaces it, and only the newest may write.
+    @ObservationIgnored private var storyListens: [String: (token: UUID, task: Task<Void, Never>)] = [:]
     private(set) var answers: [String: DeckAnswer] = [:] {
         didSet { syncVisibility() }
     }
@@ -852,6 +868,52 @@ final class DailyDeckViewModel {
         }
     }
 
+    /// Hears a Tell a story telling back: sends its audio to the server and keeps the transcript and the one
+    /// observation in the answer's notes (`transcript`, `observation`, `observationAt`), which the vault files.
+    /// A retake clears the last take's first and cancels its listen, so neither an older take's words nor a
+    /// failure ever sit on the new video. A server without the route shows nothing.
+    @discardableResult
+    func listen(to video: URL, for card: DeckCard,
+                audio: @escaping @Sendable (URL) async throws -> Data = StoryAudio.m4a) -> Task<Void, Never> {
+        let key = "\(date)/\(card.id)"
+        for note in ["transcript", "observation", "observationAt"] { setNote(note, "", for: card) }
+        storyListens[key]?.task.cancel()
+        storyListening[key] = .listening
+        let token = UUID()
+        let date = date, technique = answers[card.id]?.statuses?["technique"], question = question(for: card)
+        let task = Task {
+            let outcome: Result<StoryListen, Error>
+            do {
+                let sound = try await audio(video)
+                outcome = .success(try await client.listenToStory(audio: sound, date: date, technique: technique, question: question))
+            } catch {
+                outcome = .failure(error)
+            }
+            guard !Task.isCancelled, storyListens[key]?.token == token else { return }
+            storyListens[key] = nil
+            guard self.date == date else { storyListening[key] = nil; return }
+            switch outcome {
+            case .success(let heard):
+                setNote("transcript", heard.transcript ?? "", for: card)
+                if let text = heard.observation?.text {
+                    setNote("observation", text, for: card)
+                    if let at = heard.observation?.at { setNote("observationAt", String(format: "%.1f", at), for: card) }
+                }
+                storyListening[key] = nil
+            case .failure(APIError.http(statusCode: 404, _)):
+                storyListenUnavailable = true
+                storyListening[key] = nil
+            case .failure(let error):
+                storyListening[key] = .failed(StoryListenPhase.reason(for: error))
+            }
+        }
+        storyListens[key] = (token, task)
+        return task
+    }
+
+    /// The listen state of today's telling on `card`.
+    func storyListen(for card: DeckCard) -> StoryListenPhase? { storyListening["\(date)/\(card.id)"] }
+
     /// A self-rating card's scores so far, read from its answer text.
     func traitScores(for card: DeckCard) -> [String: Int] {
         DeckSelfRatings.scores(in: answers[card.id]?.text, traits: card.selfRatings ?? [])
@@ -1523,6 +1585,10 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
 
     func deleteWeekPhoto(weekEnding: String) async throws {
         try await apiClient.deleteWeekPhoto(weekEnding: weekEnding)
+    }
+
+    func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
+        try await apiClient.listenToStory(audio: audio, date: date, technique: technique, question: question)
     }
 
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {

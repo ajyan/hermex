@@ -1698,6 +1698,58 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
+    func testATellingHeardBackKeepsItsTranscriptAndObservationForFiling() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.storyJSON)
+        client.storyListen = .success(StoryListen(transcript: "So the bus doors closed.",
+                                                  observation: .init(text: "Your last ten seconds were the fastest. Did it feel rushed?", at: 42)))
+        let model = makeViewModel(client)
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.isStory })
+        model.setStatus("technique", "peak", for: card)
+        let video = URL(fileURLWithPath: "/tmp/none.mov")
+        await model.listen(to: video, for: card) { _ in Data("audio".utf8) }.value
+        XCTAssertNil(model.storyListen(for: card))
+        XCTAssertEqual(client.listenedTechnique, "peak")
+        let notes = try XCTUnwrap(model.answer(for: card)?.notes)
+        XCTAssertEqual(notes["transcript"], "So the bus doors closed.")
+        XCTAssertEqual(notes["observation"], "Your last ten seconds were the fastest. Did it feel rushed?")
+        XCTAssertEqual(notes["observationAt"], "42.0")
+
+        client.storyListen = .failure(APIError.http(statusCode: 503, body: nil))
+        await model.listen(to: video, for: card) { _ in Data("audio".utf8) }.value
+        XCTAssertEqual(model.storyListen(for: card), .failed("Your Mac couldn't hear it back just now."))
+        XCTAssertNil(model.answer(for: card)?.notes?["transcript"], "a retake that couldn't be heard drops the last take's words")
+        XCTAssertFalse(model.storyListenUnavailable)
+
+        client.storyListen = nil
+        await model.listen(to: video, for: card) { _ in Data("audio".utf8) }.value
+        XCTAssertNil(model.storyListen(for: card), "a server without the route shows no failure")
+        XCTAssertTrue(model.storyListenUnavailable)
+    }
+
+    @MainActor
+    func testARetakesListenReplacesTheOneStillInFlight() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.storyJSON)
+        client.storyListen = .success(StoryListen(transcript: "Second take.", observation: nil))
+        let model = makeViewModel(client)
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.isStory })
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        let first = model.listen(to: URL(fileURLWithPath: "/tmp/a.mov"), for: card) { _ in
+            for await _ in gate { break }
+            return Data("first".utf8)
+        }
+        await model.listen(to: URL(fileURLWithPath: "/tmp/b.mov"), for: card) { _ in Data("second".utf8) }.value
+        open.yield()
+        await first.value
+        XCTAssertEqual(model.answer(for: card)?.notes?["transcript"], "Second take.",
+                       "the first take finishing late never writes over the retake")
+        XCTAssertNil(model.storyListen(for: card))
+    }
+
+    @MainActor
     func testAMessagesReturnDefaultsToAYearAndFilesOnlyWhenPicked() async throws {
         store.setWorkspace("/vault", for: server)
         let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.timeCardsJSON))
@@ -2785,6 +2837,9 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     var sendError: Error?
     /// The server filer's answer; nil (the default) is a server without one.
     var filer: Result<BriefFileResponse?, Error> = .success(nil)
+    /// The stories route's answer; nil is a server without it.
+    var storyListen: Result<StoryListen, Error>?
+    private(set) var listenedTechnique: String?
     /// Runs inside `fileBrief` before it answers, to hold a filing in flight.
     var fileGate: (@Sendable () async -> Void)?
     private(set) var fileRequests: [BriefFileRequest] = []
@@ -2875,6 +2930,12 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func rawFile(sessionID: String, path: String) async throws -> Data {
         guard let data = rawFiles[path] else { throw APIError.http(statusCode: 404, body: nil) }
         return data
+    }
+
+    func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
+        listenedTechnique = technique
+        guard let storyListen else { throw APIError.http(statusCode: 404, body: nil) }
+        return try storyListen.get()
     }
 
     func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws {
