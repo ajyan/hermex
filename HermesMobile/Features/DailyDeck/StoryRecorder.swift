@@ -9,8 +9,9 @@ import os
 /// second configured server never shows the first one's tellings.
 struct StoryVideoStore {
     let server: URL
-    /// How long a telling stays before it is deleted. The weekly pick that keeps one comes in a later slice.
-    static let keepDays = 14
+    /// How long a telling stays on the phone after its day. The Sunday pick keeps the best one on the Mac.
+    /// Eight, so a review done the Monday after still finds last Monday's telling.
+    static let keepDays = 8
 
     private var folder: URL {
         let key = SHA256.hash(data: Data(server.absoluteString.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
@@ -52,20 +53,36 @@ struct StoryVideoStore {
         return target
     }
 
-    /// Deletes tellings dated more than `keepDays` before `today`, never `keeping` (the day just saved or shown).
+    /// Holds a telling past `keepDays` while it is on its way to the Mac (a marker file beside it).
+    func markKeeping(_ date: String) {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: folder.appending(path: "\(date).keep").path, contents: nil)
+    }
+
+    func unmarkKeeping(_ date: String) {
+        try? FileManager.default.removeItem(at: folder.appending(path: "\(date).keep"))
+    }
+
+    func isKeeping(_ date: String) -> Bool {
+        FileManager.default.fileExists(atPath: folder.appending(path: "\(date).keep").path)
+    }
+
+    /// Deletes tellings dated more than `keepDays` before `today`, never `keeping` (the day just saved or shown)
+    /// and never one still on its way to the Mac, unless that upload has waited a month.
     func prune(today: Date = .now, keeping: String? = nil) {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { return }
         let cutoff = Calendar.current.date(byAdding: .day, value: -Self.keepDays, to: today) ?? today
+        let giveUp = Calendar.current.date(byAdding: .day, value: -30, to: today) ?? today
         let names = DateFormatter()
         names.calendar = Calendar(identifier: .gregorian)
         names.locale = Locale(identifier: "en_US_POSIX")
         names.dateFormat = "yyyy-MM-dd"
-        for file in files where file.pathExtension == "mov" {
+        for file in files where file.pathExtension == "mov" || file.pathExtension == "keep" {
             let name = file.deletingPathExtension().lastPathComponent
-            if name != keeping, let day = names.date(from: name), day < cutoff {
-                try? fm.removeItem(at: file)
-            }
+            guard name != keeping, let day = names.date(from: name), day < cutoff else { continue }
+            if isKeeping(name), day >= giveUp { continue }
+            try? fm.removeItem(at: file)
         }
     }
 }

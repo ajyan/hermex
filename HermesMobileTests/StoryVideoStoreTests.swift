@@ -54,4 +54,14 @@ final class StoryVideoStoreTests: XCTestCase {
         XCTAssertNil(one.video(for: "2026-11-01"), "20 days old, past the \(StoryVideoStore.keepDays)-day window")
         XCTAssertNotNil(one.video(for: "2026-11-20"))
     }
+
+    func testATellingOnItsWayToTheMacOutlivesItsDaysButNotAMonth() throws {
+        _ = try one.save(recording("picked"), for: "2026-11-01", today: day("2026-11-01"))
+        one.markKeeping("2026-11-01")
+        one.prune(today: day("2026-11-21"))
+        XCTAssertNotNil(one.video(for: "2026-11-01"), "held while its upload is pending")
+        one.prune(today: day("2026-12-05"))
+        XCTAssertNil(one.video(for: "2026-11-01"), "a month on, the phone lets it go")
+        XCTAssertFalse(one.isKeeping("2026-11-01"))
+    }
 }

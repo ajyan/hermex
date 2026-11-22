@@ -174,7 +174,9 @@ struct DeckCardView: View {
                 case .weekPlan: WeekPlanCard(card: card, palette: palette, viewModel: viewModel)
                 case .weekLetter: WeekLetterCard(card: card, palette: palette, viewModel: viewModel)
                 default:
-                    if card.isStory {
+                    if card.isStoryPick {
+                        DeckStoryPickCard(card: card, palette: palette, viewModel: viewModel) { isWriting = true }
+                    } else if card.isStory {
                         DeckStoryCard(card: card, palette: palette, viewModel: viewModel, isOpen: isOpen) { isWriting = true }
                     } else if card.isIdea { idea } else if isJobCard { jobReading } else { reading }
                 }

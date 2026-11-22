@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 /// The network surface the Daily Deck needs. File reads are session-scoped on the
 /// server, so the deck owns one session per day in the brief's workspace. Filing goes
@@ -18,6 +19,9 @@ protocol DailyDeckDataClient: Sendable {
     func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws
     /// A Tell a story telling heard back: transcript and at most one observation.
     func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen
+    /// Keeps a telling's video on the Mac, or takes it off.
+    func keepStory(date: String, video: Data) async throws
+    func unkeepStory(date: String) async throws
     func deleteWeekPhoto(weekEnding: String) async throws
     /// Drafts the Sunday review's intention from its answers so far; an empty draft when the model can't.
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft
@@ -32,6 +36,9 @@ extension DailyDeckDataClient {
     func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
         throw APIError.http(statusCode: 404, body: nil)
     }
+
+    func keepStory(date: String, video: Data) async throws { throw APIError.http(statusCode: 404, body: nil) }
+    func unkeepStory(date: String) async throws { throw APIError.http(statusCode: 404, body: nil) }
 }
 
 enum DailyDeckState: Equatable {
@@ -81,6 +88,11 @@ final class DailyDeckViewModel {
     private(set) var storyListening: [String: StoryListenPhase] = [:]
     /// The server answered 404 to a listen: it has no stories route, so nothing offers to hear a telling back.
     private(set) var storyListenUnavailable = false
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "HermesMobile", category: "DailyDeck")
+    /// The Sunday pick's upload or removal, by "<deck date>/<card id>" (every Sunday's card has the same id).
+    private(set) var storyKeeping: [String: StoryKeepPhase] = [:]
+    /// The keep or unkeep in flight per key; only the newest may write.
+    @ObservationIgnored private var storyKeepTokens: [String: UUID] = [:]
     /// The listen in flight per key; a newer one (a retake) replaces it, and only the newest may write.
     @ObservationIgnored private var storyListens: [String: (token: UUID, task: Task<Void, Never>)] = [:]
     private(set) var answers: [String: DeckAnswer] = [:] {
@@ -911,6 +923,79 @@ final class DailyDeckViewModel {
         return task
     }
 
+    /// Keeps the telling from `date` on the Mac: uploads its video, then records the pick (`statuses["kept"]`),
+    /// which the vault files as `kept: true` on that day's story. Picking another day uploads it first and then
+    /// takes the earlier one off the Mac, so there is never a moment with none kept. Until the upload lands the
+    /// phone holds the video past its days (`StoryVideoStore.markKeeping`).
+    @discardableResult
+    func keepTelling(_ date: String, for card: DeckCard) -> Task<Void, Never> {
+        let key = "\(self.date)/\(card.id)", deckDate = self.date
+        let videos = StoryVideoStore(server: server)
+        let previous = answers[card.id]?.statuses?["kept"]
+        let token = UUID()
+        storyKeepTokens[key] = token
+        storyKeeping[key] = .saving(date)
+        return Task {
+            do {
+                guard let video = videos.video(for: date) else { throw StoryKeepError.gone }
+                videos.markKeeping(date)
+                let data = try Data(contentsOf: video.url, options: .mappedIfSafe)
+                try await client.keepStory(date: date, video: data)
+                videos.unmarkKeeping(date)
+                // The Mac holds one telling a week: the earlier pick comes off whatever the screen shows now.
+                if let previous, previous != date {
+                    do { try await client.unkeepStory(date: previous) } catch {
+                        Self.log.error("story pick: couldn't take \(previous, privacy: .public) off the Mac")
+                    }
+                }
+                guard storyKeepTokens[key] == token else { return }
+                storyKeepTokens[key] = nil
+                storyKeeping[key] = nil
+                if self.date == deckDate { setStatus("kept", date, for: card) }
+            } catch {
+                guard storyKeepTokens[key] == token else { return }
+                storyKeepTokens[key] = nil
+                storyKeeping[key] = .failed(date, StoryKeepPhase.reason(for: error))
+            }
+        }
+    }
+
+    /// Takes the kept telling off the Mac and clears the pick (the video stays on the phone until its days end).
+    /// While it runs the card shows Removing and offers nothing else, so a newer pick can't be erased by it.
+    @discardableResult
+    func unkeepTelling(for card: DeckCard) -> Task<Void, Never>? {
+        guard let kept = answers[card.id]?.statuses?["kept"] else { return nil }
+        let key = "\(date)/\(card.id)", deckDate = date
+        let token = UUID()
+        storyKeepTokens[key] = token
+        storyKeeping[key] = .removing(kept)
+        return Task {
+            do {
+                try await client.unkeepStory(date: kept)
+                guard storyKeepTokens[key] == token else { return }
+                storyKeepTokens[key] = nil
+                storyKeeping[key] = nil
+                if self.date == deckDate, answers[card.id]?.statuses?["kept"] == kept { setStatus("kept", nil, for: card) }
+            } catch {
+                guard storyKeepTokens[key] == token else { return }
+                storyKeepTokens[key] = nil
+                storyKeeping[key] = .removeFailed(kept, StoryKeepPhase.reason(for: error))
+            }
+        }
+    }
+
+    /// The Sunday pick's upload or removal on this deck's `card`, if one is running or failed.
+    func storyKeep(for card: DeckCard) -> StoryKeepPhase? { storyKeeping["\(date)/\(card.id)"] }
+
+    /// Clears a failed keep or removal once he moves on (picks another row).
+    func clearStoryKeepFailure(for card: DeckCard) {
+        let key = "\(date)/\(card.id)"
+        switch storyKeeping[key] {
+        case .failed, .removeFailed: storyKeeping[key] = nil
+        default: break
+        }
+    }
+
     /// The listen state of today's telling on `card`.
     func storyListen(for card: DeckCard) -> StoryListenPhase? { storyListening["\(date)/\(card.id)"] }
 
@@ -1589,6 +1674,14 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
 
     func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
         try await apiClient.listenToStory(audio: audio, date: date, technique: technique, question: question)
+    }
+
+    func keepStory(date: String, video: Data) async throws {
+        try await apiClient.keepStory(date: date, video: video)
+    }
+
+    func unkeepStory(date: String) async throws {
+        try await apiClient.unkeepStory(date: date)
     }
 
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {

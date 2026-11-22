@@ -160,6 +160,17 @@ extension APIClient {
         return try decode(StoryListen.self, from: data)
     }
 
+    /// Keeps a telling on the Mac (a raw `video/quicktime` body, up to 100 MB); the server replaces any earlier copy.
+    func keepStory(date: String, video: Data) async throws {
+        _ = try await sendData(endpoint: .storiesKeep(date: date), method: "POST", encodedBody: video,
+                               timeout: 300, contentType: "video/quicktime")
+    }
+
+    /// Takes a kept telling off the Mac; one that isn't there is not an error.
+    func unkeepStory(date: String) async throws {
+        _ = try await sendData(endpoint: .storiesKeep(date: date), method: "DELETE")
+    }
+
     /// Removes the week's photo; a week with none is not an error.
     func deleteWeekPhoto(weekEnding: String) async throws {
         _ = try await sendData(endpoint: .briefPhoto(weekEnding: weekEnding), method: "DELETE")
