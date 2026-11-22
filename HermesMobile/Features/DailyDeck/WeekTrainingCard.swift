@@ -55,9 +55,10 @@ final class WeekTrainingModel {
     }
 }
 
-/// The Sunday review's training card: Baki's read of the week's lifting as a headline and a few
-/// bullets, then each proposal as a compact `CoachProposalCard` (Use, Not now). Its kind label stands in for the
-/// corner mark, as on the deck's other act cards.
+/// The Sunday review's training card: Baki's headline, the week's lifting in numbers (pounds lifted, time, the
+/// lifts that went up; e28ba62e11a9), his one line, then each proposal as a compact `CoachProposalCard` (Use,
+/// Not now). The days trained and active minutes stay on the Body value card, drawn once. A card from before
+/// the numbers keeps its bullets. Its kind label stands in for the corner mark, as on the deck's other act cards.
 struct WeekTrainingCard: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -73,7 +74,16 @@ struct WeekTrainingCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
                 .accessibilityAddTraits(.isHeader)
-            if !card.bullets.isEmpty {
+            if let stats = card.trainingStats {
+                numbers(stats).padding(.top, 16)
+                ForEach(Array(card.bullets.enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: line)
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 16)
+                }
+            } else if !card.bullets.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(card.bullets.enumerated()), id: \.offset) { _, bullet in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -105,6 +115,24 @@ struct WeekTrainingCard: View {
             DeckFootnote(card: card, palette: palette)
         }
         .task(id: card.id) { await model.reconcile() }
+    }
+
+    /// The tiles, then the lifts that went up as tiles under "Went up".
+    private func numbers(_ stats: DeckTrainingStats) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if !stats.tiles.isEmpty {
+                MonthNumberTiles(tiles: stats.tiles, palette: palette)
+            }
+            if !stats.improved.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(verbatim: "Went up")
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(palette.secondaryInk)
+                        .accessibilityAddTraits(.isHeader)
+                    MonthNumberTiles(tiles: stats.improved.map(\.tile), palette: palette)
+                }
+            }
+        }
     }
 
     /// Baki's proposal as Body home and the finish screen draw it, in this card's paper.

@@ -1541,7 +1541,16 @@ private struct FollowUpRow: View {
             if let body = card.decisionBody {
                 Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(palette.secondaryInk)
             }
-            if !card.entries.isEmpty {
+            if card.isViewTake, !card.entries.isEmpty {
+                // His answers fold under their days, as the brief's parts do (e729daa81d88).
+                DeckPartsList(parts: card.entries.map { entry in
+                                  // His words in the saved-words serif under their day.
+                                  (label: (entry.label ?? "").isEmpty ? "Your answer" : entry.label,
+                                   text: "", quote: entry.text)
+                              },
+                              palette: palette, folded: true, title: "Your answers")
+                    .padding(.vertical, 6)
+            } else if !card.entries.isEmpty {
                 RecapList(entries: card.entries, palette: palette).padding(.vertical, 6)
             }
             if let context = card.context {

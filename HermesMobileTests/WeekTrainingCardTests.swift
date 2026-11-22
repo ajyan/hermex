@@ -75,6 +75,39 @@ final class WeekTrainingCardTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(card).name, "Training")
     }
 
+    /// The week in numbers decodes with the card; a part that fails is left off alone (e28ba62e11a9).
+    func testTrainingStatsDecode() throws {
+        let json = """
+        {"version": 1, "date": "2026-11-22", "kind": "weekly", "cards": [
+          {"id": "training", "type": "training", "headline": "Solid pull with tight back",
+           "bullets": ["Pull leads Monday."], "proposals": [],
+           "stats": {"tiles": [{"label": "Lifted", "value": "16,534 lb", "note": "+76% on last week"},
+                               {"label": "Time"}],
+                     "improved": [{"name": "Goblet squat", "value": "45 lb", "note": "from 36 lb"}, {"name": "Row"}]}}
+        ]}
+        """
+        let card = try XCTUnwrap(DailyDeck.decode(json).cards.first)
+        let stats = try XCTUnwrap(card.trainingStats)
+        XCTAssertEqual(stats.tiles.map(\.value), ["16,534 lb"], "a tile without a value is dropped alone")
+        XCTAssertEqual(stats.improved.map(\.tile.label), ["Goblet squat"], "a lift without a value is dropped alone")
+        XCTAssertEqual(stats.improved.first?.tile.note, "from 36 lb")
+        XCTAssertEqual(card.bullets, ["Pull leads Monday."])
+        XCTAssertNil(try DailyDeck.decode(Self.deckJSON).cards[0].trainingStats, "an older card has no numbers")
+    }
+
+    /// The thread card's answers fold under the questions they answered, his words opening as the quote.
+    func testThreadAnswersFoldUnderTheirQuestions() throws {
+        let json = """
+        {"day": "Nov 17", "text": "Draw a line.", "asked": "Where does your influence end?"}
+        """
+        let asked = try JSONDecoder().decode(DeckMonth.Snippet.self, from: Data(json.utf8))
+        let bare = try JSONDecoder().decode(DeckMonth.Snippet.self, from: Data(#"{"day": "Nov 21", "text": "Listen."}"#.utf8))
+        let rows = MonthQuestionCard.folded([asked, bare])
+        XCTAssertEqual(rows.map(\.label), ["Where does your influence end?", "Nov 21"])
+        XCTAssertEqual(rows.map(\.text), ["", ""])
+        XCTAssertEqual(rows.map(\.quote), ["Draw a line.", "Listen."])
+    }
+
     /// Body home, the finish screen and this card all draw `CoachProposalCard`, so they share one
     /// vocabulary: Use (primary), Not now, and Ask only where a chat can open.
     func testEveryProposalSaysUseNotNowAndAsk() throws {
