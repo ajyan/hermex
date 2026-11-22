@@ -476,7 +476,7 @@ struct MonthSleepCard: View {
                 score(sleep).padding(.top, 14)
                 nights(sleep, firstWeekday: month?.firstWeekday ?? 0, count: month?.daysInMonth ?? 31).padding(.top, 18)
                 hrv(sleep, count: month?.daysInMonth ?? 31).padding(.top, 20)
-                tiles(sleep.tiles).padding(.top, 20)
+                MonthNumberTiles(tiles: sleep.tiles, palette: palette).padding(.top, 20)
                 if let coach = sleep.coach {
                     MonthAdvisors(title: "Your sleep coach", notes: [coach], palette: palette).padding(.top, 22)
                 }
@@ -612,8 +612,15 @@ struct MonthSleepCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: "HRV: \(sleep.hrv.filter { $0.tier == "balanced" }.count) balanced nights"))
     }
+}
 
-    private func tiles(_ tiles: [DeckMonth.Sleep.NumberTile]) -> some View {
+/// Numbers as tiles, two to a row: a label in the card's ink, the value, and a note under it. The sleep
+/// card's numbers and the training card's week and lifts that went up.
+struct MonthNumberTiles: View {
+    let tiles: [DeckMonth.Sleep.NumberTile]
+    let palette: DeckPalette
+
+    var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10, alignment: .topLeading),
                             GridItem(.flexible(), spacing: 10, alignment: .topLeading)], alignment: .leading, spacing: 10) {
             ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in
@@ -704,8 +711,13 @@ struct MonthQuestionCard: View {
                 MonthAdvisors(notes: advisors, palette: palette).padding(.bottom, 22)
             }
             if let snippets = month?.snippets, !snippets.isEmpty {
-                MonthSnippets(snippets: snippets, palette: palette, revealed: revealed, delay: 0.9)
-                    .padding(.bottom, 18)
+                if card.id == Self.threadID {
+                    DeckPartsList(parts: Self.folded(snippets), palette: palette, folded: true, title: "In your words")
+                        .padding(.bottom, 22)
+                } else {
+                    MonthSnippets(snippets: snippets, palette: palette, revealed: revealed, delay: 0.9)
+                        .padding(.bottom, 18)
+                }
             }
             if let library = month?.library, !library.isEmpty {
                 MonthLibrary(quotes: library, palette: palette).padding(.bottom, 22)
@@ -716,6 +728,17 @@ struct MonthQuestionCard: View {
         .sheet(isPresented: $isEditing) {
             WeekEditorSheet(title: card.title ?? "Reflect", subtitle: card.question, placeholder: "In your words", serif: true,
                             palette: palette, initial: answer) { viewModel.setText($0, for: card) }
+        }
+    }
+
+    /// The weekly review's "The thread this week" card: its answers fold under their questions (db80acc02dd6).
+    static let threadID = "through"
+
+    /// Each answer as a folded row: the question it answered (or its day) opens to his words.
+    static func folded(_ snippets: [DeckMonth.Snippet]) -> [(label: String?, text: String, quote: String?)] {
+        snippets.map { snippet in
+            let asked = snippet.asked.flatMap { WeekLastIntentionCard.nonBlank($0) }
+            return (label: asked ?? snippet.day ?? "Your answer", text: "", quote: snippet.text)
         }
     }
 

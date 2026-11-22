@@ -337,6 +337,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let headline: String?
         let bullets: [String]
         let proposals: [BodyProposal]
+        /// A training card's numbers (`gym.week_stats`): its tiles and the lifts that went up.
+        let trainingStats: DeckTrainingStats?
         /// A money card's week, its Monday ("2026-10-12"): the `week_details` entry it shows.
         let weekStart: String?
         /// The cover's week number, date range ("Oct 19–25"), and the note a year-ago self left.
@@ -435,7 +437,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
             case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
             case progress, questionPinyin, questionRuby, questionEn, hook, speaker, scene, rows, week
-            case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals, weekStart
+            case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals, weekStart, stats
             case piece, learned, variant, date, options, returns, techniques, tellings, front, fronts, frontReason, weekRows, yesterdayOne
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
@@ -513,6 +515,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             bullets = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .bullets)) ?? []).compactMap(\.value)
             proposals = ((try? c.decodeIfPresent([Lossy<BodyProposal>].self, forKey: .proposals)) ?? []).compactMap(\.value)
                 .filter { !$0.id.isEmpty }
+            trainingStats = try? c.decodeIfPresent(DeckTrainingStats.self, forKey: .stats)
             weekStart = try? c.decodeIfPresent(String.self, forKey: .weekStart)
             weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
             range = try? c.decodeIfPresent(String.self, forKey: .range)
@@ -683,6 +686,30 @@ struct DeckNight: Decodable, Equatable {
 }
 
 /// One item in a recap card. An entry that fails to decode is dropped, never the card.
+/// The Sunday training card's week in numbers (vault `gym_coach._stats_json`): pounds lifted and time as tiles,
+/// and each lift that went up as a tile ("100 lb", "from 90 lb"). Every part decodes tolerantly, so a missing
+/// one is just left off the card.
+struct DeckTrainingStats: Decodable, Equatable {
+    let tiles: [DeckMonth.Sleep.NumberTile]
+    let improved: [Lift]
+
+    struct Lift: Decodable, Equatable {
+        let name: String
+        let value: String
+        let note: String?
+
+        var tile: DeckMonth.Sleep.NumberTile { .init(label: name, value: value, note: note) }
+    }
+
+    private enum CodingKeys: String, CodingKey { case tiles, improved }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tiles = ((try? c.decodeIfPresent([Lossy<DeckMonth.Sleep.NumberTile>].self, forKey: .tiles)) ?? []).compactMap(\.value)
+        improved = ((try? c.decodeIfPresent([Lossy<Lift>].self, forKey: .improved)) ?? []).compactMap(\.value)
+    }
+}
+
 struct DeckEntry: Decodable, Equatable, Hashable {
     let label: String?
     let text: String

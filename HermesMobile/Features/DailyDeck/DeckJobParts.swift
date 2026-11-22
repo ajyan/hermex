@@ -266,16 +266,19 @@ struct DeckAnswerBoxLabel: View {
 /// "The parts": a bullet per part, its label bold before its text, and the source's line it stands on under it.
 /// A Piece card's steps. An idea card folds them (`folded`): a row per label, and a tap opens that part's text
 /// and line under it, one part at a time, so the card reads short until he asks for more (6012848c55f4).
+/// The weekly review folds his answers the same way (db80acc02dd6): the thread card's questions open to his
+/// words (an empty `text`, the answer as `quote`), and the week question's answers open under their days.
 struct DeckPartsList: View {
     let parts: [(label: String?, text: String, quote: String?)]
     let palette: DeckPalette
     var folded = false
+    var title = "The parts"
     @State private var openIndex: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(verbatim: "The parts")
+            Text(verbatim: title)
                 .font(AppFont.footnote(weight: .semibold))
                 .foregroundStyle(palette.secondaryInk)
                 .accessibilityAddTraits(.isHeader)
@@ -284,10 +287,10 @@ struct DeckPartsList: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
                         foldedRow(index: index, part: part)
-                            .overlay(alignment: .top) { Rectangle().fill(palette.colors.edge).frame(height: 0.5) }
+                            .overlay(alignment: .top) { Rectangle().fill(palette.edge).frame(height: 0.5) }
                     }
                 }
-                .overlay(alignment: .bottom) { Rectangle().fill(palette.colors.edge).frame(height: 0.5) }
+                .overlay(alignment: .bottom) { Rectangle().fill(palette.edge).frame(height: 0.5) }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
@@ -350,7 +353,7 @@ struct DeckPartsList: View {
                 .accessibilityHint(Text(verbatim: isOpen ? "Hides this part" : "Shows this part"))
                 if isOpen {
                     VStack(alignment: .leading, spacing: 10) {
-                        if label != nil {
+                        if label != nil, !part.text.isEmpty {
                             Text(verbatim: part.text)
                                 .font(AppFont.subheadline())
                                 .foregroundStyle(Color.hxTextPrimary)
@@ -362,9 +365,11 @@ struct DeckPartsList: View {
                         }
                     }
                     .padding(.bottom, 14)
-                    .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
+                    // Fades in place: a move from the top slid the text over the rows above it (14ab0bc56bb5).
+                    .transition(.opacity)
                 }
             }
+            .clipped()
         }
     }
 }
