@@ -1754,6 +1754,65 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertNil(model.storyListen(for: card))
     }
 
+    static let storyPickJSON = #"""
+    {"date": "2026-10-04", "kind": "morning", "cards": [{"id": "story-pick", "type": "prompt", "kind": "story_pick",
+      "files_to": "story_pick", "title": "Keep your best telling", "reason": "Your stories this week", "chapter": "Reflect",
+      "tellings": [{"date": "2026-09-29", "age": 12, "technique": "Pause before the key line", "words": 3, "voice": 2},
+                   {"date": "2026-10-02", "age": 15, "technique": "Start at the peak", "energy": 4}, {"age": 3}]}]}
+    """#
+
+    func testTheSundayPickWearsTheStoryPaperAndReadsItsTellings() throws {
+        let card = try DailyDeck.decode(Self.storyPickJSON).cards[0]
+        XCTAssertTrue(card.isStoryPick && !card.isStory)
+        XCTAssertEqual(DeckPalette.of(card).colors, HermexPaper.notes, "the pick is the story card's, not the review's dusk")
+        XCTAssertEqual(card.tellings.map(\.date), ["2026-09-29", "2026-10-02"], "a telling without a date is dropped")
+        XCTAssertEqual(card.tellings[0].ratings, [3, 2, nil, nil])
+        XCTAssertEqual(DeckCopy.invitation(for: card), "What did you like about it?")
+    }
+
+    @MainActor
+    func testKeepingATellingUploadsItThenRecordsThePickAndAnotherReplacesIt() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.storyPickJSON)
+        let model = makeViewModel(client)
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.isStoryPick })
+        let videos = StoryVideoStore(server: server)
+        for date in ["2026-09-29", "2026-10-02"] {
+            let file = FileManager.default.temporaryDirectory.appending(path: "pick-\(UUID().uuidString).mov")
+            try Data("ftyp".utf8).write(to: file)
+            _ = try videos.save(file, for: date, today: morning)
+        }
+        defer { for date in ["2026-09-29", "2026-10-02"] { try? FileManager.default.removeItem(at: videos.url(for: date)) } }
+
+        await model.keepTelling("2026-09-29", for: card).value
+        XCTAssertEqual(client.keptDates, ["2026-09-29"])
+        XCTAssertEqual(model.answer(for: card)?.statuses?["kept"], "2026-09-29")
+        XCTAssertFalse(videos.isKeeping("2026-09-29"), "uploaded, so the phone no longer holds it past its days")
+
+        await model.keepTelling("2026-10-02", for: card).value
+        XCTAssertEqual(client.keptDates, ["2026-09-29", "2026-10-02"])
+        XCTAssertEqual(client.unkeptDates, ["2026-09-29"], "the earlier pick comes off the Mac only after the new one is there")
+        XCTAssertEqual(model.answer(for: card)?.statuses?["kept"], "2026-10-02")
+
+        client.keepError = APIError.network(underlying: URLError(.notConnectedToInternet))
+        await model.keepTelling("2026-09-29", for: card).value
+        XCTAssertEqual(model.storyKeep(for: card), .failed("2026-09-29", "Couldn't reach your Mac. Try again when you're connected."))
+        XCTAssertEqual(model.answer(for: card)?.statuses?["kept"], "2026-10-02", "a failed upload never changes the pick")
+        XCTAssertTrue(videos.isKeeping("2026-09-29"), "held on the phone until it reaches the Mac")
+        videos.unmarkKeeping("2026-09-29")
+
+        model.clearStoryKeepFailure(for: card)
+        XCTAssertNil(model.storyKeep(for: card), "picking another row clears the failure")
+
+        let removal = try XCTUnwrap(model.unkeepTelling(for: card))
+        XCTAssertEqual(model.storyKeep(for: card), .removing("2026-10-02"))
+        await removal.value
+        XCTAssertEqual(client.unkeptDates, ["2026-09-29", "2026-10-02"])
+        XCTAssertNil(model.answer(for: card)?.statuses?["kept"])
+        XCTAssertNil(model.storyKeep(for: card))
+    }
+
     @MainActor
     func testAMessagesReturnDefaultsToAYearAndFilesOnlyWhenPicked() async throws {
         store.setWorkspace("/vault", for: server)
@@ -2842,6 +2901,10 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     var sendError: Error?
     /// The server filer's answer; nil (the default) is a server without one.
     var filer: Result<BriefFileResponse?, Error> = .success(nil)
+    /// The keep route's answer: nil succeeds; dates kept and taken off, in order.
+    var keepError: Error?
+    private(set) var keptDates: [String] = []
+    private(set) var unkeptDates: [String] = []
     /// The stories route's answer; nil is a server without it.
     var storyListen: Result<StoryListen, Error>?
     private(set) var listenedTechnique: String?
@@ -2936,6 +2999,13 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
         guard let data = rawFiles[path] else { throw APIError.http(statusCode: 404, body: nil) }
         return data
     }
+
+    func keepStory(date: String, video: Data) async throws {
+        if let keepError { throw keepError }
+        keptDates.append(date)
+    }
+
+    func unkeepStory(date: String) async throws { unkeptDates.append(date) }
 
     func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
         listenedTechnique = technique

@@ -160,6 +160,7 @@ struct DeckPalette: Equatable {
         case .section: return .section(front: card.frontName)
         case .front: return .front(card.front)
         case .close: return card.weekRows.isEmpty ? .quote : .tracker
+        case .prompt where card.isStoryPick: return .story
         case .prompt where card.chapter != nil: return .week
         case .prompt:
             if card.isPast { return .lookingBack }

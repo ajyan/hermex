@@ -29,7 +29,7 @@ enum StoryListenPhase: Equatable {
 
     static func reason(for error: Error) -> String {
         if error is StoryAudio.NoSound { return "This take has no sound. Turn the microphone on for Atlas in Settings, then tell it again." }
-        if error is URLError { return "Couldn't reach your Mac. Try again when you're connected." }
+        if StoryKeepPhase.isOffline(error) { return "Couldn't reach your Mac. Try again when you're connected." }
         return "Your Mac couldn't hear it back just now."
     }
 }
@@ -349,7 +349,7 @@ private struct StoryRatingRow: View {
 
 /// The telling on the open card. A new player per file version, so a retake (same path) reloads; audio
 /// plays out loud even with the ring switch silenced, as a video he chose to watch should.
-private struct StoryVideoPlayer: View {
+struct StoryVideoPlayer: View {
     let url: URL
     let version: Date
     /// Set to jump there and play; cleared once done.
@@ -375,7 +375,7 @@ private struct StoryVideoPlayer: View {
 }
 
 /// The telling's first frame on the stacked card, under a play mark; tapping the card opens it to play.
-private struct StoryVideoStill: View {
+struct StoryVideoStill: View {
     let url: URL
     let version: Date
     @State private var frame: UIImage?

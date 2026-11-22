@@ -238,6 +238,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// notes what he noticed; the vault files the ratings and note to stories/ (the video stays on the phone).
     var isStory: Bool { self.type == .prompt && self.itemKind == "story" }
 
+    /// The Sunday review's Keep your best telling card: the week's `tellings` to watch back, one to keep on the
+    /// Mac (uploaded when picked, `statuses["kept"]`) and what he liked about it (`text`).
+    var isStoryPick: Bool { self.type == .prompt && self.itemKind == "story_pick" }
+
     /// The return a Looking ahead message gets when he doesn't pick one (the vault files a missing `returns` as this).
     static let defaultReturn = "1y"
 
@@ -369,6 +373,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let returns: [DeckSleepTag]
         /// A Tell a story card's three speaking techniques to pick one from; empty on every other card.
         let techniques: [DeckStoryTechnique]
+        /// The Sunday review's Keep your best telling card: the week's filed tellings, oldest first.
+        let tellings: [DeckStoryTelling]
         /// A front divider's (and the week divider's) week: a row of day dots per daily commitment, pips for a count.
         let weekRows: [DeckFrontRow]
         /// A front divider's one thing to do today (wire `today`): "Outreach: Anthropic, from Today's Ask".
@@ -430,7 +436,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
             case progress, questionPinyin, questionRuby, questionEn, hook, speaker, scene, rows, week
             case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals, weekStart
-            case piece, learned, variant, date, options, returns, techniques, front, fronts, frontReason, weekRows, yesterdayOne
+            case piece, learned, variant, date, options, returns, techniques, tellings, front, fronts, frontReason, weekRows, yesterdayOne
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
             case act, gist, quotes, parts, weekQuestion, thread, linked, fromIdea, dateLabel, month
@@ -527,6 +533,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             options = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .options)) ?? []).compactMap(\.value)
             returns = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .returns)) ?? []).compactMap(\.value)
             techniques = ((try? c.decodeIfPresent([Lossy<DeckStoryTechnique>].self, forKey: .techniques)) ?? []).compactMap(\.value)
+            tellings = ((try? c.decodeIfPresent([Lossy<DeckStoryTelling>].self, forKey: .tellings)) ?? []).compactMap(\.value)
             month = try? c.decodeIfPresent(DeckMonth.self, forKey: .month)
             front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
             fronts = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .fronts)) ?? []).compactMap(\.value)
