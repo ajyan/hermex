@@ -27,6 +27,14 @@ struct BrainReaderPageLayout {
     }
 }
 
+/// A photo story's photo on its page and on the Memories shelf: the photo, the server it comes from (its image
+/// cache is keyed by it) and how to fetch it.
+struct BrainPagePhoto {
+    let photo: DeckPhoto
+    let server: URL
+    let load: @MainActor (String) async -> Data?
+}
+
 /// The reader's pure layout decisions, kept out of the views so they can be tested.
 enum BrainReaderLayout {
     /// Backlinks shown before "Show all N".
@@ -170,6 +178,8 @@ struct BrainReaderView: View {
     /// leaves the opened page, and the idea no longer applies there.
     private let opened: (module: BrainModuleID, id: String)
     private let focusIdea: Int?
+    /// The server a story page's photo comes from (its image cache is keyed by it).
+    private let server: URL
 
     /// `hub` keeps the page in the hub it was opened from (its trail and pager).
     init(module: BrainModuleID, id: String, hub: String? = nil, server: URL, modelContext: ModelContext,
@@ -183,6 +193,7 @@ struct BrainReaderView: View {
         self.push = push
         self.opened = (module, id)
         self.focusIdea = focusIdea
+        self.server = server
     }
 
     var body: some View {
@@ -389,7 +400,10 @@ struct BrainReaderView: View {
                 focusIdea: viewModel.module == opened.module && viewModel.id == opened.id ? focusIdea : nil,
                 // Facts are edited on the live page only: a saved copy can't be written to.
                 onEditFacts: page.person?.editable != nil && viewModel.hasFetched && !viewModel.isShowingCachedCopy
-                    ? { showsFacts = true } : nil
+                    ? { showsFacts = true } : nil,
+                photo: page.photo.map { photo in
+                    BrainPagePhoto(photo: photo, server: server) { [viewModel] in await viewModel.photoData(id: $0) }
+                }
             )
             .refreshable { await viewModel.load() }
         }
@@ -413,6 +427,8 @@ struct BrainReaderContent: View {
     var focusIdea: Int?
     /// Opens a person page's Edit facts sheet; nil where the facts can't be edited.
     var onEditFacts: (() -> Void)?
+    /// A story page's photo, under its title; nil on every other page.
+    var photo: BrainPagePhoto?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Built once per page load, by the view model: a structured person page's header, chips,
     /// Catch up, About and timeline, its words already parsed.
@@ -440,8 +456,9 @@ struct BrainReaderContent: View {
 
     init(page: BrainPage, person: BrainPersonPage?, layout: BrainReaderPageLayout, isShowingCachedCopy: Bool,
          isMissing: Bool = false, push: @escaping (BrainRoute) -> Void, rating: BrainPageRating? = nil,
-         focusIdea: Int? = nil, onEditFacts: (() -> Void)? = nil) {
+         focusIdea: Int? = nil, onEditFacts: (() -> Void)? = nil, photo: BrainPagePhoto? = nil) {
         self.onEditFacts = onEditFacts
+        self.photo = photo
         self.page = page
         self.isShowingCachedCopy = isShowingCachedCopy
         self.isMissing = isMissing
@@ -491,6 +508,9 @@ struct BrainReaderContent: View {
                         BrainPersonCardView(item: page.item, facts: page.facts)
                     } else {
                         titleBlock
+                    }
+                    if let photo {
+                        DeckPhotoView(photo: photo.photo, server: photo.server, paper: page.item.module.paper, load: photo.load)
                     }
                     if !BrainReaderLayout.displayTags(page.item.tags).isEmpty {
                         tagRow

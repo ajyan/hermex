@@ -226,6 +226,8 @@ extension BrainModuleID {
         case .journal, .articles, .highlights: .knowledge
         // Letters to his daughter wear the Daily Deck's Dad card paper.
         case .letters: .advisor
+        // Photo stories live in the Brain, like the shelf's Memories.
+        case .memories: .knowledge
         }
     }
 
@@ -238,6 +240,7 @@ extension BrainModuleID {
         case .articles: "Article"
         case .highlights: "Highlight"
         case .letters: "Letter"
+        case .memories: "Memory"
         }
     }
 
@@ -250,6 +253,7 @@ extension BrainModuleID {
         case .journal: "book.closed"
         case .highlights: "quote.opening"
         case .letters: "heart"
+        case .memories: "photo"
         }
     }
 }
@@ -554,7 +558,7 @@ struct BrainListPlaceholder: View {
         switch module {
         case .articles, .highlights: cards
         case .journal: month
-        case .people, .wiki, .letters: rows
+        case .people, .wiki, .letters, .memories: rows
         }
     }
 

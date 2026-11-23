@@ -228,7 +228,8 @@ private struct BrainAboutSection: View {
 /// "Timeline" over a person's encounters and the journal days that name them, newest first, as rows
 /// on one neutral card: the kind's tile (a note, a text, a journal day), the headline on up to two
 /// lines, and when. Three show, then "Show all N". Tapping a row opens its card full screen (the
-/// review's open card), where a journal day's "Open the journal day" sits at the foot.
+/// review's open card), where a journal day's "Open the journal day" sits at the foot. A photo story that
+/// names them joins by when the photo was taken, its words in serif, and opens the story.
 struct BrainPersonTimeline: View {
     let entries: [BrainPersonLayout.Entry]
     let open: (BrainRoute) -> Void
@@ -303,23 +304,18 @@ private struct BrainTimelineRow: View {
         .accessibilityValue(Text(verbatim: text.accessibilityValue))
         .accessibilityAddTraits(.isButton)
         .accessibilityHint(Text(verbatim: "Opens the whole entry"))
-        .opensAsFullCard(.glow(paper), action: journalID.map { id in
-            HXCardAction(title: "Open the journal day") { open(.page(.journal, id)) }
+        .opensAsFullCard(.glow(paper), action: BrainTimelineCard.target(entry).map { target in
+            HXCardAction(title: target.title) { open(target.route) }
         }) {
             BrainTimelineCard(entry: entry, text: text, open: open, isOpen: true)
         }
     }
 
+    /// His saved words (a journal day, a story) read in the serif.
     private var isJournal: Bool {
-        if case .journal = entry.kind { return true }
-        return false
-    }
-
-    /// The journal day the open card's foot button opens: the folded one, or the row's own.
-    private var journalID: String? {
         switch entry.kind {
-        case .encounter: entry.journal?.id
-        case .journal(let mention): mention.id
+        case .encounter: false
+        case .journal, .memory: true
         }
     }
 }
@@ -350,6 +346,8 @@ private struct BrainTimelineCardText {
             lead = BrainArticleDigestView.inlineMarkdown(entry.headline)
         case .journal(let mention):
             lead = BrainConnectionsLayout.highlighted(entry.headline, mention: mention.mention, paper: person)
+        case .memory:
+            lead = AttributedString(entry.headline)
         }
         bullets = entry.bullets.map(BrainArticleDigestView.inlineMarkdown)
         prose = entry.extra.split(whereSeparator: \.isNewline).compactMap { raw in
@@ -389,21 +387,24 @@ private struct BrainTimelineCard: View {
         switch entry.kind {
         case .encounter: BrainModuleID.people.paper
         case .journal: BrainModuleID.journal.paper
+        case .memory: BrainModuleID.memories.paper
         }
     }
 
-    /// The journal day the footer opens: the folded one, or the card's own.
-    private var journalID: String? {
+    /// What the footer opens: the journal day (the folded one, or the card's own), or the story.
+    static func target(_ entry: BrainPersonLayout.Entry) -> (title: String, route: BrainRoute)? {
         switch entry.kind {
-        case .encounter: entry.journal?.id
-        case .journal(let mention): mention.id
+        case .encounter: entry.journal.map { ("Open the journal day", .page(.journal, $0.id)) }
+        case .journal(let mention): ("Open the journal day", .page(.journal, mention.id))
+        case .memory(let mention): ("Open the story", .page(.memories, mention.id))
         }
     }
 
     var body: some View {
         let paper = Self.paper(entry)
-        BrainDeckCard(paper: paper, footer: "Open the journal day",
-                      open: journalID.map { id in { open(.page(.journal, id)) } },
+        let target = Self.target(entry)
+        BrainDeckCard(paper: paper, footer: target?.title ?? "Open the journal day",
+                      open: target.map { target in { open(target.route) } },
                       accessibilityLabel: text.accessibilityLabel, accessibilityValue: text.accessibilityValue,
                       footnote: text.footnote, contentOpacity: contentOpacity, isOpen: isOpen) {
             Text(verbatim: entry.kicker)
@@ -441,7 +442,7 @@ private struct BrainTimelineCard: View {
         let style = DeckCardText.leadStyle(length: entry.headline.count, isQuote: false)
         switch entry.kind {
         case .encounter: return AppFont.display(style: style, weight: .semibold)
-        case .journal: return AppFont.serif(style: style)
+        case .journal, .memory: return AppFont.serif(style: style)
         }
     }
 }

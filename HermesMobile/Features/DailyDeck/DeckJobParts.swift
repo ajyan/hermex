@@ -408,7 +408,8 @@ struct DeckQuoteRow: View {
 struct DeckPhotoView: View {
     let photo: DeckPhoto
     let server: URL
-    let palette: DeckPalette
+    /// The frame's glow and the placeholder's mark: the card's paper (a Looking back card, a story page).
+    let paper: HermexPaper
     let load: @MainActor (String) async -> Data?
 
     var body: some View {
@@ -416,13 +417,14 @@ struct DeckPhotoView: View {
             RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
                 .fill(Color.clear)
                 .aspectRatio(4 / 3, contentMode: .fit)
-                .glowSurface(palette.colors, cornerRadius: HXRadius.lg)
+                .glowSurface(paper, cornerRadius: HXRadius.lg)
                 .overlay {
-                    WeekPhotoImage(server: server, sessionID: nil, path: "photos/\(photo.id)",
+                    // Decoded down to the frame off the main thread: the Memories shelf scrolls a list of these.
+                    WeekPhotoImage(server: server, sessionID: nil, path: "photos/\(photo.id)", thumbnailPixels: 1200,
                                    load: { _ in await load(photo.id) }) {
                         Image(systemName: "photo")
                             .font(AppFont.title())
-                            .foregroundStyle(palette.ink)
+                            .foregroundStyle(paper.glow)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
@@ -430,7 +432,7 @@ struct DeckPhotoView: View {
             if !caption.isEmpty {
                 Text(verbatim: caption)
                     .font(AppFont.footnote())
-                    .foregroundStyle(palette.secondaryInk)
+                    .foregroundStyle(.hxSecondary)
             }
         }
         .accessibilityElement(children: .ignore)

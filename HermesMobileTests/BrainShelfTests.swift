@@ -406,3 +406,23 @@ final class BrainShelfTests: XCTestCase {
         XCTAssertEqual(client.shelfCalls.count, 6)
     }
 }
+
+extension BrainShelfTests {
+    func testAMemoryAboutAPhotoShowsItAndOpensItsStory() throws {
+        let json = """
+        {"kind": "memories", "entries": [
+          {"id": "past/2026-11-20.md", "date": "2026-11-20", "prompt": "What was going on?", "text": "The ridge.",
+           "photo": {"id": "aaaaaaaaaaaa", "when": "June 2021", "people": []},
+           "source": {"module": "memories", "id": "memories/2021-06-12-aaaaaaaaaaaa.md", "title": "June 2021"}},
+          {"id": "past/2026-11-21.md", "date": "2026-11-21", "text": "The lake.", "photo": {"id": "nope"}}]}
+        """
+        let shelf = try JSONDecoder().decode(BrainShelf.self, from: Data(json.utf8))
+        let told = BrainShelfLayout.card(shelf.entries[0], kind: .memories, index: 0)
+        XCTAssertEqual(told.photo?.id, "aaaaaaaaaaaa")
+        XCTAssertEqual(told.source, .page(.memories, "memories/2021-06-12-aaaaaaaaaaaa.md"))
+        XCTAssertEqual(told.sourceLabel, "Open the story")
+        XCTAssertNil(BrainShelfLayout.card(shelf.entries[1], kind: .memories, index: 1).photo, "a malformed id shows no photo")
+        XCTAssertNil(BrainShelfLayout.card(shelf.entries[0], kind: .takes, index: 0).photo, "only Memories shows photos")
+        XCTAssertEqual(try JSONDecoder().decode(BrainShelf.self, from: JSONEncoder().encode(shelf)), shelf)
+    }
+}

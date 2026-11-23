@@ -4,8 +4,9 @@ import Foundation
 /// Built once per page (not in a view body), so all date math and string building lives here.
 struct BrainPersonLayout: Equatable {
     struct Entry: Identifiable, Equatable {
-        enum Kind: Equatable { case encounter(BrainEncounter), journal(BrainJournalMention) }
-        /// The encounter id, or `"journal:" + journal id`.
+        /// `memory` is a photo story that names them (`snippet` his words about them, `date` when it was taken).
+        enum Kind: Equatable { case encounter(BrainEncounter), journal(BrainJournalMention), memory(BrainJournalMention) }
+        /// The encounter id, `"journal:" + journal id`, or `"memory:" + story id`.
         let id: String
         let kind: Kind
         /// "Note · Oct 8 · 6 days ago", "Texted · Oct 28 · 3 days ago" or "Journal · Sep 25 · 3 weeks
@@ -66,8 +67,8 @@ struct BrainPersonLayout: Equatable {
     /// The last twelve months, oldest first, ending with the server's `rhythm_end` (else today's
     /// month); empty unless the server sent exactly twelve counts.
     let rhythm: [RhythmMonth]
-    /// Encounters and journal days, newest first; on one date, encounters before journal. A
-    /// journal day with an encounter on its date folds into the first such encounter. Ids are unique.
+    /// Encounters, journal days and photo stories, newest first; on one date, encounters, then journal,
+    /// then stories. A journal day with an encounter on its date folds into the first such encounter. Ids are unique.
     let timeline: [Entry]
     /// Journal ids already shown in the timeline, to drop from "Mentioned in" and "Unlinked".
     let hiddenMentionIDs: Set<String>
@@ -79,7 +80,8 @@ struct BrainPersonLayout: Equatable {
         catchUp = Self.catchUp(person: person, days: days)
         rhythm = Self.rhythm(person.rhythm, endingIn: person.rhythmEnd, today: today, calendar: calendar)
         let journal = person.journal.filter { !$0.id.isEmpty }
-        timeline = Self.timeline(encounters: person.encounters.filter { !$0.id.isEmpty }, journal: journal, days: days)
+        timeline = Self.timeline(encounters: person.encounters.filter { !$0.id.isEmpty }, journal: journal,
+                                 memories: person.memories.filter { !$0.id.isEmpty }, days: days)
         hiddenMentionIDs = Set(journal.map(\.id))
     }
 
@@ -317,7 +319,8 @@ struct BrainPersonLayout: Equatable {
 
     // MARK: Timeline
 
-    private static func timeline(encounters: [BrainEncounter], journal: [BrainJournalMention], days: DayMath) -> [Entry] {
+    private static func timeline(encounters: [BrainEncounter], journal: [BrainJournalMention],
+                                 memories: [BrainJournalMention] = [], days: DayMath) -> [Entry] {
         let encounters = timelineOrder(encounters, date: \.date, id: \.id)
         let journal = timelineOrder(journal, date: \.date, id: \.id)
         var firstEncounterOfDay: [String: String] = [:]
@@ -337,6 +340,8 @@ struct BrainPersonLayout: Equatable {
         let rows: [(sortDate: String, order: Int, entry: Entry)] =
             encounters.enumerated().map { ($1.date.isoDay ?? "", $0, encounterEntry($1, journal: folded[$1.id], days: days)) }
             + separate.enumerated().map { ($1.date.isoDay ?? "", encounters.count + $0, journalEntry($1, days: days)) }
+            + timelineOrder(memories, date: \.date, id: \.id).enumerated()
+                .map { ($1.date.isoDay ?? "", encounters.count + separate.count + $0, memoryEntry($1)) }
         // An encounter id can still collide with a `journal:` id; the first in timeline order wins.
         var seen: Set<String> = []
         return rows
@@ -411,6 +416,16 @@ struct BrainPersonLayout: Equatable {
         return Entry(id: "journal:" + mention.id, kind: .journal(mention),
                      kicker: ["Journal", day].filter { !$0.isEmpty }.joined(separator: " · "),
                      when: day, symbol: "book.closed.fill",
+                     headline: stripMarker(mention.snippet), bullets: [], extra: "", journal: nil)
+    }
+
+    /// A photo story: "Memory · Jun 12, 2021", his words about them as the headline.
+    private static func memoryEntry(_ mention: BrainJournalMention) -> Entry {
+        let raw = mention.date.trimmingCharacters(in: .whitespacesAndNewlines)
+        let day = monthDay(raw).map { day in raw.isoDayParts.map { "\(day), \($0.year)" } ?? day } ?? raw
+        return Entry(id: "memory:" + mention.id, kind: .memory(mention),
+                     kicker: [BrainModuleID.memories.kindName, day].filter { !$0.isEmpty }.joined(separator: " · "),
+                     when: day, symbol: "photo.fill",
                      headline: stripMarker(mention.snippet), bullets: [], extra: "", journal: nil)
     }
 

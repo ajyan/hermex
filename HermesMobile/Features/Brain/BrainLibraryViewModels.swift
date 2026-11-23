@@ -517,6 +517,11 @@ final class BrainPageViewModel {
         self.onAPIError = onAPIError
     }
 
+    /// A story page's photo; nil when it can't load (the frame keeps its placeholder).
+    func photoData(id: String) async -> Data? {
+        try? await client.photoData(id: id)
+    }
+
     /// The same client and cache for another page in the hub (the pager's next or previous).
     func sibling(module: BrainModuleID, id: String, hub: String) -> BrainPageViewModel {
         BrainPageViewModel(module: module, id: id, hub: hub, client: client, cache: cache, onAPIError: onAPIError)
