@@ -162,7 +162,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let folders: [(String, BrainModuleID)] = [
             ("wiki/", .wiki), ("journal/", .journal), ("email_ingest/summaries/", .articles),
             ("crm/contacts/", .people), ("youtube_highlights/summaries/", .highlights),
-            ("daughter/letters/", .letters),
+            ("daughter/letters/", .letters), ("memories/", .memories),
         ]
         let path = link.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
         guard let module = folders.first(where: { path.hasPrefix($0.0) })?.1 else { return nil }
@@ -179,6 +179,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case .people: return "Open their page"
         case .highlights: return "Open the video"
         case .letters: return "Open the letter"
+        case .memories: return "Open the story"
         }
     }
 
@@ -611,7 +612,7 @@ struct DeckPart: Decodable, Equatable, Hashable {
 /// Yesterday's words a check-in or letter picks up from: a small label, the quote, and who said it where.
 /// A photo on a Looking back card: its id in the Mac's Takeout index (served by `GET /api/photos/<id>`), when
 /// it was taken ("June 2021"), and the people Google Photos named in it.
-struct DeckPhoto: Decodable, Equatable {
+struct DeckPhoto: Codable, Hashable, Sendable {
     let id: String
     let when: String?
     let people: [String]

@@ -462,3 +462,28 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(BrainHomeLayout.askDraft("  caching tips \n"), "caching tips")
     }
 }
+
+extension BrainModelsTests {
+    func testAStoryPageCarriesItsPhotoAndAPersonTheirStories() throws {
+        let json = """
+        {"item": {"module": "memories", "id": "memories/2021-06-12-aaaaaaaaaaaa.md", "title": "June 2021", "kind": "memory"},
+         "photo": {"id": "aaaaaaaaaaaa", "when": "June 2021", "people": ["Mira Okafor"]},
+         "person": {"memories": [{"id": "memories/2021-06-12-aaaaaaaaaaaa.md", "date": "2021-06-12",
+                                  "title": "June 2021", "snippet": "Mira laughed."}, {"date": "bad"}]}}
+        """
+        let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.item.module, .memories)
+        XCTAssertEqual(page.photo, DeckPhoto(id: "aaaaaaaaaaaa", when: "June 2021", people: ["Mira Okafor"]))
+        XCTAssertEqual(page.person?.memories.first?.snippet, "Mira laughed.")
+        let cached = try JSONDecoder().decode(BrainPage.self, from: JSONEncoder().encode(page))
+        XCTAssertEqual(cached.photo, page.photo, "the saved copy keeps the photo")
+        let odd = #"{"item": {"module": "memories", "id": "x", "title": "x"}, "photo": {"id": "../../etc"}}"#
+        XCTAssertNil(try JSONDecoder().decode(BrainPage.self, from: Data(odd.utf8)).photo, "a malformed id is never a photo")
+    }
+
+    func testAStoryLinkOpensItsPage() {
+        let route = DeckCard.brainRoute(forLink: "memories/2021-06-12-aaaaaaaaaaaa")
+        XCTAssertEqual(route, .page(.memories, "memories/2021-06-12-aaaaaaaaaaaa.md"))
+        XCTAssertEqual(route.map(DeckCard.openTitle(for:)), "Open the story")
+    }
+}

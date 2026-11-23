@@ -134,11 +134,13 @@ struct BrainShelfEntry: Codable, Hashable, Sendable {
     /// Takes: the area's name.
     let group: String
     let source: BrainShelfSource?
+    /// Memories: the photo a Looking back answer was about; nil otherwise.
+    let photo: DeckPhoto?
 
-    private enum CodingKeys: String, CodingKey { case id, date, title, context, prompt, text, group, source }
+    private enum CodingKeys: String, CodingKey { case id, date, title, context, prompt, text, group, source, photo }
 
     init(id: String = "", date: String = "", title: String = "", context: String = "", prompt: String = "",
-         text: String = "", group: String = "", source: BrainShelfSource? = nil) {
+         text: String = "", group: String = "", source: BrainShelfSource? = nil, photo: DeckPhoto? = nil) {
         self.id = id
         self.date = date
         self.title = title
@@ -147,6 +149,7 @@ struct BrainShelfEntry: Codable, Hashable, Sendable {
         self.text = text
         self.group = group
         self.source = source
+        self.photo = photo
     }
 
     init(from decoder: Decoder) throws {
@@ -159,6 +162,7 @@ struct BrainShelfEntry: Codable, Hashable, Sendable {
         text = c.shelfString(.text)
         group = c.shelfString(.group)
         source = (try? c.decodeIfPresent(BrainShelfSource.self, forKey: .source)) ?? nil
+        photo = ((try? c.decodeIfPresent(DeckPhoto.self, forKey: .photo)) ?? nil).flatMap { DeckPhoto.isValidID($0.id) ? $0 : nil }
     }
 }
 
@@ -199,6 +203,8 @@ enum BrainShelfLayout {
         let source: BrainRoute?
         let sourceModule: BrainModuleID?
         let sourceLabel: String
+        /// A memory about one of his photos: the photo, over his words.
+        let photo: DeckPhoto?
 
         /// VoiceOver's heading for the card: the kicker and the title.
         var accessibilityHeading: String {
@@ -240,7 +246,8 @@ enum BrainShelfLayout {
             text: entry.text,
             source: route,
             sourceModule: route == nil ? nil : entry.source?.module,
-            sourceLabel: route == nil ? "" : openLabel(entry.source?.module)
+            sourceLabel: route == nil ? "" : openLabel(entry.source?.module),
+            photo: kind == .memories ? entry.photo : nil
         )
     }
 
@@ -257,6 +264,7 @@ enum BrainShelfLayout {
         case .journal: "Open the journal day"
         case .people: "Open the person"
         case .letters: "Open the letter"
+        case .memories: "Open the story"
         case nil: ""
         }
     }
@@ -367,6 +375,11 @@ final class BrainShelfViewModel {
             }
             onAPIError(error)
         }
+    }
+
+    /// A memory's photo; nil when it can't load (the frame keeps its placeholder).
+    func photoData(id: String) async -> Data? {
+        try? await client.photoData(id: id)
     }
 
     private func show(_ shelf: BrainShelf, cached: Bool) {

@@ -10,6 +10,9 @@ import SwiftUI
 /// content skip such elements via `BrainLossy`.
 enum BrainModuleID: String, CaseIterable, Codable, Hashable, Sendable {
     case people, wiki, articles, journal, highlights, letters
+    /// Photo stories (the vault's `memories/`): opened from the Memories shelf, a person's timeline,
+    /// search and the Daily Brief; never listed in Browse.
+    case memories
 }
 
 /// A snake_case field read as written. `APIClient` decodes with `.convertFromSnakeCase`, so
@@ -359,16 +362,20 @@ struct BrainPerson: Codable, Hashable, Sendable {
     let imessage: String?
     /// The facts this page can edit; nil from a server without `POST /api/brain/person/facts`.
     let editable: BrainPersonFacts?
+    /// Photo stories that name them (`date` is when the photo was taken, `snippet` his words about them),
+    /// newest photo first; empty from an older server.
+    let memories: [BrainJournalMention]
 
     private enum CodingKeys: String, CodingKey {
         case encounters, profile, questions, other, journal, lastSeen, nextBirthday, catchup, threads, rhythm, rhythmEnd
-        case imessage, editable
+        case imessage, editable, memories
     }
 
     init(encounters: [BrainEncounter] = [], profile: [BrainProfileSection] = [], questions: [String] = [],
          other: String = "", lastSeen: String? = nil, nextBirthday: String? = nil,
          journal: [BrainJournalMention] = [], catchup: String? = nil, threads: [String] = [], rhythm: [Int] = [],
-         rhythmEnd: String? = nil, imessage: String? = nil, editable: BrainPersonFacts? = nil) {
+         rhythmEnd: String? = nil, imessage: String? = nil, editable: BrainPersonFacts? = nil,
+         memories: [BrainJournalMention] = []) {
         self.encounters = encounters
         self.profile = profile
         self.questions = questions
@@ -382,6 +389,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         self.rhythmEnd = rhythmEnd
         self.imessage = imessage
         self.editable = editable
+        self.memories = memories
     }
 
     init(from decoder: Decoder) throws {
@@ -399,6 +407,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         rhythmEnd = c.optional(String.self, .rhythmEnd)
         imessage = c.optional(String.self, .imessage).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         editable = c.optional(BrainPersonFacts.self, .editable)
+        memories = c.lossy(BrainJournalMention.self, .memories)
     }
 }
 
@@ -424,17 +433,19 @@ struct BrainPage: Codable, Hashable, Sendable {
     let person: BrainPerson?
     /// The page's interactive diagram from the vault (`diagrams/index.json`); nil for most pages and older servers.
     let diagram: BrainDiagram?
+    /// A photo story's photo (`GET /api/photos/<id>`); nil for every other page and older servers.
+    let photo: DeckPhoto?
 
     private enum CodingKeys: String, CodingKey {
         case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub, unlinkedCount, person
-        case diagram, hubPages
+        case diagram, hubPages, photo
     }
 
     init(item: BrainItem, content: String = "", links: [BrainRef] = [], backlinks: [BrainRef] = [],
          further: [BrainRef] = [], prev: BrainRef? = nil, next: BrainRef? = nil,
          highlights: [BrainHighlight] = [], facts: [BrainFact] = [], unlinked: [BrainRef] = [],
          unlinkedCount: Int? = nil, hub: BrainHubContext? = nil, person: BrainPerson? = nil,
-         diagram: BrainDiagram? = nil, hubPages: [BrainRef] = []) {
+         diagram: BrainDiagram? = nil, hubPages: [BrainRef] = [], photo: DeckPhoto? = nil) {
         self.item = item
         self.content = content
         self.links = links
@@ -450,6 +461,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         self.person = person
         self.diagram = diagram
         self.hubPages = hubPages
+        self.photo = photo
     }
 
     init(from decoder: Decoder) throws {
@@ -470,6 +482,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         person = c.optional(BrainPerson.self, .person)
         diagram = c.optional(BrainDiagram.self, .diagram)
         hubPages = c.lossy(BrainRef.self, .hubPages)
+        photo = c.optional(DeckPhoto.self, .photo).flatMap { DeckPhoto.isValidID($0.id) ? $0 : nil }
     }
 }
 
@@ -765,6 +778,7 @@ extension BrainModuleID {
         case .journal: "Journal"
         case .highlights: "Highlights"
         case .letters: "Letters"
+        case .memories: "Memories"
         }
     }
 }

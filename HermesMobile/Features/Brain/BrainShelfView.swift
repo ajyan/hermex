@@ -7,6 +7,8 @@ import SwiftUI
 /// `BrainRoute.shelf(_:)`. Copy is English-only (personal fork).
 struct BrainShelfView: View {
     @State private var viewModel: BrainShelfViewModel
+    /// The server a memory's photo comes from; nil for a fixture page, which shows no photos.
+    private var server: URL?
 
     init(kind: BrainShelfKind, server: URL, modelContext: ModelContext, onAPIError: @escaping (Error) -> Void) {
         _viewModel = State(initialValue: BrainShelfViewModel(
@@ -15,6 +17,7 @@ struct BrainShelfView: View {
             cache: BrainCacheHandle(server: server, context: modelContext),
             onAPIError: onAPIError
         ))
+        self.server = server
     }
 
     /// A page over a view model built elsewhere (a fixture, for previews and screenshots).
@@ -50,7 +53,10 @@ struct BrainShelfView: View {
                 Task { await viewModel.load() }
             }
         case .loaded:
-            BrainShelfPage(kind: kind, cards: viewModel.cards, isShowingCachedCopy: viewModel.isShowingCachedCopy)
+            BrainShelfPage(kind: kind, cards: viewModel.cards, isShowingCachedCopy: viewModel.isShowingCachedCopy,
+                           photo: server.map { server in { [viewModel] photo in
+                               BrainPagePhoto(photo: photo, server: server) { await viewModel.photoData(id: $0) }
+                           } })
                 .refreshable { await viewModel.load() }
         }
     }
@@ -87,6 +93,8 @@ struct BrainShelfPage: View {
     let kind: BrainShelfKind
     let cards: [BrainShelfLayout.Card]
     var isShowingCachedCopy = false
+    /// How a memory's photo loads; nil shows none.
+    var photo: ((DeckPhoto) -> BrainPagePhoto)?
 
     var body: some View {
         ScrollView {
@@ -100,7 +108,7 @@ struct BrainShelfPage: View {
                     .padding(.top, BrainStyle.xl)
                 }
                 ForEach(cards) { card in
-                    BrainShelfCard(card: card, paper: kind.paper)
+                    BrainShelfCard(card: card, paper: kind.paper, photo: card.photo.flatMap { p in photo.map { $0(p) } })
                 }
                 if isShowingCachedCopy {
                     Text(verbatim: "Offline, showing saved copy")
@@ -122,6 +130,8 @@ struct BrainShelfPage: View {
 struct BrainShelfCard: View {
     let card: BrainShelfLayout.Card
     let paper: HermexPaper
+    /// A memory's photo, over the question and his words.
+    var photo: BrainPagePhoto?
 
     var body: some View {
         HXCard(.glow(paper), title: card.title, spacing: BrainStyle.s) {
@@ -132,6 +142,10 @@ struct BrainShelfCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } content: {
+            if let photo {
+                DeckPhotoView(photo: photo.photo, server: photo.server, paper: paper,
+                              load: photo.load)
+            }
             if !card.prompt.isEmpty {
                 Text(verbatim: card.prompt)
                     .font(AppFont.subheadline())
@@ -154,7 +168,8 @@ struct BrainShelfCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.chatTactile(.capsule))
-                .accessibilityHint(Text(verbatim: "Opens the idea this answers"))
+                .accessibilityHint(Text(verbatim: card.sourceModule == .memories ? "Opens everything you told Atlas about this photo"
+                                        : "Opens the idea this answers"))
             }
         }
     }

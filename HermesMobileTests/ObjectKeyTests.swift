@@ -40,9 +40,9 @@ final class ObjectKeyTests: XCTestCase {
     }
 
     func testBrainPagesWearTheirKindsPaper() {
-        for module in [BrainModuleID.wiki, .journal, .articles, .highlights] {
+        for module in [BrainModuleID.wiki, .journal, .articles, .highlights, .memories] {
             XCTAssertEqual(module.paper, .knowledge,
-                           "DESIGN.md: inside the Brain, wiki, journal, articles and highlights wear wiki (\(module))")
+                           "DESIGN.md: inside the Brain, wiki, journal, articles, highlights and photo stories wear wiki (\(module))")
         }
         XCTAssertEqual(BrainModuleID.people.paper, .advisor, "DESIGN.md: inside the Brain, a person wears advisor")
         XCTAssertEqual(BrainModuleID.letters.paper, .advisor, "DESIGN.md: inside the Brain, letters wear advisor (a letter is to a person)")

@@ -430,3 +430,23 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(layout(person).hiddenMentionIDs, ["2026-09-25", "2026-09-10"])
     }
 }
+
+extension BrainPersonLayoutTests {
+    func testPhotoStoriesJoinTheTimelineByWhenThePhotoWasTaken() {
+        let person = BrainPerson(
+            encounters: [BrainEncounter(id: "e-new", date: "2026-10-08", title: "New")],
+            journal: [BrainJournalMention(id: "2026-09-24", date: "2026-09-24", snippet: "Dinner")],
+            memories: [BrainJournalMention(id: "memories/2021-06-12-aaaaaaaaaaaa.md", date: "2021-06-12",
+                                           snippet: "Mira laughed the whole way down."),
+                       BrainJournalMention(id: "memories/2026-10-08-bbbbbbbbbbbb.md", date: "2026-10-08", snippet: "Same day")])
+        let layout = layout(person)
+        XCTAssertEqual(layout.timeline.map(\.id), ["e-new", "memory:memories/2026-10-08-bbbbbbbbbbbb.md",
+                                                   "journal:2026-09-24", "memory:memories/2021-06-12-aaaaaaaaaaaa.md"],
+                       "a story on an encounter's day comes after it and never folds into it")
+        let story = layout.timeline[3]
+        XCTAssertEqual(story.kicker, "Memory · Jun 12, 2021")
+        XCTAssertEqual(story.symbol, "photo.fill")
+        XCTAssertEqual(story.headline, "Mira laughed the whole way down.")
+        XCTAssertNil(layout.timeline[0].journal)
+    }
+}

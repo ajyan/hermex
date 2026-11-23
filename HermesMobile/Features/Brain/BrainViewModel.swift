@@ -18,6 +18,13 @@ protocol BrainDataClient: Sendable {
     func logPerson(_ request: BrainPersonLogRequest) async throws -> BrainPersonLogResult
     /// Sets a contact's facts (`POST /api/brain/person/facts`); the answer carries what it replaced.
     func savePersonFacts(_ request: BrainPersonFactsRequest) async throws -> BrainPersonFactsResult
+    /// A photo story's photo (`GET /api/photos/<id>`).
+    func photoData(id: String) async throws -> Data
+}
+
+extension BrainDataClient {
+    /// Test doubles and fixtures have no photos.
+    func photoData(id: String) async throws -> Data { throw URLError(.fileDoesNotExist) }
 }
 
 /// A catch-up logged from a person page: what happened, or the words of a text Messages reported sent.
@@ -69,6 +76,10 @@ enum BrainLoadState<Value: Equatable>: Equatable {
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol.
 struct APIClientBrainAdapter: BrainDataClient {
     let apiClient: APIClient
+
+    func photoData(id: String) async throws -> Data {
+        try await apiClient.photoData(id: id)
+    }
 
     func modules() async throws -> [BrainModule] {
         let response: BrainModulesResponse = try await apiClient.send(endpoint: .brainModules, method: "GET")

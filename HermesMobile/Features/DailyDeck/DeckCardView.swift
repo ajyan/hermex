@@ -406,6 +406,13 @@ struct DeckCardView: View {
         let isYearAgo = card.itemKind == "on_this_day"
         let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
             : isYearAgo ? (card.title ?? text.lead) : text.lead
+        if isYearAgo, let photo = card.photo {
+            // A photo story taken on this date: the photo, then his words about it. It was answered already, so
+            // there is no "Not this one" and no "Tell Atlas more"; the foot opens the story.
+            DeckPhotoView(photo: photo, server: viewModel.server, paper: palette.colors,
+                          load: { await viewModel.deckPhotoData(id: $0) })
+                .padding(.top, 14)
+        }
         if let title {
             Text(card.markdown(title))
                 .font(isYearAgo ? AppFont.serif(style: .title2) : AppFont.display(style: .title2, weight: .bold))
@@ -443,7 +450,7 @@ struct DeckCardView: View {
             } else if card.takesText {
                 reflection(DeckCopy.invitation(for: card))
             }
-            if let photo = card.photo, !viewModel.hiddenPhotos.contains(photo.id), hasAnswer {
+            if let photo = card.photo, card.itemKind != "on_this_day", !viewModel.hiddenPhotos.contains(photo.id), hasAnswer {
                 let starting = viewModel.startingPhotoChat == card.id
                 ChoiceButton(title: starting ? "Starting the chat…" : "Tell Atlas more", isSelected: false) {
                     Task { await viewModel.tellPhotoStory(card) }
@@ -478,7 +485,7 @@ struct DeckCardView: View {
                     VStack(alignment: .leading, spacing: 8) { hiddenLine; undoHide }
                 }
             } else {
-                DeckPhotoView(photo: photo, server: viewModel.server, palette: palette,
+                DeckPhotoView(photo: photo, server: viewModel.server, paper: palette.colors,
                               load: { await viewModel.deckPhotoData(id: $0) })
                 ChoiceButton(title: "Not this one", isSelected: false) {
                     Task { await viewModel.setPhotoHidden(true, on: card) }

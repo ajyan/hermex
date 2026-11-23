@@ -279,7 +279,8 @@ struct BrainModuleListView: View {
         // Highlights routes to `BrainHighlightsView`; it shares the article grid only to
         // keep the switch exhaustive.
         case .articles, .highlights: articleSection(list)
-        case .letters: letterSections(list)
+        // Stories aren't in Browse (the Memories shelf lists them); a list of them reads like the letters.
+        case .letters, .memories: letterSections(list)
         }
         // A clear row, not a section footer: a plain list paints footers in the system background.
         Section {
@@ -489,7 +490,7 @@ struct BrainModuleListView: View {
                 ForEach(section.items, id: \.id) { item in
                     NavigationLink(value: link(item.id)) {
                         BrainRow(
-                            leading: { BrainModuleIcon(systemName: BrainModuleID.letters.symbolName, paper: BrainModuleID.letters.paper) },
+                            leading: { BrainModuleIcon(systemName: module.symbolName, paper: module.paper) },
                             title: item.title,
                             subtitle: item.preview
                         )
