@@ -469,6 +469,11 @@ struct DeckCardView: View {
             if let idea = card.fromIdea {
                 fromIdeaChip(idea).padding(.top, 14)
             }
+            if let photo = card.photo {
+                DeckPhotoView(photo: photo, server: viewModel.server, palette: palette,
+                              load: { await viewModel.deckPhotoData(id: $0) })
+                    .padding(.top, 14)
+            }
             if let thread = card.thread {
                 DeckThreadView(thread: thread, palette: palette).padding(.top, 18)
             }

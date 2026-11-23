@@ -432,6 +432,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let isFromSummary: Bool?
         /// A year-ago card's day, "Tue, Oct 28, 2025".
         let dateLabel: String?
+        /// A Looking back card's photo from his Google Takeout (vault `tools/photos.py`), shown above the question.
+        let photo: DeckPhoto?
 
         private enum CodingKeys: String, CodingKey {
             case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
@@ -442,7 +444,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
             case act, gist, quotes, parts, weekQuestion, thread, linked, fromIdea, dateLabel, month
-            case take, summary, sourceText, calendar
+            case take, summary, sourceText, calendar, photo
             case valueID = "value"
             case itemKind = "kind"
         }
@@ -556,6 +558,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             linked = (try? c.decodeIfPresent(DeckThread.self, forKey: .linked)).flatMap { $0.quote.isEmpty ? nil : $0 }
             fromIdea = (try? c.decodeIfPresent(DeckFromIdea.self, forKey: .fromIdea)).flatMap { $0.title.isEmpty ? nil : $0 }
             take = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .take))
+            photo = (try? c.decodeIfPresent(DeckPhoto.self, forKey: .photo)).flatMap { DeckPhoto.isValidID($0.id) ? $0 : nil }
             isFromSummary = (try? c.decodeIfPresent(Bool.self, forKey: .summary))
                 ?? (try? c.decodeIfPresent(Bool.self, forKey: .sourceText)).map { !$0 }
             dateLabel = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .dateLabel))
@@ -606,6 +609,34 @@ struct DeckPart: Decodable, Equatable, Hashable {
 }
 
 /// Yesterday's words a check-in or letter picks up from: a small label, the quote, and who said it where.
+/// A photo on a Looking back card: its id in the Mac's Takeout index (served by `GET /api/photos/<id>`), when
+/// it was taken ("June 2021"), and the people Google Photos named in it.
+struct DeckPhoto: Decodable, Equatable {
+    let id: String
+    let when: String?
+    let people: [String]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? ""
+        when = (try? c.decodeIfPresent(String.self, forKey: .when)).flatMap { $0.isEmpty ? nil : $0 }
+        people = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .people)) ?? []).compactMap(\.value)
+    }
+
+    init(id: String, when: String?, people: [String] = []) {
+        self.id = id
+        self.when = when
+        self.people = people
+    }
+
+    /// Twelve lowercase hex characters, the vault's id shape, so an id can only ever name a photo.
+    static func isValidID(_ id: String) -> Bool {
+        id.count == 12 && id.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, when, people }
+}
+
 struct DeckThread: Decodable, Equatable {
     let label: String?
     let quote: String

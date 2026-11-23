@@ -403,6 +403,54 @@ struct DeckQuoteRow: View {
     }
 }
 
+/// A Looking back card's photo, framed like the photo of the week, with when it was taken and who Google Photos
+/// named in it underneath. It loads through the deck's client and shows the date alone until (or unless) it does.
+struct DeckPhotoView: View {
+    let photo: DeckPhoto
+    let server: URL
+    let palette: DeckPalette
+    let load: @MainActor (String) async -> Data?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
+                .fill(Color.clear)
+                .aspectRatio(4 / 3, contentMode: .fit)
+                .glowSurface(palette.colors, cornerRadius: HXRadius.lg)
+                .overlay {
+                    WeekPhotoImage(server: server, sessionID: nil, path: "photos/\(photo.id)",
+                                   load: { _ in await load(photo.id) }) {
+                        Image(systemName: "photo")
+                            .font(AppFont.title())
+                            .foregroundStyle(palette.ink)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+                .accessibilityHidden(true)
+            if !caption.isEmpty {
+                Text(verbatim: caption)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(palette.secondaryInk)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: accessibilityText))
+    }
+
+    /// "June 2021 · Sam Lee, Pat"
+    private var caption: String {
+        ([photo.when].compactMap { $0 } + (photo.people.isEmpty ? [] : [photo.people.joined(separator: ", ")]))
+            .joined(separator: " · ")
+    }
+
+    private var accessibilityText: String {
+        var text = "Your photo"
+        if let when = photo.when { text += " from \(when)" }
+        if !photo.people.isEmpty { text += ", with \(photo.people.joined(separator: ", "))" }
+        return text
+    }
+}
+
 /// Yesterday's words a check-in or letter picks up from: a small label, the quote in italic serif, and where it was said.
 struct DeckThreadView: View {
     let thread: DeckThread
