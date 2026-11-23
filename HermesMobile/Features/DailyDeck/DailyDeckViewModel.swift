@@ -22,6 +22,8 @@ protocol DailyDeckDataClient: Sendable {
     /// Keeps a telling's video on the Mac, or takes it off.
     func keepStory(date: String, video: Data) async throws
     func unkeepStory(date: String) async throws
+    /// A Looking back card's photo by its Takeout id.
+    func photoData(id: String) async throws -> Data
     func deleteWeekPhoto(weekEnding: String) async throws
     /// Drafts the Sunday review's intention from its answers so far; an empty draft when the model can't.
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft
@@ -39,6 +41,7 @@ extension DailyDeckDataClient {
 
     func keepStory(date: String, video: Data) async throws { throw APIError.http(statusCode: 404, body: nil) }
     func unkeepStory(date: String) async throws { throw APIError.http(statusCode: 404, body: nil) }
+    func photoData(id: String) async throws -> Data { throw APIError.http(statusCode: 404, body: nil) }
 }
 
 enum DailyDeckState: Equatable {
@@ -1492,6 +1495,11 @@ final class DailyDeckViewModel {
         return try? await client.rawFile(sessionID: sessionID, path: path)
     }
 
+    /// A Looking back card's photo, or nil when the server has none (an older webui, or the export was cleared).
+    func deckPhotoData(id: String) async -> Data? {
+        try? await client.photoData(id: id)
+    }
+
     /// The picked photo could not be read as an image; nothing was uploaded.
     func weekPhotoUnreadable() {
         weekPhotoError = "That photo couldn't be read. Pick another."
@@ -1682,6 +1690,10 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
 
     func unkeepStory(date: String) async throws {
         try await apiClient.unkeepStory(date: date)
+    }
+
+    func photoData(id: String) async throws -> Data {
+        try await apiClient.photoData(id: id)
     }
 
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {

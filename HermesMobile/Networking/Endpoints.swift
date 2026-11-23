@@ -294,6 +294,8 @@ enum Endpoint {
     /// The week's best telling kept on the Mac (this user's webui fork, `api/stories_keep.py`): POST the raw
     /// .mov or DELETE, `?date=YYYY-MM-DD`.
     case storiesKeep(date: String)
+    /// A Looking back card's photo (this user's webui fork, `api/photos.py`): GET the kept JPEG by its 12-hex id.
+    case photo(id: String)
     /// The Daily Deck's Mandarin card, live (`api/vault_mandarin.py` on this user's webui fork):
     /// POST `{date, text, question?, again?}`: the retelling and its upgrades, or which he used.
     case mandarinAnswer
@@ -729,6 +731,8 @@ enum Endpoint {
             return "/api/stories/listen"
         case .storiesKeep:
             return "/api/stories/keep"
+        case let .photo(id):
+            return "/api/photos/\(id)"
         case .mandarinAnswer:
             return "/api/mandarin/answer"
         case .atlasStatus:

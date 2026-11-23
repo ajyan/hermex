@@ -3948,3 +3948,48 @@ final class DeckOpenerCalendarTests: XCTestCase {
         XCTAssertEqual([0, 660, 720, 780, 1110, 1440].map(DeckTimelineLayout.clock), ["12:00", "11:00", "12:00", "1:00", "6:30", "12:00"])
     }
 }
+
+/// A Looking back card's photo from the Mac's Takeout index (`GET /api/photos/<id>`).
+final class DeckPhotoTests: APIClientTestCase {
+    private func card(_ photo: String) throws -> DeckCard {
+        let deck = try DailyDeck.decode(#"{"date":"2026-11-24","kind":"morning","cards":[{"id":"past","type":"prompt","kind":"past","title":"June 2021","question":"What do you remember?","photo":"# + photo + "}]}")
+        return try XCTUnwrap(deck.cards.first)
+    }
+
+    func testDecodesThePhotoAndItsCaption() throws {
+        let photo = try XCTUnwrap(card(#"{"id":"0123456789ab","date":"2021-06-01","when":"June 2021","people":["Sam Lee",7],"url":"/api/photos/0123456789ab"}"#).photo)
+        XCTAssertEqual(photo, DeckPhoto(id: "0123456789ab", when: "June 2021", people: ["Sam Lee"]))
+    }
+
+    func testAnIDThatIsNotTwelveHexIsNoPhoto() throws {
+        for id in ["../secret", "0123456789AB", "0123456789a", ""] {
+            XCTAssertNil(try card(#"{"id":"\#(id)"}"#).photo, id)
+        }
+        XCTAssertNil(try card(#""not an object""#).photo)
+        XCTAssertEqual(try card(#""not an object""#).question, "What do you remember?")
+    }
+
+    func testFetchesTheJPEGByID() async throws {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "/api/photos/0123456789ab")
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "image/jpeg"])!, jpeg)
+        }
+        let data = try await client.photoData(id: "0123456789ab")
+        XCTAssertEqual(data, jpeg)
+    }
+
+    func testABadIDNeverReachesTheServer() async {
+        let client = makeClient { request in
+            XCTFail("Requested \(request.url?.absoluteString ?? "")")
+            return apiTestJSONResponse("{}", for: request)
+        }
+        do {
+            _ = try await client.photoData(id: "../../etc")
+            XCTFail("Expected an error")
+        } catch {
+            guard case APIError.http(404, _) = error else { return XCTFail("\(error)") }
+        }
+    }
+}

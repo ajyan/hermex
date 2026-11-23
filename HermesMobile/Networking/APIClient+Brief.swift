@@ -166,6 +166,12 @@ extension APIClient {
                                timeout: 300, contentType: "video/quicktime")
     }
 
+    /// A Looking back card's photo, by its id in the Mac's Takeout index.
+    func photoData(id: String) async throws -> Data {
+        guard DeckPhoto.isValidID(id) else { throw APIError.http(statusCode: 404, body: nil) }
+        return try await sendData(endpoint: .photo(id: id), method: "GET")
+    }
+
     /// Takes a kept telling off the Mac; one that isn't there is not an error.
     func unkeepStory(date: String) async throws {
         _ = try await sendData(endpoint: .storiesKeep(date: date), method: "DELETE")
