@@ -443,6 +443,16 @@ struct DeckCardView: View {
             } else if card.takesText {
                 reflection(DeckCopy.invitation(for: card))
             }
+            if let photo = card.photo, !viewModel.hiddenPhotos.contains(photo.id), hasAnswer {
+                let starting = viewModel.startingPhotoChat == card.id
+                ChoiceButton(title: starting ? "Starting the chat…" : "Tell Atlas more", isSelected: false) {
+                    Task { await viewModel.tellPhotoStory(card) }
+                }
+                .disabled(viewModel.startingPhotoChat != nil)
+                .accessibilityLabel(Text(verbatim: "Tell Atlas more"))
+                .accessibilityValue(Text(verbatim: starting ? "Starting" : ""))
+                .accessibilityHint(Text(verbatim: "Opens a short chat about this photo"))
+            }
             if !card.returns.isEmpty {
                 returnsPicker
             }
@@ -451,6 +461,55 @@ struct DeckCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .top) { Rectangle().fill(palette.ink.opacity(0.15)).frame(height: 0.5) }
         .padding(.top, 24)
+    }
+
+    private var hasAnswer: Bool {
+        !(viewModel.answer(for: card)?.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+
+    /// A Looking back photo with "Not this one" under it; once hidden, a line saying so and Undo.
+    @ViewBuilder
+    private func photoBlock(_ photo: DeckPhoto) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if viewModel.hiddenPhotos.contains(photo.id) {
+                // Undo goes under the words when they run long (large text), like the workout's undo line.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { hiddenLine; Spacer(minLength: 0); undoHide }
+                    VStack(alignment: .leading, spacing: 8) { hiddenLine; undoHide }
+                }
+            } else {
+                DeckPhotoView(photo: photo, server: viewModel.server, palette: palette,
+                              load: { await viewModel.deckPhotoData(id: $0) })
+                ChoiceButton(title: "Not this one", isSelected: false) {
+                    Task { await viewModel.setPhotoHidden(true, on: card) }
+                }
+                .accessibilityHint(Text(verbatim: "Hides this photo for good"))
+            }
+            if let error = viewModel.photoError, error.card == card.id {
+                Text(verbatim: error.message)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(palette.secondaryInk)
+            }
+        }
+        .onChange(of: viewModel.photoError?.message) { _, message in
+            if let message, viewModel.photoError?.card == card.id {
+                AccessibilityNotification.Announcement(message).post()
+            }
+        }
+    }
+
+    private var hiddenLine: some View {
+        Text(verbatim: "Hidden. This photo won't come back.")
+            .font(AppFont.footnote())
+            .foregroundStyle(palette.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var undoHide: some View {
+        ChoiceButton(title: "Undo", isSelected: false) {
+            Task { await viewModel.setPhotoHidden(false, on: card) }
+        }
+        .accessibilityHint(Text(verbatim: "Brings the photo back"))
     }
 
     /// "From today's idea · <title>" in the idea card's own paper, on a writing card whose prompt builds on it.
@@ -470,9 +529,7 @@ struct DeckCardView: View {
                 fromIdeaChip(idea).padding(.top, 14)
             }
             if let photo = card.photo {
-                DeckPhotoView(photo: photo, server: viewModel.server, palette: palette,
-                              load: { await viewModel.deckPhotoData(id: $0) })
-                    .padding(.top, 14)
+                photoBlock(photo).padding(.top, 14)
             }
             if let thread = card.thread {
                 DeckThreadView(thread: thread, palette: palette).padding(.top, 18)
