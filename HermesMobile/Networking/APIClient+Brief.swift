@@ -172,6 +172,12 @@ extension APIClient {
         return try await sendData(endpoint: .photo(id: id), method: "GET")
     }
 
+    /// Hides a Looking back photo for good (`hide`), or shows it again; both are idempotent on the server.
+    func setPhotoHidden(id: String, _ hide: Bool) async throws {
+        guard DeckPhoto.isValidID(id) else { throw APIError.http(statusCode: 400, body: nil) }
+        _ = try await sendData(endpoint: .photoHide(id: id), method: hide ? "POST" : "DELETE")
+    }
+
     /// Takes a kept telling off the Mac; one that isn't there is not an error.
     func unkeepStory(date: String) async throws {
         _ = try await sendData(endpoint: .storiesKeep(date: date), method: "DELETE")

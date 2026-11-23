@@ -296,6 +296,8 @@ enum Endpoint {
     case storiesKeep(date: String)
     /// A Looking back card's photo (this user's webui fork, `api/photos.py`): GET the kept JPEG by its 12-hex id.
     case photo(id: String)
+    /// "Not this one" on a Looking back photo (same fork): POST hides it for good, DELETE undoes it, `?id=`.
+    case photoHide(id: String)
     /// The Daily Deck's Mandarin card, live (`api/vault_mandarin.py` on this user's webui fork):
     /// POST `{date, text, question?, again?}`: the retelling and its upgrades, or which he used.
     case mandarinAnswer
@@ -733,6 +735,8 @@ enum Endpoint {
             return "/api/stories/keep"
         case let .photo(id):
             return "/api/photos/\(id)"
+        case .photoHide:
+            return "/api/photos/hide"
         case .mandarinAnswer:
             return "/api/mandarin/answer"
         case .atlasStatus:
@@ -965,6 +969,8 @@ enum Endpoint {
             return [URLQueryItem(name: "week_ending", value: weekEnding)]
         case let .storiesKeep(date):
             return [URLQueryItem(name: "date", value: date)]
+        case let .photoHide(id):
+            return [URLQueryItem(name: "id", value: id)]
         case let .bodyPrescription(day):
             return day.map { [URLQueryItem(name: "day", value: $0)] } ?? []
         case let .bodySession(id):

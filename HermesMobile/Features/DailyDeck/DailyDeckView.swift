@@ -32,6 +32,7 @@ struct DailyDeckView: View {
     init(server: URL, openSession: @escaping (String) -> Void, ask: ((String) -> Void)? = nil) {
         let deck = DailyDeckViewModel(server: server)
         deck.askAtlas = ask
+        deck.openSession = openSession
         _viewModel = State(initialValue: deck)
         let labels = LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server)))
         _labels = State(initialValue: labels)

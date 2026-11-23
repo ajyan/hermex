@@ -3007,6 +3007,15 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
 
     func unkeepStory(date: String) async throws { unkeptDates.append(date) }
 
+    /// What `setPhotoHidden` does; succeeds by default. Each call, in order.
+    var photoHideResult: Result<Void, Error> = .success(())
+    private(set) var photoHides: [(id: String, hide: Bool)] = []
+
+    func setPhotoHidden(id: String, _ hide: Bool) async throws {
+        photoHides.append((id, hide))
+        try photoHideResult.get()
+    }
+
     func listenToStory(audio: Data, date: String, technique: String?, question: String?) async throws -> StoryListen {
         listenedTechnique = technique
         guard let storyListen else { throw APIError.http(statusCode: 404, body: nil) }
@@ -3991,5 +4000,102 @@ final class DeckPhotoTests: APIClientTestCase {
         } catch {
             guard case APIError.http(404, _) = error else { return XCTFail("\(error)") }
         }
+    }
+}
+
+
+/// The Looking back photo's own actions: Tell Atlas more starts the photo-interview chat, Not this one hides it.
+extension DailyDeckTests {
+    static let photoDeckJSON = #"{"date":"2026-10-04","kind":"morning","cards":[{"id":"past","type":"prompt","kind":"past","files_to":"past","title":"June 2021","question":"What do you remember about this day?","photo":{"id":"0123456789ab","when":"June 2021","people":["Sam Lee"]}},{"id":"close","type":"close"}]}"#
+
+    @MainActor
+    func testTellAtlasMoreStartsAFreshChatWithThePhotoAndOpensIt() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.photoDeckJSON)
+        let viewModel = makeViewModel(client)
+        var opened: [String] = []
+        viewModel.openSession = { opened.append($0) }
+        await viewModel.load()
+        let card = viewModel.cards[0]
+        let deckSession = viewModel.sessionID
+
+        await viewModel.tellPhotoStory(card)
+        XCTAssertTrue(client.sent.isEmpty, "no answer yet, no chat")
+
+        viewModel.setText("  We drove to the coast.  ", for: card)
+        await viewModel.tellPhotoStory(card)
+        let sent = try XCTUnwrap(client.sent.first)
+        XCTAssertEqual(opened, [sent.sessionID])
+        XCTAssertEqual(viewModel.sessionID, deckSession, "the deck keeps its own session")
+        XCTAssertEqual(client.renamed.last?.1, "Photo · June 2021")
+        XCTAssertEqual(sent.message, """
+        Use the photo-interview skill.
+
+        Photo 0123456789ab, taken June 2021, from my Looking back card on 2026-10-04.
+        Google Photos tagged: Sam Lee.
+
+        The card asked: What do you remember about this day?
+
+        My answer:
+        We drove to the coast.
+        """)
+        XCTAssertEqual(viewModel.answer(for: card)?.text, "  We drove to the coast.  ", "the answer stays on the card to file")
+        XCTAssertNil(viewModel.startingPhotoChat)
+    }
+
+    @MainActor
+    func testAChatThatDoesntStartSaysSoUnderItsCard() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.photoDeckJSON)
+        client.sendError = APIError.http(statusCode: 500, body: nil)
+        let viewModel = makeViewModel(client)
+        var opened: [String] = []
+        viewModel.openSession = { opened.append($0) }
+        await viewModel.load()
+        viewModel.setText("We drove.", for: viewModel.cards[0])
+        await viewModel.tellPhotoStory(viewModel.cards[0])
+        XCTAssertTrue(opened.isEmpty)
+        XCTAssertEqual(viewModel.photoError?.card, "past")
+        XCTAssertEqual(viewModel.photoError?.message, "The chat didn't start. Try again.")
+    }
+
+    @MainActor
+    func testNotThisOneHidesOnlyOnceTheServerHasItAndUndoBringsItBack() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.photoDeckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        let card = viewModel.cards[0]
+
+        client.photoHideResult = .failure(APIError.http(statusCode: 500, body: nil))
+        await viewModel.setPhotoHidden(true, on: card)
+        XCTAssertTrue(viewModel.hiddenPhotos.isEmpty)
+        XCTAssertEqual(viewModel.photoError?.message, "The photo wasn't hidden. Try again.")
+
+        client.photoHideResult = .success(())
+        await viewModel.setPhotoHidden(true, on: card)
+        XCTAssertEqual(viewModel.hiddenPhotos, ["0123456789ab"])
+        XCTAssertNil(viewModel.photoError)
+
+        await viewModel.setPhotoHidden(false, on: card)
+        XCTAssertTrue(viewModel.hiddenPhotos.isEmpty)
+        XCTAssertEqual(client.photoHides.map(\.hide), [true, true, false])
+        XCTAssertEqual(Set(client.photoHides.map(\.id)), ["0123456789ab"])
+    }
+}
+
+/// `POST`/`DELETE /api/photos/hide?id=`.
+final class PhotoHideHTTPTests: APIClientTestCase {
+    func testHideAndUndoUseTheirMethodsWithTheID() async throws {
+        var seen: [(String?, String?)] = []
+        let client = makeClient { request in
+            seen.append((request.httpMethod, request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?.queryItems?.first?.value))
+            XCTAssertEqual(request.url?.path, "/api/photos/hide")
+            return apiTestJSONResponse(#"{"ok":true}"#, for: request)
+        }
+        try await client.setPhotoHidden(id: "0123456789ab", true)
+        try await client.setPhotoHidden(id: "0123456789ab", false)
+        XCTAssertEqual(seen.map(\.0), ["POST", "DELETE"])
+        XCTAssertEqual(seen.map(\.1), ["0123456789ab", "0123456789ab"])
     }
 }

@@ -24,6 +24,8 @@ protocol DailyDeckDataClient: Sendable {
     func unkeepStory(date: String) async throws
     /// A Looking back card's photo by its Takeout id.
     func photoData(id: String) async throws -> Data
+    /// "Not this one": hides a photo for good, or undoes that.
+    func setPhotoHidden(id: String, _ hide: Bool) async throws
     func deleteWeekPhoto(weekEnding: String) async throws
     /// Drafts the Sunday review's intention from its answers so far; an empty draft when the model can't.
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft
@@ -42,6 +44,7 @@ extension DailyDeckDataClient {
     func keepStory(date: String, video: Data) async throws { throw APIError.http(statusCode: 404, body: nil) }
     func unkeepStory(date: String) async throws { throw APIError.http(statusCode: 404, body: nil) }
     func photoData(id: String) async throws -> Data { throw APIError.http(statusCode: 404, body: nil) }
+    func setPhotoHidden(id: String, _ hide: Bool) async throws { throw APIError.http(statusCode: 404, body: nil) }
 }
 
 enum DailyDeckState: Equatable {
@@ -163,6 +166,8 @@ final class DailyDeckViewModel {
     let training: WeekTrainingModel
     /// Starts a chat with these words, from a card that asks Atlas (the money card's rows); nil does nothing.
     @ObservationIgnored var askAtlas: ((String) -> Void)?
+    /// Opens a session in the chat, for a card that starts its own (the photo card's Tell Atlas more).
+    @ObservationIgnored var openSession: ((String) -> Void)?
     private let now: () -> Date
     /// How long after the last change an answer is written to `store`.
     private let draftDelay: Duration
@@ -1500,6 +1505,58 @@ final class DailyDeckViewModel {
         try? await client.photoData(id: id)
     }
 
+    // MARK: Photo stories
+
+    /// Photos he hid this session ("Not this one"); the deck still names them until tomorrow's build.
+    private(set) var hiddenPhotos: Set<String> = []
+    /// The card whose photo chat is starting, so its button shows the wait and can't start two.
+    private(set) var startingPhotoChat: String?
+    /// The last photo action that failed, under the card it came from.
+    private(set) var photoError: (card: String, message: String)?
+
+    /// Hides the card's photo for good, or (`hide` false) undoes that. The photo stays hidden on screen
+    /// only once the server has it.
+    func setPhotoHidden(_ hide: Bool, on card: DeckCard) async {
+        guard let photo = card.photo else { return }
+        photoError = nil
+        do {
+            try await client.setPhotoHidden(id: photo.id, hide)
+            if hide { hiddenPhotos.insert(photo.id) } else { hiddenPhotos.remove(photo.id) }
+        } catch {
+            photoError = (card.id, hide ? "The photo wasn't hidden. Try again." : "The photo is still hidden. Try again.")
+        }
+    }
+
+    /// Starts the photo-interview chat in a fresh session (never today's deck session) with the card's photo,
+    /// question and his answer, and opens it. The answer stays on the card and files with the deck as usual.
+    func tellPhotoStory(_ card: DeckCard) async {
+        guard let photo = card.photo, startingPhotoChat == nil, let workspace,
+              let answer = answer(for: card)?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !answer.isEmpty
+        else { return }
+        startingPhotoChat = card.id
+        photoError = nil
+        defer { startingPhotoChat = nil }
+        let message = Self.photoStoryMessage(photo: photo, date: date, question: question(for: card), answer: answer)
+        do {
+            let sessionID = try await client.createSession(workspace: workspace)
+            try? await client.renameSession(id: sessionID, title: "Photo · \(photo.when ?? "a memory")")
+            try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)
+            openSession?(sessionID)
+        } catch {
+            photoError = (card.id, "The chat didn't start. Try again.")
+        }
+    }
+
+    /// The photo chat's first message: what the `photo-interview` skill (vault) needs to run it and file it.
+    nonisolated static func photoStoryMessage(photo: DeckPhoto, date: String, question: String?, answer: String) -> String {
+        var lines = ["Use the photo-interview skill.", "",
+                     "Photo \(photo.id)\(photo.when.map { ", taken \($0)" } ?? ""), from my Looking back card on \(date)."]
+        if !photo.people.isEmpty { lines.append("Google Photos tagged: \(photo.people.joined(separator: ", ")).") }
+        if let question { lines += ["", "The card asked: \(question)"] }
+        lines += ["", "My answer:", answer]
+        return lines.joined(separator: "\n")
+    }
+
     /// The picked photo could not be read as an image; nothing was uploaded.
     func weekPhotoUnreadable() {
         weekPhotoError = "That photo couldn't be read. Pick another."
@@ -1694,6 +1751,10 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
 
     func photoData(id: String) async throws -> Data {
         try await apiClient.photoData(id: id)
+    }
+
+    func setPhotoHidden(id: String, _ hide: Bool) async throws {
+        try await apiClient.setPhotoHidden(id: id, hide)
     }
 
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {
