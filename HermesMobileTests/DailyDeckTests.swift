@@ -1734,6 +1734,52 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
+    func testAWrittenTellingShowsInPlaceOfTheVideoAndFilesAsItsTranscript() async throws {
+        store.setWorkspace("/vault", for: server)
+        let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.storyJSON))
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.isStory })
+        XCTAssertEqual(DeckStoryStage.of(model.answer(for: card), hasVideo: false), .record)
+
+        model.setStatus("technique", "peak", for: card)
+        model.setWrittenTelling("The bus doors closed behind me.", for: card)
+        let answer = try XCTUnwrap(model.answer(for: card))
+        XCTAssertEqual(answer.notes?["transcript"], "The bus doors closed behind me.")
+        XCTAssertEqual(answer.statuses?["told"], "written")
+        XCTAssertEqual(DeckStoryStage.of(answer, hasVideo: false), .written("The bus doors closed behind me."))
+        XCTAssertEqual(DeckStoryStage.of(answer, hasVideo: true), .watch, "a video on the phone wins")
+        XCTAssertEqual(DeckStoryStage.of(DeckAnswer(card: card.id, notes: ["transcript": "Heard back."]), hasVideo: false), .record,
+                       "a recording's transcript alone isn't a written telling")
+
+        let filed = try XCTUnwrap(DeckAnswersPayload(deck: try XCTUnwrap(model.deck), answers: model.answers, completedAt: morning)
+            .answers.first { $0.card == card.id })
+        XCTAssertEqual(filed.notes?["transcript"], "The bus doors closed behind me.", "the vault files it under the story's Transcript")
+        XCTAssertNil(filed.statuses?["recorded"], "so the vault files it as not recorded")
+        XCTAssertNil(filed.scores)
+
+        model.setWrittenTelling("  ", for: card)
+        XCTAssertNil(model.answer(for: card)?.notes?["transcript"])
+        XCTAssertNil(model.answer(for: card)?.statuses?["told"], "an emptied telling clears both")
+        XCTAssertEqual(DeckStoryStage.of(model.answer(for: card), hasVideo: false), .record)
+    }
+
+    @MainActor
+    func testRecordingAfterWritingReplacesTheWrittenTelling() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.storyJSON)
+        client.storyListen = .success(StoryListen(transcript: "So the bus doors closed.", observation: nil))
+        let model = makeViewModel(client)
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.isStory })
+        model.setWrittenTelling("Typed first.", for: card)
+        model.setStatus("recorded", "yes", for: card)
+        await model.listen(to: URL(fileURLWithPath: "/tmp/none.mov"), for: card) { _ in Data("audio".utf8) }.value
+        let answer = try XCTUnwrap(model.answer(for: card))
+        XCTAssertNil(answer.statuses?["told"], "recording clears told")
+        XCTAssertEqual(answer.notes?["transcript"], "So the bus doors closed.", "the newer telling wins")
+    }
+
+    @MainActor
     func testARetakesListenReplacesTheOneStillInFlight() async throws {
         store.setWorkspace("/vault", for: server)
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.storyJSON)
