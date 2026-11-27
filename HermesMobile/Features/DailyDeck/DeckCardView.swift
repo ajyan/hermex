@@ -124,6 +124,8 @@ struct DeckCardView: View {
     /// The goal card's model, whose landed check-ins the close's tracker answers with a haptic.
     @Environment(GoalsHomeViewModel.self) private var goalCheckIns: GoalsHomeViewModel?
     @State private var isWriting = false
+    /// What the writing sheet writes: the answer's text, unless the story card asked for its written telling.
+    @State private var writing: ReflectionTarget = .text
     /// The sleep card's numbers, shown before rating when asked for.
     @State private var showsNumbers = false
     /// The Sleep screen, opened from the sleep card's numbers.
@@ -177,7 +179,10 @@ struct DeckCardView: View {
                     if card.isStoryPick {
                         DeckStoryPickCard(card: card, palette: palette, viewModel: viewModel) { isWriting = true }
                     } else if card.isStory {
-                        DeckStoryCard(card: card, palette: palette, viewModel: viewModel, isOpen: isOpen) { isWriting = true }
+                        DeckStoryCard(card: card, palette: palette, viewModel: viewModel, isOpen: isOpen) { target in
+                            writing = target
+                            isWriting = true
+                        }
                     } else if card.isIdea { idea } else if isJobCard { jobReading } else { reading }
                 }
                 // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
@@ -215,8 +220,8 @@ struct DeckCardView: View {
         .tint(palette.ink)
         // A glow card's choices wear its paper; a neutral card's stay Nous blue.
         .environment(\.hxPaper, palette.isNeutralCard ? nil : palette.colors)
-        .sheet(isPresented: $isWriting) {
-            ReflectionSheet(card: card, palette: palette, viewModel: viewModel)
+        .sheet(isPresented: $isWriting, onDismiss: { writing = .text }) {
+            ReflectionSheet(card: card, palette: palette, viewModel: viewModel, target: writing)
         }
         .sheet(isPresented: $showsSleepHistory) {
             let deck = viewModel
@@ -1474,6 +1479,13 @@ private struct GoalMeters: View {
     }
 }
 
+/// What the writing sheet writes into: the answer's `text` (a reflection, what he noticed), or a Tell a story
+/// card's written telling (`DailyDeckViewModel.setWrittenTelling`).
+enum ReflectionTarget {
+    case text
+    case telling
+}
+
 /// Writing a reflection: the card's question pinned on its own paper, the whole sheet for words.
 /// Text saves as you type, so closing the sheet any way keeps it. Done waits for dictation to land
 /// and be tidied; a swipe can't close the sheet mid-dictation.
@@ -1481,6 +1493,7 @@ private struct ReflectionSheet: View {
     let card: DeckCard
     let palette: DeckPalette
     let viewModel: DailyDeckViewModel
+    var target: ReflectionTarget = .text
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
@@ -1535,11 +1548,17 @@ private struct ReflectionSheet: View {
         .tint(palette.ink)
         .interactiveDismissDisabled(dictation.isBusy)
         .onAppear {
-            text = viewModel.answer(for: card)?.text ?? ""
+            let answer = viewModel.answer(for: card)
+            text = (target == .telling ? answer?.notes?["transcript"] : answer?.text) ?? ""
             dictation.opened($text, server: server)
             isFocused = true
         }
-        .onChange(of: text) { _, new in viewModel.setText(new, for: card) }
+        .onChange(of: text) { _, new in
+            switch target {
+            case .text: viewModel.setText(new, for: card)
+            case .telling: viewModel.setWrittenTelling(new, for: card)
+            }
+        }
         .presentationDragIndicator(.visible)
     }
 }

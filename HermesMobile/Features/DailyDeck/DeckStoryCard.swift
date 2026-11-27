@@ -59,19 +59,36 @@ enum DeckStoryRating: String, CaseIterable, Identifiable {
     var label: String { rawValue.capitalized }
 }
 
+/// What the story card shows under its picks (`DeckStoryStage.of`): Record or write it, his written telling,
+/// or the video to watch back.
+enum DeckStoryStage: Equatable {
+    case record
+    case written(String)
+    case watch
+
+    /// A video on the phone wins: recording after writing replaces the written telling (`listen` clears `told`).
+    static func of(_ answer: DeckAnswer?, hasVideo: Bool) -> DeckStoryStage {
+        if hasVideo { return .watch }
+        if answer?.statuses?["told"] == "written", let telling = answer?.notes?["transcript"] { return .written(telling) }
+        return .record
+    }
+}
+
 /// The Tell a story card (DESIGN.md object key: `.story`, violet): the time of his life, the question, three
-/// techniques to practise, then a minute on the front camera. Once recorded: the telling (a still on the
-/// stacked card, the player once the card is open), Tell it again, a 1–5 rating per area and what he
-/// noticed. The video stays on the phone (`StoryVideoStore`); the vault files the technique
-/// (`statuses["technique"]`), the ratings (`scores`) and his note (`text`).
+/// techniques to practise, then a minute on the front camera, or Write it instead. Once recorded: the telling
+/// (a still on the stacked card, the player once the card is open), Tell it again, a 1–5 rating per area and
+/// what he noticed. Once written: his telling (a tap edits it), Record it instead and what he noticed, with no
+/// ratings, since voice, gestures and energy can't be rated from text. The video stays on the phone
+/// (`StoryVideoStore`); the vault files the technique (`statuses["technique"]`), the ratings (`scores`), his
+/// note (`text`) and the telling's words (`notes["transcript"]`, heard back or written).
 struct DeckStoryCard: View {
     let card: DeckCard
     let palette: DeckPalette
     let viewModel: DailyDeckViewModel
     /// Open to fill the screen: the telling plays here; on the stacked card a tap opens the card instead.
     let isOpen: Bool
-    /// Opens the writing sheet for what he noticed.
-    let write: () -> Void
+    /// Opens the writing sheet: for what he noticed (`.text`) or for the written telling (`.telling`).
+    let write: (ReflectionTarget) -> Void
 
     @State private var isRecording = false
     @State private var video: StoryVideoStore.Telling?
@@ -114,9 +131,12 @@ struct DeckStoryCard: View {
                     .padding(.top, 16)
             }
             if !card.techniques.isEmpty { techniquePicker.padding(.top, 18) }
-            if let video {
-                watchBack(video).padding(.top, 22)
-            } else {
+            switch DeckStoryStage.of(answer, hasVideo: video != nil) {
+            case .watch:
+                if let video { watchBack(video).padding(.top, 22) }
+            case .written(let telling):
+                writtenBack(telling).padding(.top, 22)
+            case .record:
                 recordButton.padding(.top, 24)
             }
         }
@@ -171,6 +191,38 @@ struct DeckStoryCard: View {
                 .foregroundStyle(palette.secondaryInk)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+            Button { write(.telling) } label: { Text(verbatim: "Write it instead") }
+                .buttonStyle(.chatDecision(.secondary))
+                .padding(.top, 4)
+                .accessibilityHint(Text(verbatim: "Opens the writing sheet to tell the story in words"))
+        }
+    }
+
+    /// A written telling in place of the video: his words (a tap opens them to edit), the technique, Record it
+    /// instead and what he noticed. No ratings and no transcript row: the telling is already on the card.
+    private func writtenBack(_ telling: String) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(verbatim: "Your telling")
+                    .font(AppFont.display(style: .subheadline, weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                Button { write(.telling) } label: {
+                    DeckAnswerBoxLabel(text: telling, prompt: "Tell it the way you'd say it", palette: palette)
+                }
+                .buttonStyle(.chatTactile(.card))
+                .accessibilityLabel(Text(verbatim: "Your telling"))
+                .accessibilityValue(Text(verbatim: telling))
+                .accessibilityHint(Text(verbatim: "Opens it to edit"))
+            }
+            HStack {
+                if let technique { HXChip(paper: palette.colors, label: technique.name) }
+                Spacer(minLength: 8)
+                Button { isRecording = true } label: { Text(verbatim: "Record it instead") }
+                    .buttonStyle(.chatDecision(.secondary))
+                    .accessibilityHint(Text(verbatim: "Records a video telling in place of the written one"))
+            }
+            Rectangle().fill(palette.colors.edge).frame(height: 0.5)
+            noticed
         }
     }
 
@@ -195,18 +247,23 @@ struct DeckStoryCard: View {
             }
             Rectangle().fill(palette.colors.edge).frame(height: 0.5)
             ratings
-            VStack(alignment: .leading, spacing: 8) {
-                Text(verbatim: "What did you notice?")
-                    .font(AppFont.display(style: .subheadline, weight: .semibold))
-                    .foregroundStyle(Color.hxTextPrimary)
-                Button(action: write) {
-                    DeckAnswerBoxLabel(text: answer?.text, prompt: "Started at the peak? Hands? Pace?", palette: palette)
-                }
-                .buttonStyle(.chatTactile(.card))
-                .accessibilityLabel(Text(verbatim: "What did you notice?"))
-                .accessibilityValue(Text(verbatim: answer?.text ?? "Not written yet"))
-            }
+            noticed
             heardBack(video)
+        }
+    }
+
+    /// "What did you notice?": his note on the telling, the answer's `text`, written in the writing sheet.
+    private var noticed: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(verbatim: "What did you notice?")
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+            Button { write(.text) } label: {
+                DeckAnswerBoxLabel(text: answer?.text, prompt: "Started at the peak? Hands? Pace?", palette: palette)
+            }
+            .buttonStyle(.chatTactile(.card))
+            .accessibilityLabel(Text(verbatim: "What did you notice?"))
+            .accessibilityValue(Text(verbatim: answer?.text ?? "Not written yet"))
         }
     }
 

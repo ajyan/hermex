@@ -888,15 +888,25 @@ final class DailyDeckViewModel {
         }
     }
 
+    /// A Tell a story card's written telling, in place of a recording. The words go where a recording's go
+    /// (`notes["transcript"]`, which the vault files under the day's story's Transcript, `recorded: false`), and
+    /// `statuses["told"] = "written"` tells the card to show them in place of a video. Emptied, both clear.
+    func setWrittenTelling(_ text: String, for card: DeckCard) {
+        setNote("transcript", text, for: card)
+        setStatus("told", answers[card.id]?.notes?["transcript"] == nil ? nil : "written", for: card)
+    }
+
     /// Hears a Tell a story telling back: sends its audio to the server and keeps the transcript and the one
     /// observation in the answer's notes (`transcript`, `observation`, `observationAt`), which the vault files.
     /// A retake clears the last take's first and cancels its listen, so neither an older take's words nor a
-    /// failure ever sit on the new video. A server without the route shows nothing.
+    /// failure ever sit on the new video; a written telling goes too (`told`), since the newer telling wins.
+    /// A server without the route shows nothing.
     @discardableResult
     func listen(to video: URL, for card: DeckCard,
                 audio: @escaping @Sendable (URL) async throws -> Data = StoryAudio.m4a) -> Task<Void, Never> {
         let key = "\(date)/\(card.id)"
         for note in ["transcript", "observation", "observationAt"] { setNote(note, "", for: card) }
+        setStatus("told", nil, for: card)
         storyListens[key]?.task.cancel()
         storyListening[key] = .listening
         let token = UUID()
