@@ -19,6 +19,11 @@ final class FeedbackInboxViewModel {
     private(set) var error: String?
     /// The entry whose decision is in flight. One decision at a time.
     private(set) var pendingID: String?
+    /// Each feature's slices, by the feature's id, in the order the job made them. Slices stay
+    /// off the top level; a slice whose feature isn't loaded shows on its own instead.
+    private(set) var slicesByParent: [String: [FeedbackEntry]] = [:]
+    /// The slice being built, for each feature that is building. Set with the entries.
+    private(set) var sliceProgress: [String: FeedbackSliceProgress] = [:]
 
     @ObservationIgnored private let client: any FeedbackDataClient
     @ObservationIgnored private var generation = 0
@@ -39,6 +44,12 @@ final class FeedbackInboxViewModel {
     func entry(id: String) -> FeedbackEntry? {
         guard case .loaded(let groups) = state else { return nil }
         return groups.values.lazy.flatMap { $0 }.first { $0.id == id }
+            ?? slicesByParent.values.lazy.flatMap { $0 }.first { $0.id == id }
+    }
+
+    /// The feature `id`'s slices, oldest first.
+    func slices(of id: String) -> [FeedbackEntry] {
+        slicesByParent[id] ?? []
     }
 
     /// The row's secondary text. An entry merged into another entry's plan names that entry
@@ -69,7 +80,7 @@ final class FeedbackInboxViewModel {
         do {
             let entries = try await client.list()
             guard token == generation, !Task.isCancelled else { return }
-            state = .loaded(Self.grouped(entries))
+            apply(entries)
         } catch {
             guard token == generation, !Self.isCancellation(error) else { return }
             state = Self.isNotFound(error) ? .unavailable : .failed(error.localizedDescription)
@@ -120,9 +131,45 @@ final class FeedbackInboxViewModel {
 
     private func replace(_ id: String, with updated: FeedbackEntry) {
         guard case .loaded(let groups) = state else { return }
-        var entries = groups.values.flatMap { $0 }.filter { $0.id != id }
+        var entries = (groups.values.flatMap { $0 } + slicesByParent.values.flatMap { $0 }).filter { $0.id != id }
         entries.append(updated)
-        state = .loaded(Self.grouped(entries))
+        apply(entries)
+    }
+
+    /// Splits slices from the top level, then groups the rest. Runs once per load or decision.
+    private func apply(_ entries: [FeedbackEntry]) {
+        let split = Self.splitSlices(entries)
+        slicesByParent = split.slices
+        sliceProgress = Self.progress(of: split.topLevel)
+        state = .loaded(Self.grouped(split.topLevel))
+    }
+
+    /// The entries shown on their own, and each loaded feature's slices in creation order
+    /// (`ts`, then the server's order). A slice whose feature isn't in `entries` stays top level.
+    static func splitSlices(_ entries: [FeedbackEntry]) -> (topLevel: [FeedbackEntry], slices: [String: [FeedbackEntry]]) {
+        let ids = Set(entries.map(\.id))
+        var topLevel: [FeedbackEntry] = []
+        var slices: [String: [(offset: Int, entry: FeedbackEntry)]] = [:]
+        for (offset, entry) in entries.enumerated() {
+            if let parent = entry.parent, parent != entry.id, ids.contains(parent) {
+                slices[parent, default: []].append((offset, entry))
+            } else {
+                topLevel.append(entry)
+            }
+        }
+        return (topLevel, slices.mapValues { items in
+            items.sorted { ($0.entry.ts ?? "", $0.offset) < ($1.entry.ts ?? "", $1.offset) }.map(\.entry)
+        })
+    }
+
+    /// The slice each building feature is on, from the server's `slice_done` and `slice_total`.
+    static func progress(of entries: [FeedbackEntry]) -> [String: FeedbackSliceProgress] {
+        var progress: [String: FeedbackSliceProgress] = [:]
+        for entry in entries where entry.isFeature && (entry.status == .approved || entry.status == .building) {
+            guard let total = entry.sliceTotal, total > 0 else { continue }
+            progress[entry.id] = FeedbackSliceProgress(done: min(max(entry.sliceDone ?? 0, 0), total), total: total)
+        }
+        return progress
     }
 
     /// Groups by status, newest first within each group.
@@ -161,6 +208,18 @@ final class FeedbackInboxViewModel {
     private static func isCancellation(_ error: Error) -> Bool {
         error is CancellationError || (error as? URLError)?.code == .cancelled
     }
+}
+
+/// Where a feature's build is: `done` of `total` slices built, the next one being built.
+struct FeedbackSliceProgress: Equatable, Sendable {
+    let done: Int
+    let total: Int
+
+    /// The slice being built, 1-based; the last one once all are built.
+    var current: Int { min(done + 1, total) }
+
+    /// "Slice 2 of 4".
+    var label: String { "Slice \(current) of \(total)" }
 }
 
 extension FeedbackGroup {
@@ -242,6 +301,7 @@ extension FeedbackEntry {
     /// The ready entry's main button. The server merges a vault or webui branch that isn't on its base
     /// yet; an app fix lands as a PR first; a build with no branch found its fix already on the base.
     var mergeAction: (title: String, caption: String) {
+        if isFeature { return ("Merge it", "Merges every slice on the Mac and moves it to Done.") }
         if branch == nil { return ("Mark done", "Already on main. Moves it to Done.") }
         if repo == "hermex" { return ("I merged it", "Merge the PR and pull master on the Mac first.") }
         return ("Merge it", "Merges the branch on the Mac and moves it to Done.")

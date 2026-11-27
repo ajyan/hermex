@@ -307,3 +307,174 @@ struct FeedbackQuestionsCard: View {
         .accessibilityAddTraits(isPicked ? .isSelected : [])
     }
 }
+
+// MARK: - Features
+
+/// A ready feature's Try it list: the spec's `phone` scenarios, for the user to try before
+/// merging. A request card, since it waits on them.
+struct FeedbackTryItCard: View {
+    let scenarios: [FeedbackScenario]
+
+    var body: some View {
+        HXCard(.wash(.request), title: "Try it on your phone") {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(scenarios, id: \.n) { scenario in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(verbatim: "\(scenario.n).")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(HermexPaper.request.glow)
+                            .monospacedDigit()
+                        Text(verbatim: scenario.text)
+                            .font(AppFont.subheadline())
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+}
+
+/// A feature spec's scenarios, numbered, each marked with how it is checked: a test, or on
+/// the user's phone.
+struct FeedbackScenariosCard: View {
+    let scenarios: [FeedbackScenario]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HXSectionHeader(title: "Scenarios")
+            VStack(spacing: 0) {
+                ForEach(Array(scenarios.enumerated()), id: \.element.n) { index, scenario in
+                    if index > 0 { PrepRowDivider().padding(.leading, 14) }
+                    row(scenario)
+                }
+            }
+            .hxCard()
+        }
+    }
+
+    private func row(_ scenario: FeedbackScenario) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(verbatim: "\(scenario.n).")
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(.hxSecondary)
+                .monospacedDigit()
+            Text(verbatim: scenario.text)
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let marker = scenario.check.marker {
+                Label { Text(verbatim: marker.label) } icon: { Image(systemName: marker.symbol) }
+                    .labelStyle(.titleAndIcon)
+                    .font(AppFont.caption())
+                    .foregroundStyle(.hxSecondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension FeedbackScenario.Check {
+    /// The scenario's marker: what checks it.
+    var marker: (label: String, symbol: String)? {
+        switch self {
+        case .test: ("Test", "testtube.2")
+        case .phone: ("Phone", "iphone")
+        case .unknown: nil
+        }
+    }
+}
+
+/// A feature's slices. Once the job has made them, each slice's title, status and check
+/// counts, opening its own detail; before that, the slices the spec plans.
+struct FeedbackSlicesCard: View {
+    let slices: [FeedbackEntry]
+    let planned: [FeedbackPlanSlice]
+    let open: (String) -> Void
+
+    var body: some View {
+        if !slices.isEmpty || !planned.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HXSectionHeader(title: "Slices")
+                VStack(spacing: 0) {
+                    if slices.isEmpty {
+                        ForEach(Array(planned.enumerated()), id: \.element.n) { index, slice in
+                            if index > 0 { divider }
+                            row(number: slice.n, title: slice.title, detail: slice.repo)
+                                .padding(.vertical, 10)
+                        }
+                    } else {
+                        ForEach(Array(slices.enumerated()), id: \.element.id) { index, slice in
+                            if index > 0 { divider }
+                            Button { open(slice.id) } label: { builtRow(index + 1, slice) }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(Text(verbatim: "Opens this slice."))
+                        }
+                    }
+                }
+                .hxCard()
+            }
+        }
+    }
+
+    private var divider: some View {
+        PrepRowDivider().padding(.leading, 14)
+    }
+
+    private func builtRow(_ number: Int, _ slice: FeedbackEntry) -> some View {
+        let detail = [slice.status.label, slice.planRepo ?? slice.repo].compactMap { $0 }.joined(separator: " · ")
+        return HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
+                row(number: number, title: slice.headline, detail: detail)
+                let states = [FeedbackCheck.State.ok, .warn, .fail].filter { slice.checkCount($0) > 0 }
+                if !states.isEmpty {
+                    FlowRow(spacing: 6) {
+                        ForEach(states, id: \.self) { state in
+                            FeedbackCheckChip(state: state, count: slice.checkCount(state))
+                        }
+                    }
+                    .padding(.leading, 14)
+                }
+            }
+            Image(systemName: "chevron.right")
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(.hxSecondary)
+                .padding(.trailing, 14)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private func row(number: Int, title: String, detail: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(verbatim: "\(number).")
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(.hxSecondary)
+                .monospacedDigit()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: title)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail, !detail.isEmpty {
+                    Text(verbatim: detail)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(.hxSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 14)
+        .accessibilityElement(children: .combine)
+    }
+}
