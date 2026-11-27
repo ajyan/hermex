@@ -1557,6 +1557,18 @@ final class DailyDeckViewModel {
         return lines.joined(separator: "\n")
     }
 
+    /// The photo chat's first message as its bubble shows it: "About my photo from June 2021", then his answer.
+    /// Nil for any other message, or one `photoStoryMessage` didn't write. Display-only; the stored and copied
+    /// text keep the whole message, which the skill reads.
+    nonisolated static func photoStoryDisplayText(_ content: String) -> String? {
+        guard content.hasPrefix("Use the photo-interview skill.\n"),
+              let answerStart = content.range(of: "\nMy answer:\n") else { return nil }
+        let answer = content[answerStart.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !answer.isEmpty else { return nil }
+        let when = content.firstMatch(of: /, taken (.+?), from my Looking back card/).map { String($0.1) }
+        return "About my photo\(when.map { " from \($0)" } ?? "")\n\n\(answer)"
+    }
+
     /// The picked photo could not be read as an image; nothing was uploaded.
     func weekPhotoUnreadable() {
         weekPhotoError = "That photo couldn't be read. Pick another."

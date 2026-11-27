@@ -4041,6 +4041,19 @@ extension DailyDeckTests {
         """)
         XCTAssertEqual(viewModel.answer(for: card)?.text, "  We drove to the coast.  ", "the answer stays on the card to file")
         XCTAssertNil(viewModel.startingPhotoChat)
+        XCTAssertEqual(MessageBubbleView.displayText(forUserMessage: sent.message),
+                       "About my photo from June 2021\n\nWe drove to the coast.", "the bubble hides the skill's instructions")
+    }
+
+    func testOnlyThePhotoChatsOwnFirstMessageIsShownShort() {
+        let photo = DeckPhoto(id: "0123456789ab", when: nil, people: [])
+        let message = DailyDeckViewModel.photoStoryMessage(photo: photo, date: "2026-10-04", question: nil,
+                                                           answer: "First line.\n\nSecond paragraph.")
+        XCTAssertEqual(MessageBubbleView.displayText(forUserMessage: message), "About my photo\n\nFirst line.\n\nSecond paragraph.")
+        let typed = "Use the photo-interview skill. on this one please"
+        XCTAssertEqual(MessageBubbleView.displayText(forUserMessage: typed), typed, "a message he typed is shown as typed")
+        let noAnswer = "Use the photo-interview skill.\n\nPhoto 0123456789ab, from my Looking back card on 2026-10-04."
+        XCTAssertEqual(MessageBubbleView.displayText(forUserMessage: noAnswer), noAnswer)
     }
 
     @MainActor
