@@ -661,10 +661,11 @@ struct MessageBubbleView: View {
 }
 
 extension MessageBubbleView {
-    /// A user message as shown: a call's leading `[voice 2:41 PM] ` (or legacy `[voice] `) tag is hidden.
-    /// Display-only; the stored and copied text keep it.
+    /// A user message as shown: a call's leading `[voice 2:41 PM] ` (or legacy `[voice] `) tag is hidden, and a
+    /// photo chat's first message (Tell Atlas more on a Looking back photo) shows as the photo's line and his
+    /// answer instead of the skill's instructions. Display-only; the stored and copied text keep them.
     static func displayText(forUserMessage content: String) -> String {
-        VoiceCallPhrases.withoutVoiceTag(content)
+        DailyDeckViewModel.photoStoryDisplayText(content) ?? VoiceCallPhrases.withoutVoiceTag(content)
     }
 }
 

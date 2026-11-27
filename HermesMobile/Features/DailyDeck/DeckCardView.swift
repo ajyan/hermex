@@ -411,12 +411,16 @@ struct DeckCardView: View {
         let isYearAgo = card.itemKind == "on_this_day"
         let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
             : isYearAgo ? (card.title ?? text.lead) : text.lead
+        // The photo leads both photo cards, so it is the cue and the question or his words follow it.
         if isYearAgo, let photo = card.photo {
             // A photo story taken on this date: the photo, then his words about it. It was answered already, so
             // there is no "Not this one" and no "Tell Atlas more"; the foot opens the story.
             DeckPhotoView(photo: photo, server: viewModel.server, paper: palette.colors,
                           load: { await viewModel.deckPhotoData(id: $0) })
                 .padding(.top, 14)
+        } else if let photo = card.photo, card.thread != nil || card.type == .prompt {
+            // A Looking back photo, with "Not this one" under it, above the question it asks.
+            photoBlock(photo).padding(.top, 14)
         }
         if let title {
             Text(card.markdown(title))
@@ -503,6 +507,8 @@ struct DeckCardView: View {
                     .foregroundStyle(palette.secondaryInk)
             }
         }
+        // The block sits above the question, so hiding the photo moves the question up: it slides, not snaps.
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.hiddenPhotos.contains(photo.id))
         .onChange(of: viewModel.photoError?.message) { _, message in
             if let message, viewModel.photoError?.card == card.id {
                 AccessibilityNotification.Announcement(message).post()
@@ -539,9 +545,6 @@ struct DeckCardView: View {
         if card.thread != nil || card.type == .prompt {
             if let idea = card.fromIdea {
                 fromIdeaChip(idea).padding(.top, 14)
-            }
-            if let photo = card.photo {
-                photoBlock(photo).padding(.top, 14)
             }
             if let thread = card.thread {
                 DeckThreadView(thread: thread, palette: palette).padding(.top, 18)
