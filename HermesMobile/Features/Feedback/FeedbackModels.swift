@@ -158,9 +158,19 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     /// The build's checklist and commits, once there is a build report.
     let checks: [FeedbackCheck]
     let commits: [FeedbackCommit]
+    /// `feature` for a spec the job cuts into slices; otherwise nil or the plan's kind.
+    let kind: String?
+    /// On a feature's slice: the feature's id. A slice lists under its feature, not on its own.
+    let parent: String?
+    /// On a feature: how many slices it has, and how many are built.
+    let sliceTotal: Int?
+    let sliceDone: Int?
 
     /// Whether the nightly job folded this entry into another entry's plan.
     var isMerged: Bool { status == .rejected && mergedInto != nil }
+
+    /// Whether this is a feature, built as slices.
+    var isFeature: Bool { kind == "feature" }
 
     private enum CodingKeys: String, CodingKey {
         case id, ts, feature, screen, item, build, text, status, updated, notes
@@ -171,6 +181,9 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         case recurred, evidence
         case mergeSha = "merge_sha"
         case now, after, files, checks, commits
+        case kind, parent
+        case sliceTotal = "slice_total"
+        case sliceDone = "slice_done"
     }
 
     init(from decoder: Decoder) throws {
@@ -205,6 +218,10 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         files = ((try? c.decodeIfPresent([FeedbackLossy<String>].self, forKey: .files)) ?? []).compactMap(\.value)
         checks = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackCheck>].self, forKey: .checks)) ?? []).compactMap(\.value)
         commits = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackCommit>].self, forKey: .commits)) ?? []).compactMap(\.value)
+        kind = str(.kind)
+        parent = str(.parent).flatMap { $0.isEmpty ? nil : $0 }
+        sliceTotal = try? c.decodeIfPresent(Int.self, forKey: .sliceTotal)
+        sliceDone = try? c.decodeIfPresent(Int.self, forKey: .sliceDone)
     }
 }
 
@@ -335,17 +352,71 @@ struct FeedbackQuestion: Decodable, Hashable, Sendable {
     }
 }
 
+/// One of a feature spec's user stories, and how it is checked: a test a slice adds, or
+/// by the user on their phone.
+struct FeedbackScenario: Decodable, Hashable, Sendable {
+    enum Check: String, Sendable {
+        case test, phone, unknown
+    }
+
+    let n: Int
+    let text: String
+    let check: Check
+
+    private enum CodingKeys: String, CodingKey { case n, text, check }
+
+    init(n: Int, text: String, check: Check) {
+        self.n = n
+        self.text = text
+        self.check = check
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        n = (try? c.decodeIfPresent(Int.self, forKey: .n)) ?? 0
+        check = (try? c.decodeIfPresent(String.self, forKey: .check)).flatMap(Check.init(rawValue:)) ?? .unknown
+    }
+}
+
+/// One slice a feature spec plans, before the job has made it an entry.
+struct FeedbackPlanSlice: Decodable, Hashable, Sendable {
+    let n: Int
+    let title: String
+    let repo: String?
+
+    private enum CodingKeys: String, CodingKey { case n, title, repo }
+
+    init(n: Int, title: String, repo: String? = nil) {
+        self.n = n
+        self.title = title
+        self.repo = repo
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        title = try c.decode(String.self, forKey: .title)
+        n = (try? c.decodeIfPresent(Int.self, forKey: .n)) ?? 0
+        repo = (try? c.decodeIfPresent(String.self, forKey: .repo)).flatMap { $0.isEmpty ? nil : $0 }
+    }
+}
+
 /// `GET /api/feedback/<id>/plan`: the Markdown, plus the parts the server finds in a plan
 /// written in the steering format (Questions, What changes, Details). An older plan has no
-/// `changes`, and the app shows its Markdown whole.
+/// `changes`, and the app shows its Markdown whole. A feature's spec adds Scenarios and Slices.
 struct FeedbackPlan: Decodable, Hashable, Sendable {
     let markdown: String
     let questions: [FeedbackQuestion]
     let changes: String?
     let details: String?
+    let scenarios: [FeedbackScenario]
+    let slices: [FeedbackPlanSlice]
 
     /// Whether the plan has the steering parts; otherwise show `body` whole.
     var isSteerable: Bool { changes != nil }
+
+    /// What a ready feature asks the user to try on their phone: the `phone` scenarios.
+    var tryIt: [FeedbackScenario] { scenarios.filter { $0.check == .phone } }
 
     /// The Markdown without its `---` frontmatter, whose fields the entry already carries.
     /// Rendered raw, the fences turn the frontmatter into one giant heading.
@@ -357,13 +428,16 @@ struct FeedbackPlan: Decodable, Hashable, Sendable {
         return lines[(close + 1)...].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private enum CodingKeys: String, CodingKey { case markdown, questions, changes, details }
+    private enum CodingKeys: String, CodingKey { case markdown, questions, changes, details, scenarios, slices }
 
-    init(markdown: String, questions: [FeedbackQuestion] = [], changes: String? = nil, details: String? = nil) {
+    init(markdown: String, questions: [FeedbackQuestion] = [], changes: String? = nil, details: String? = nil,
+         scenarios: [FeedbackScenario] = [], slices: [FeedbackPlanSlice] = []) {
         self.markdown = markdown
         self.questions = questions
         self.changes = changes
         self.details = details
+        self.scenarios = scenarios
+        self.slices = slices
     }
 
     init(from decoder: Decoder) throws {
@@ -378,6 +452,15 @@ struct FeedbackPlan: Decodable, Hashable, Sendable {
         }
         changes = text(.changes)
         details = text(.details)
+        // A number the server leaves out is the item's place in the list.
+        scenarios = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackScenario>].self, forKey: .scenarios)) ?? [])
+            .compactMap(\.value)
+            .enumerated()
+            .map { index, s in s.n > 0 ? s : FeedbackScenario(n: index + 1, text: s.text, check: s.check) }
+        slices = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackPlanSlice>].self, forKey: .slices)) ?? [])
+            .compactMap(\.value)
+            .enumerated()
+            .map { index, s in s.n > 0 ? s : FeedbackPlanSlice(n: index + 1, title: s.title, repo: s.repo) }
     }
 }
 

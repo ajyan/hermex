@@ -244,6 +244,55 @@ final class FeedbackModelsTests: XCTestCase {
         ])
     }
 
+    func testEntryDecodesFeatureFields() throws {
+        let feature = try decode(FeedbackEntry.self, #"""
+        {"id": "f", "kind": "feature", "parent": null, "slice_total": 4, "slice_done": 1}
+        """#)
+        XCTAssertTrue(feature.isFeature)
+        XCTAssertNil(feature.parent)
+        XCTAssertEqual(feature.sliceTotal, 4)
+        XCTAssertEqual(feature.sliceDone, 1)
+
+        let slice = try decode(FeedbackEntry.self, #"{"id": "s", "parent": "f", "slice_total": "4"}"#)
+        XCTAssertEqual(slice.parent, "f")
+        XCTAssertFalse(slice.isFeature)
+        XCTAssertNil(slice.sliceTotal, "a wrong type is no value")
+
+        let old = try decode(FeedbackEntry.self, #"{"id": "o", "kind": "code", "parent": ""}"#)
+        XCTAssertFalse(old.isFeature)
+        XCTAssertNil(old.parent)
+        XCTAssertNil(old.sliceTotal)
+        XCTAssertNil(old.sliceDone)
+    }
+
+    func testPlanDecodesScenariosAndSlices() throws {
+        let plan = try decode(FeedbackPlan.self, #"""
+        {"markdown": "md", "changes": "x",
+         "scenarios": [
+           {"n": 1, "text": "Rows show slices", "check": "test"},
+           {"n": 2, "text": "Open a slice", "check": "phone"},
+           {"text": "No number", "check": "phone"},
+           {"n": 4, "check": "test"},
+           {"n": 5, "text": "Odd check", "check": "eyeball"}
+         ],
+         "slices": [{"n": 1, "title": "Server", "repo": "hermes-webui"}, {"n": 2, "title": "Screen", "repo": null}, {"n": 3}]}
+        """#)
+        XCTAssertEqual(plan.scenarios, [
+            FeedbackScenario(n: 1, text: "Rows show slices", check: .test),
+            FeedbackScenario(n: 2, text: "Open a slice", check: .phone),
+            FeedbackScenario(n: 3, text: "No number", check: .phone),
+            FeedbackScenario(n: 5, text: "Odd check", check: .unknown),
+        ])
+        XCTAssertEqual(plan.tryIt.map(\.n), [2, 3], "Try it is the phone scenarios only")
+        XCTAssertEqual(plan.slices, [
+            FeedbackPlanSlice(n: 1, title: "Server", repo: "hermes-webui"),
+            FeedbackPlanSlice(n: 2, title: "Screen"),
+        ])
+
+        let fix = try decode(FeedbackPlan.self, #"{"markdown": "md", "changes": "x"}"#)
+        XCTAssertTrue(fix.scenarios.isEmpty && fix.slices.isEmpty && fix.tryIt.isEmpty)
+    }
+
     func testOldFormatPlanIsNotSteerable() throws {
         let plan = try decode(FeedbackPlan.self, ###"{"markdown": "## What changes\nx", "changes": null, "questions": []}"###)
         XCTAssertFalse(plan.isSteerable)

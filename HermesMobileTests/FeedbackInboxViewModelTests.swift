@@ -367,10 +367,68 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.entry(id: "d")?.mergedInto)
     }
 
-    private func entry(_ id: String, status: String, ts: String, title: String? = nil, mergedInto: String? = nil) -> FeedbackEntry {
+    func testSlicesListUnderTheirFeatureInCreationOrder() async throws {
+        let client = InboxStubClient(entries: [
+            entry("s2", status: "planned", ts: "2026-11-27T12:05:00Z", extra: ["parent": "f"]),
+            entry("f", status: "building", ts: "2026-11-27T09:00:00Z",
+                  extra: ["kind": "feature", "slice_total": 3, "slice_done": 1]),
+            entry("s1", status: "ready", ts: "2026-11-27T12:00:00Z", extra: ["parent": "f"]),
+            entry("s3", status: "approved", ts: "2026-11-27T12:05:00Z", extra: ["parent": "f"]),
+            entry("x", status: "new", ts: "2026-11-27T10:00:00Z"),
+            entry("orphan", status: "failed", ts: "2026-11-27T11:00:00Z", extra: ["parent": "gone"]),
+        ])
+        let viewModel = FeedbackInboxViewModel(client: client)
+
+        await viewModel.load()
+
+        let topLevel = viewModel.sections.flatMap(\.entries).map(\.id)
+        XCTAssertEqual(Set(topLevel), ["f", "x", "orphan"], "slices stay off the top level; an orphan doesn't vanish")
+        XCTAssertEqual(viewModel.slices(of: "f").map(\.id), ["s1", "s2", "s3"], "by ts, then the server's order")
+        XCTAssertTrue(viewModel.slices(of: "x").isEmpty)
+        XCTAssertEqual(viewModel.entry(id: "s2")?.status, .planned, "a slice still opens its own detail")
+        XCTAssertEqual(viewModel.sliceProgress["f"], FeedbackSliceProgress(done: 1, total: 3))
+        XCTAssertEqual(viewModel.sliceProgress["f"]?.label, "Slice 2 of 3")
+        XCTAssertNil(viewModel.sliceProgress["x"])
+    }
+
+    func testDecidingASliceKeepsItUnderItsFeature() async throws {
+        let client = InboxStubClient(entries: [
+            entry("f", status: "building", ts: "2026-11-27T09:00:00Z", extra: ["kind": "feature"]),
+            entry("s1", status: "planned", ts: "2026-11-27T12:00:00Z", extra: ["parent": "f"]),
+        ])
+        await client.setDecisionResult(entry("s1", status: "approved", ts: "2026-11-27T12:00:00Z", extra: ["parent": "f"]))
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "s1")), .approve)
+
+        XCTAssertEqual(viewModel.slices(of: "f").map(\.status), [.approved])
+        XCTAssertEqual(viewModel.sections.flatMap(\.entries).map(\.id), ["f"])
+    }
+
+    func testProgressOnlyWhileAFeatureBuilds() {
+        func progress(_ status: String, _ extra: [String: Any]) -> FeedbackSliceProgress? {
+            FeedbackInboxViewModel.progress(of: [entry("f", status: status, ts: "t", extra: extra)])["f"]
+        }
+        let feature: [String: Any] = ["kind": "feature", "slice_total": 4, "slice_done": 4]
+        XCTAssertEqual(progress("building", feature)?.label, "Slice 4 of 4", "never past the last slice")
+        XCTAssertNil(progress("ready", feature))
+        XCTAssertNil(progress("building", ["kind": "feature"]), "no total, no progress")
+        XCTAssertNil(progress("building", ["slice_total": 4, "slice_done": 1]), "only a feature")
+        XCTAssertEqual(progress("approved", ["kind": "feature", "slice_total": 2])?.label, "Slice 1 of 2")
+    }
+
+    func testAFeatureMergesEverySlice() throws {
+        let feature = entry("f", status: "ready", ts: "t", extra: ["kind": "feature"])
+        XCTAssertEqual(feature.mergeAction.title, "Merge it")
+    }
+
+    private func entry(_ id: String, status: String, ts: String, title: String? = nil, mergedInto: String? = nil,
+                       extra: [String: Any] = [:]) -> FeedbackEntry {
         var object: [String: Any] = ["id": id, "status": status, "ts": ts, "feature": "Prep", "text": "Note \(id)"]
         if let title { object["title"] = title }
         if let mergedInto { object["merged_into"] = mergedInto }
+        object.merge(extra) { _, new in new }
         let data = try! JSONSerialization.data(withJSONObject: object)
         return try! FeedbackDecoding.decode(FeedbackEntry.self, from: data)
     }

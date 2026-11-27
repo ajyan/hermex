@@ -143,10 +143,14 @@ struct FeedbackInboxView: View {
                             .foregroundStyle(Color.hxTextPrimary)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(verbatim: status(entry))
-                            .font(AppFont.footnote())
-                            .foregroundStyle(Color.hxTextSecondary)
-                            .lineLimit(1)
+                        if let progress = viewModel.sliceProgress[entry.id] {
+                            FeedbackSliceProgressView(progress: progress, status: status(entry))
+                        } else {
+                            Text(verbatim: status(entry))
+                                .font(AppFont.footnote())
+                                .foregroundStyle(.hxSecondary)
+                                .lineLimit(1)
+                        }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 11)
@@ -317,6 +321,34 @@ private struct FeedbackRequestCard: View {
             .disabled(isBusy)
             .accessibilityHint(Text(verbatim: quick.hint))
         }
+    }
+}
+
+/// A building feature's slices as pips in the feedback glow (built filled, the one building
+/// ringed, the rest dashed), then the row's status word. VoiceOver reads "Slice 2 of 4".
+struct FeedbackSliceProgressView: View {
+    let progress: FeedbackSliceProgress
+    let status: String
+
+    var body: some View {
+        let ink = HermexPaper.feedback.glow
+        // A long feature packs its pips tighter rather than turning into a count.
+        let packed = progress.total > 8
+        HStack(spacing: 6) {
+            HStack(spacing: 0) {
+                ForEach(0..<progress.total, id: \.self) { index in
+                    DeckDot(state: index < progress.done ? "done" : index == progress.done ? "today" : "ahead",
+                            ink: ink, column: packed ? 9 : 14, size: packed ? 7 : 10)
+                }
+            }
+            Text(verbatim: status)
+                .font(AppFont.footnote())
+                .foregroundStyle(.hxSecondary)
+                .lineLimit(1)
+        }
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(progress.label), \(status)"))
     }
 }
 

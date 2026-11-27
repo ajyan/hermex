@@ -16,6 +16,8 @@ struct FeedbackDetailView: View {
     @State private var isConfirmingUndo = false
     @State private var sheet: Sheet?
     @State private var showsWholeQuote = false
+    /// The slice a feature's Slices row opened.
+    @State private var openedSlice: String?
 
     private enum Sheet: String, Identifiable {
         case plan, report
@@ -47,6 +49,9 @@ struct FeedbackDetailView: View {
                         Text(verbatim: "Reverts this change on the vault's main branch.")
                     }
                     .sheet(item: $sheet) { sheet in sheetContent(sheet, entry) }
+                    .navigationDestination(item: $openedSlice) { id in
+                        FeedbackDetailView(entryID: id, viewModel: viewModel)
+                    }
                     .hxNavigationTitle(entry.status.screenTitle)
                     .feedbackReplyPrompt(for: $replyTarget, viewModel: viewModel,
                                          prefix: steerable.flatMap { answers.note(for: $0.questions) })
@@ -137,10 +142,24 @@ struct FeedbackDetailView: View {
                     }
                 }
 
+                // Ahead of the checks, so it is read before Merge it.
+                if entry.status == .ready, let tryIt = loadedPlan?.tryIt, !tryIt.isEmpty {
+                    FeedbackTryItCard(scenarios: tryIt)
+                }
+
                 if entry.status == .ready || entry.status == .merged {
                     FeedbackChecksCard(entry: entry)
                 } else if entry.status != .failed {
                     touches(entry)
+                }
+
+                if let scenarios = loadedPlan?.scenarios, !scenarios.isEmpty {
+                    FeedbackScenariosCard(scenarios: scenarios)
+                }
+
+                if entry.isFeature {
+                    FeedbackSlicesCard(slices: viewModel.slices(of: entry.id),
+                                       planned: loadedPlan?.slices ?? []) { openedSlice = $0 }
                 }
 
                 let merged = viewModel.mergedNotes(into: entry.id)
